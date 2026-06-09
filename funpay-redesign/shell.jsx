@@ -53,9 +53,9 @@
 
   function chatMenu() {
     const chats = [
-      ['sergey543522f', 'Оплатил, жду выдачу', 'S', true],
-      ['molekylaswag', 'Здравствуйте! Я отвечу вам…', 'M', false],
-      ['Zombak', 'спасибо, всё пришло', 'Z', false],
+      ['Покупатель #184', 'Сообщение скрыто на главном экране', '#', true],
+      ['Покупатель #207', 'Сообщение скрыто на главном экране', '#', false],
+      ['Покупатель #319', 'Сообщение скрыто на главном экране', '#', false],
     ];
     return React.createElement('div', { className: 'fp-menu' },
       React.createElement('div', { className: 'fp-menu-head eyebrow' }, 'Сообщения'),
