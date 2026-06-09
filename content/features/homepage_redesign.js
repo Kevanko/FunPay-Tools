@@ -193,6 +193,67 @@ function setupSearchFilter() {
     searchInput.addEventListener('input', debounce(filterGames, 200));
 }
 
+function anonymizeHomepageChat(chatElement) {
+    if (!chatElement) return;
+    chatElement.classList.add('fpt-anonymous-home-chat');
+
+    let aliasIndex = 1;
+    const nextAlias = () => `Покупатель #${String(aliasIndex++).padStart(2, '0')}`;
+    const nameSelectors = [
+        '.user-link-name',
+        '.media-user-name',
+        '.media-heading a',
+        '.media-heading',
+        '.chat-user-name',
+        '.chat-name',
+        '.contact-name',
+        'a[href*="/users/"]',
+        'a[href*="/user/"]'
+    ];
+
+    chatElement.querySelectorAll(nameSelectors.join(',')).forEach(node => {
+        const text = node.textContent.trim();
+        if (!text || text.length > 64) return;
+        if (node.dataset.fptAnonName) return;
+        node.dataset.fptAnonName = '1';
+        node.textContent = nextAlias();
+        node.removeAttribute('title');
+    });
+
+    const previewSelectors = [
+        '.chat-last-message',
+        '.message-preview',
+        '.media-message',
+        '.media-body small',
+        '.media-body .text-muted'
+    ];
+    chatElement.querySelectorAll(previewSelectors.join(',')).forEach(node => {
+        const text = node.textContent.trim();
+        if (!text || node.dataset.fptAnonPreview) return;
+        node.dataset.fptAnonPreview = '1';
+        node.textContent = 'Сообщение скрыто на главном экране';
+        node.removeAttribute('title');
+    });
+
+    chatElement.querySelectorAll('img, .avatar, .user-avatar, .media-object').forEach(node => {
+        node.classList.add('fpt-anonymous-avatar');
+        if (node.tagName === 'IMG') {
+            node.alt = 'Анонимный пользователь';
+            node.removeAttribute('title');
+        }
+    });
+
+    if (!chatElement.dataset.fptAnonObserver) {
+        chatElement.dataset.fptAnonObserver = '1';
+        let timer = null;
+        const observer = new MutationObserver(() => {
+            clearTimeout(timer);
+            timer = setTimeout(() => anonymizeHomepageChat(chatElement), 100);
+        });
+        observer.observe(chatElement, { childList: true, subtree: true });
+    }
+}
+
 function initializeRedesign() {
     // Удаляем стандартный фильтр игр FunPay, так как у нас есть свой.
     const promoFilterForm = document.querySelector('.promo-games-filter');
@@ -219,6 +280,7 @@ function initializeRedesign() {
     originalContentContainer.innerHTML = '';
     originalContentContainer.appendChild(newUI);
     if (chatElement) {
+        anonymizeHomepageChat(chatElement);
         const searchContainer = newUI.querySelector('.redesign-search-container');
         if (searchContainer) {
             newUI.insertBefore(chatElement, searchContainer);

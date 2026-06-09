@@ -75,11 +75,28 @@ function createMainPopup() {
     toolsPopup.className = 'fp-tools-popup';
     toolsPopup.innerHTML = `
         <div class="fp-tools-header">
-            <h2><a href="https://funpay.tools" target="_blank" class="fp-tools-site-link">FP Tools</a></h2>
+            <h2>
+                <a href="https://funpay.tools" target="_blank" class="fp-tools-site-link">
+                    <span class="fpt-brand-mark">FP</span>
+                    <span class="fpt-brand-copy">
+                        <span class="fpt-brand-title">FP Tools</span>
+                        <span class="fpt-brand-subtitle">Командный центр</span>
+                    </span>
+                </a>
+            </h2>
+            <div class="fpt-titlebar-actions" aria-hidden="true">
+                <span class="fpt-window-dot"></span>
+                <span class="fpt-window-dot"></span>
+            </div>
             <button class="close-btn" aria-label="Закрыть"></button>
         </div>
         <div class="fp-tools-body">
             <nav class="fp-tools-nav">
+                <label class="fpt-menu-search" for="fpToolsMenuSearch">
+                    <span class="material-symbols-rounded">search</span>
+                    <input type="search" id="fpToolsMenuSearch" placeholder="Найти функцию">
+                </label>
+                <div class="fpt-nav-empty" hidden>Ничего не найдено</div>
                 <ul>
                     <li class="fp-nav-divider">Основное</li>
                     <li data-page="general" class="active"><a><span class="nav-icon material-symbols-rounded">settings</span><span>Общие</span></a></li>
@@ -116,6 +133,30 @@ function createMainPopup() {
             </nav>
             <main class="fp-tools-content">
                 <div class="fp-tools-page-content active" data-page="general">
+                    <section class="fpt-command-center" aria-label="Сводка FP Tools">
+                        <div class="fpt-command-copy">
+                            <span class="fpt-eyebrow">FP Tools · локальная панель</span>
+                            <h3>Командный центр</h3>
+                            <p>Быстрый доступ к автоматизации, чату, лотам, финансам и внешнему виду. Интерфейс собран спокойнее: меньше шума, больше контроля, все старые функции остаются на своих вкладках.</p>
+                        </div>
+                        <div class="fpt-command-metrics">
+                            <button type="button" class="fpt-metric-card" data-nav-to="autobump">
+                                <span class="material-symbols-rounded">rocket_launch</span>
+                                <strong>Авто-поднятие</strong>
+                                <small>таймеры и категории</small>
+                            </button>
+                            <button type="button" class="fpt-metric-card" data-nav-to="templates">
+                                <span class="material-symbols-rounded">quickreply</span>
+                                <strong>Шаблоны</strong>
+                                <small>ответы и позиции</small>
+                            </button>
+                            <button type="button" class="fpt-metric-card" data-nav-to="lot_io">
+                                <span class="material-symbols-rounded">inventory_2</span>
+                                <strong>Лоты</strong>
+                                <small>импорт и экспорт</small>
+                            </button>
+                        </div>
+                    </section>
                     <h3>Общие настройки</h3>
                     <div class="checkbox-label-inline">
                         <input type="checkbox" id="showSalesStatsCheckbox">
@@ -1269,15 +1310,16 @@ function setupPopupNavigation() {
         });
     });
 
-    const promoLink = document.querySelector('a[data-nav-to="support"]');
-    if (promoLink) {
-        promoLink.addEventListener('click', (e) => {
+    toolsPopup.querySelectorAll('[data-nav-to]').forEach(navLink => {
+        navLink.addEventListener('click', (e) => {
             e.preventDefault();
-            const supportTabLi = document.querySelector('.fp-tools-nav li[data-page="support"]');
-            if (supportTabLi) supportTabLi.click();
+            const targetPage = navLink.dataset.navTo;
+            const targetLi = document.querySelector(`.fp-tools-nav li[data-page="${targetPage}"]`);
+            if (targetLi) targetLi.click();
         });
-    }
+    });
 
+    setupMenuSearch(toolsPopup);
     compactNav(toolsPopup);
     attachAutoReplyImageButtons(toolsPopup);
 
@@ -1288,6 +1330,52 @@ function setupPopupNavigation() {
             if (typeof fptGcApplyVisibility === 'function') fptGcApplyVisibility();
         });
     }
+}
+
+function setupMenuSearch(toolsPopup) {
+    const searchInput = toolsPopup.querySelector('#fpToolsMenuSearch');
+    const emptyState = toolsPopup.querySelector('.fpt-nav-empty');
+    const nav = toolsPopup.querySelector('.fp-tools-nav');
+    if (!searchInput || !nav) return;
+
+    const applyFilter = () => {
+        const query = searchInput.value.trim().toLowerCase();
+        const items = Array.from(nav.querySelectorAll('li[data-page]'));
+        let visibleCount = 0;
+
+        items.forEach(item => {
+            const text = item.textContent.trim().toLowerCase();
+            const isVisible = !query || text.includes(query) || item.dataset.page.toLowerCase().includes(query);
+            item.hidden = !isVisible;
+            if (isVisible) visibleCount += 1;
+        });
+
+        const dividers = Array.from(nav.querySelectorAll('.fp-nav-divider'));
+        dividers.forEach((divider, index) => {
+            const nextDivider = dividers[index + 1];
+            let cursor = divider.nextElementSibling;
+            let hasVisibleItem = false;
+            while (cursor && cursor !== nextDivider) {
+                if (cursor.dataset.page && !cursor.hidden) {
+                    hasVisibleItem = true;
+                    break;
+                }
+                cursor = cursor.nextElementSibling;
+            }
+            divider.hidden = query ? !hasVisibleItem : false;
+        });
+
+        if (emptyState) emptyState.hidden = visibleCount !== 0;
+    };
+
+    searchInput.addEventListener('input', applyFilter);
+    searchInput.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+            searchInput.value = '';
+            applyFilter();
+            searchInput.blur();
+        }
+    });
 }
 
 // 3.0: add an image-insert button to every autoreply textarea (greeting, keyword responses,
