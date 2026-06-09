@@ -6294,8 +6294,17 @@ a.contact-item:hover {
    ═══════════════════════════════════════════════════════════════ */
 
 /* ── Header button: flat accent style ──────────────────────────── */
+.fp-tools-header-item {
+    display: flex;
+    align-items: stretch;
+}
+
 #fpToolsButton {
-    color: var(--fpt-btn-color, #C026D3);
+    display: flex;
+    align-items: center;
+    height: 60px;
+    padding: 0 12px;
+    color: var(--fpt-btn-color, #5b86d8);
     background: none !important;
     -webkit-background-clip: unset !important;
     background-clip: unset !important;
@@ -6303,10 +6312,13 @@ a.contact-item:hover {
     transition: color 0.2s ease, opacity 0.2s ease !important;
     animation: none !important;
     transform: none !important;
+    font-size: 13px;
+    font-weight: 650;
+    letter-spacing: 0.01em;
 }
 
 #fpToolsButton::before {
-    background: var(--fpt-btn-color, #C026D3);
+    background: var(--fpt-btn-color, #5b86d8);
     height: 2px;
     border-radius: 2px;
     box-shadow: none !important;

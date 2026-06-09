@@ -138,14 +138,28 @@
     }
 
     function addFpToolsButton() {
-        const anchor = document.querySelector('.nav.navbar-nav.navbar-right.logged .user-link[data-toggle="dropdown"]')?.parentElement;
-        if (!anchor || document.getElementById('fpToolsButton')) {
+        const existingButton = document.getElementById('fpToolsButton');
+        if (existingButton?.dataset?.fptLocation === 'header') {
+            return true;
+        }
+
+        const rightNav = document.querySelector('ul.nav.navbar-nav.navbar-right.logged');
+        if (!rightNav) {
             return false;
         }
 
-        const toolsMenu = createElement('li');
-        toolsMenu.innerHTML = `<a style="font-weight: bold; cursor: pointer; user-select: none;" id="fpToolsButton">FP Tools<span></span></a>`;
-        anchor.insertAdjacentElement('afterend', toolsMenu);
+        if (existingButton?.dataset?.fptLocation === 'floating') {
+            existingButton.closest('button')?.remove();
+        }
+
+        const userMenuItem = rightNav.querySelector('li.dropdown.hidden-sm.hidden-xs');
+        const toolsMenu = createElement('li', { class: 'dropdown fp-tools-header-item' });
+        toolsMenu.innerHTML = `<a href="javascript:void(0)" style="font-weight: 650; cursor: pointer; user-select: none;" id="fpToolsButton" data-fpt-location="header">FP Tools<span></span></a>`;
+        if (userMenuItem) {
+            rightNav.insertBefore(toolsMenu, userMenuItem);
+        } else {
+            rightNav.appendChild(toolsMenu);
+        }
 
         const button = toolsMenu.querySelector('#fpToolsButton');
 
@@ -213,6 +227,7 @@
             fontWeight: '700',
             cursor: 'pointer'
         }, 'FP Tools');
+        button.dataset.fptLocation = 'floating';
         document.body.appendChild(button);
         wireFpToolsButton(button);
         console.log('FP Tools: floating fallback button added.');
