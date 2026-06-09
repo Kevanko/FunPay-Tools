@@ -197,6 +197,7 @@ function anonymizeHomepageChat(chatElement) {
     if (!chatElement) return;
     chatElement.classList.add('fpt-anonymous-home-chat');
 
+    const hiddenPreviewText = 'Сообщение скрыто на главном экране';
     let aliasIndex = 1;
     const nextAlias = () => `Покупатель #${String(aliasIndex++).padStart(2, '0')}`;
     const nameSelectors = [
@@ -223,6 +224,8 @@ function anonymizeHomepageChat(chatElement) {
     const previewSelectors = [
         '.chat-last-message',
         '.message-preview',
+        '.chat-msg-text',
+        '.chat-msg-body',
         '.media-message',
         '.media-body small',
         '.media-body .text-muted'
@@ -231,7 +234,7 @@ function anonymizeHomepageChat(chatElement) {
         const text = node.textContent.trim();
         if (!text || node.dataset.fptAnonPreview) return;
         node.dataset.fptAnonPreview = '1';
-        node.textContent = 'Сообщение скрыто на главном экране';
+        node.textContent = hiddenPreviewText;
         node.removeAttribute('title');
     });
 
