@@ -1,0 +1,144 @@
+/* ============================================================
+   FunPay Tools — Design tokens
+   Premium graphite monochrome + one restrained steel-blue accent.
+   Themes switch the --bg / surface ramp; accent stays constant.
+   ============================================================ */
+
+:root {
+  /* ---- Type ---- */
+  --font-ui: "Geist", "Inter", system-ui, sans-serif;
+  --font-mono: "Geist Mono", "SF Mono", ui-monospace, monospace;
+  --font-display: "Geist", system-ui, sans-serif;
+
+  /* ---- Accent (constant across themes) — restrained steel blue ---- */
+  --accent: oklch(0.66 0.115 252);
+  --accent-strong: oklch(0.60 0.13 252);
+  --accent-soft: oklch(0.66 0.115 252 / 0.14);
+  --accent-line: oklch(0.66 0.115 252 / 0.32);
+  --accent-fg: #0b0d10;
+
+  /* ---- Radii ---- */
+  --r-xs: 6px;
+  --r-sm: 9px;
+  --r-md: 13px;
+  --r-lg: 18px;
+  --r-xl: 24px;
+
+  /* ---- Motion ---- */
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --dur: 0.28s;
+
+  /* ---- Elevation (tuned per theme below via --shadow-color) ---- */
+  --shadow-color: 0deg 0% 0%;
+  --shadow-sm: 0 1px 2px hsl(var(--shadow-color) / 0.30);
+  --shadow-md: 0 8px 24px -8px hsl(var(--shadow-color) / 0.45);
+  --shadow-lg: 0 28px 60px -18px hsl(var(--shadow-color) / 0.62);
+}
+
+/* ===================== THEME: GRAPHITE (default) ===================== */
+[data-theme="graphite"] {
+  --bg: oklch(0.18 0.008 255);
+  --bg-deep: oklch(0.15 0.008 255);
+  --surface-1: oklch(0.215 0.009 255);
+  --surface-2: oklch(0.245 0.010 255);
+  --surface-3: oklch(0.285 0.011 255);
+  --line: oklch(1 0 0 / 0.08);
+  --line-strong: oklch(1 0 0 / 0.14);
+  --text: oklch(0.96 0.004 255);
+  --text-dim: oklch(0.74 0.006 255);
+  --text-faint: oklch(0.56 0.008 255);
+  --shadow-color: 255deg 12% 3%;
+  color-scheme: dark;
+}
+
+/* ===================== THEME: OBSIDIAN (near-black) ===================== */
+[data-theme="obsidian"] {
+  --bg: oklch(0.115 0.003 260);
+  --bg-deep: oklch(0.075 0.003 260);
+  --surface-1: oklch(0.145 0.004 260);
+  --surface-2: oklch(0.182 0.005 260);
+  --surface-3: oklch(0.225 0.006 260);
+  --line: oklch(1 0 0 / 0.07);
+  --line-strong: oklch(1 0 0 / 0.13);
+  --text: oklch(0.97 0.003 260);
+  --text-dim: oklch(0.72 0.005 260);
+  --text-faint: oklch(0.52 0.006 260);
+  --shadow-color: 260deg 20% 1%;
+  color-scheme: dark;
+}
+
+/* ===================== THEME: SLATE (blue-gray) ===================== */
+[data-theme="slate"] {
+  --bg: oklch(0.235 0.038 250);
+  --bg-deep: oklch(0.198 0.040 250);
+  --surface-1: oklch(0.275 0.040 250);
+  --surface-2: oklch(0.315 0.042 250);
+  --surface-3: oklch(0.355 0.044 250);
+  --line: oklch(1 0 0 / 0.09);
+  --line-strong: oklch(1 0 0 / 0.15);
+  --text: oklch(0.965 0.006 252);
+  --text-dim: oklch(0.76 0.012 252);
+  --text-faint: oklch(0.58 0.016 252);
+  --shadow-color: 252deg 30% 4%;
+  color-scheme: dark;
+}
+
+/* ===================== THEME: LIGHT (paper) ===================== */
+[data-theme="light"] {
+  --bg: oklch(0.965 0.003 255);
+  --bg-deep: oklch(0.93 0.004 255);
+  --surface-1: oklch(0.995 0.001 255);
+  --surface-2: oklch(0.975 0.003 255);
+  --surface-3: oklch(0.945 0.004 255);
+  --line: oklch(0.2 0.01 255 / 0.10);
+  --line-strong: oklch(0.2 0.01 255 / 0.18);
+  --text: oklch(0.26 0.012 255);
+  --text-dim: oklch(0.46 0.012 255);
+  --text-faint: oklch(0.62 0.012 255);
+  --accent-fg: #ffffff;
+  --shadow-color: 255deg 24% 56%;
+  --shadow-md: 0 8px 24px -10px hsl(var(--shadow-color) / 0.28);
+  --shadow-lg: 0 28px 60px -22px hsl(var(--shadow-color) / 0.34);
+  color-scheme: light;
+}
+
+/* ===================== Base ===================== */
+* { box-sizing: border-box; }
+
+.fpx-root {
+  font-family: var(--font-ui);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "ss01", "cv01";
+  letter-spacing: -0.011em;
+}
+
+/* numbers, prices, ids -> mono + tabular */
+.mono, .tnum {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+  letter-spacing: -0.01em;
+}
+
+/* thin Lucide icons inherit currentColor + 1.6 stroke */
+.fpx-root svg.lucide {
+  stroke-width: 1.6;
+  width: 1em; height: 1em;
+  vertical-align: -0.13em;
+}
+
+.fpx-focusable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::selection { background: var(--accent-soft); color: var(--text); }
+
+.fpx-scroll { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.fpx-scroll::-webkit-scrollbar { width: 9px; height: 9px; }
+.fpx-scroll::-webkit-scrollbar-thumb {
+  background: var(--line-strong); border-radius: 99px;
+  border: 2px solid transparent; background-clip: padding-box;
+}
+.fpx-scroll::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }

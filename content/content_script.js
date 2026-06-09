@@ -98,6 +98,45 @@
         document.head.appendChild(link);
     }
 
+    function wireFpToolsButton(button) {
+        button?.addEventListener('click', async () => {
+            // Build the popup on first click (perf: avoids a permanent heavy DOM subtree).
+            if (typeof window.__fpEnsurePopup === 'function') {
+                await window.__fpEnsurePopup();
+            }
+            const popup = document.querySelector('.fp-tools-popup');
+            if (popup) {
+                await loadLastActivePage();
+                popup.classList.add('active');
+                if (typeof applyFptMenuTransparency === 'function') applyFptMenuTransparency();
+                if (typeof syncFptMenuControls === 'function') syncFptMenuControls();
+            }
+        });
+
+        let hoverTimeout;
+        button?.addEventListener('mouseenter', () => {
+            hoverTimeout = setTimeout(() => {
+                if (typeof showHeaderButtonTooltip === 'function') {
+                    showHeaderButtonTooltip(button);
+                }
+            }, 2000);
+        });
+
+        button?.addEventListener('mouseleave', () => {
+            clearTimeout(hoverTimeout);
+            if (typeof hideHeaderButtonTooltip === 'function') {
+                hideHeaderButtonTooltip();
+            }
+        });
+
+        button?.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            if (typeof showButtonStyler === 'function') {
+                showButtonStyler(e.clientX, e.clientY);
+            }
+        });
+    }
+
     function addFpToolsButton() {
         const anchor = document.querySelector('.nav.navbar-nav.navbar-right.logged .user-link[data-toggle="dropdown"]')?.parentElement;
         if (!anchor || document.getElementById('fpToolsButton')) {
@@ -148,6 +187,35 @@
         });
 
         console.log("FP Tools: Кнопка в хедере успешно добавлена.");
+        return true;
+    }
+
+    function addFloatingFpToolsButton() {
+        if (document.getElementById('fpToolsButton')) {
+            return true;
+        }
+
+        const button = createElement('button', {
+            id: 'fpToolsButton',
+            type: 'button',
+            title: 'Open FP Tools'
+        }, {
+            position: 'fixed',
+            top: '76px',
+            right: '18px',
+            zIndex: '2147483647',
+            padding: '10px 14px',
+            border: '1px solid rgba(192, 38, 211, 0.45)',
+            borderRadius: '8px',
+            background: 'rgba(16, 16, 24, 0.92)',
+            color: '#e9a8ff',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.28)',
+            fontWeight: '700',
+            cursor: 'pointer'
+        }, 'FP Tools');
+        document.body.appendChild(button);
+        wireFpToolsButton(button);
+        console.log('FP Tools: floating fallback button added.');
         return true;
     }
 
@@ -328,6 +396,7 @@
         });
 
         if (!addFpToolsButton()) {
+            addFloatingFpToolsButton();
             buttonObserver.observe(document.body, {
                 childList: true,
                 subtree: true
