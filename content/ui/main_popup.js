@@ -54,15 +54,15 @@ function createMainPopup() {
         s.id = 'fp-popup-extra-styles';
         s.textContent = `
             .fp-tools-site-link{color:inherit;text-decoration:none;display:inline-block;transition:all .25s ease;position:relative;}
-            .fp-tools-site-link::after{content:'';position:absolute;left:0;bottom:-2px;width:0;height:2px;background:linear-gradient(90deg,#C026D3,#a78bfa);transition:width .3s ease;border-radius:2px;}
-            .fp-tools-site-link:hover{background:linear-gradient(90deg,#C026D3,#a78bfa,#C026D3);background-size:200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:fp-shimmer 1.2s linear infinite;}
+            .fp-tools-site-link::after{content:'';position:absolute;left:0;bottom:-2px;width:0;height:2px;background:linear-gradient(90deg,#5b86d8,#8ea7df);transition:width .3s ease;border-radius:2px;}
+            .fp-tools-site-link:hover{background:linear-gradient(90deg,#5b86d8,#8ea7df,#5b86d8);background-size:200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:fp-shimmer 1.2s linear infinite;}
             .fp-tools-site-link:hover::after{width:100%;}
             @keyframes fp-shimmer{0%{background-position:0%}100%{background-position:200%}}
             .fp-wallpaper-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px;}
-            .fp-wallpaper-card:hover{box-shadow:0 0 0 2px #C026D3,0 4px 16px rgba(192,38,211,.3);}
+            .fp-wallpaper-card:hover{box-shadow:0 0 0 2px #5b86d8,0 4px 16px rgba(91,134,216,.3);}
             .fp-wallpaper-card img{pointer-events:none;}
-            .fp-site-footer-link{display:inline-flex;align-items:center;gap:6px;padding:6px 16px;border:1px solid rgba(192,38,211,.35);border-radius:20px;color:#7672ff;text-decoration:none;font-size:12px;font-weight:600;letter-spacing:.5px;transition:all .2s;}
-            .fp-site-footer-link:hover{background:rgba(192,38,211,.12);border-color:#C026D3;color:#a09af8;transform:translateY(-1px);box-shadow:0 4px 12px rgba(192,38,211,.2);}
+            .fp-site-footer-link{display:inline-flex;align-items:center;gap:6px;padding:6px 16px;border:1px solid rgba(91,134,216,.35);border-radius:20px;color:#7fa1df;text-decoration:none;font-size:12px;font-weight:600;letter-spacing:.5px;transition:all .2s;}
+            .fp-site-footer-link:hover{background:rgba(91,134,216,.12);border-color:#5b86d8;color:#a9bde6;transform:translateY(-1px);box-shadow:0 4px 12px rgba(91,134,216,.2);}
             .fp-nav-divider{padding:10px 16px 3px!important;font-size:10px!important;font-weight:700!important;color:#3a3d52!important;text-transform:uppercase;letter-spacing:1px;cursor:default!important;pointer-events:none;margin-top:10px!important;}
             .fp-nav-divider:first-child{margin-top:0!important;}
             .fp-nav-divider:hover{background:none!important;}
@@ -196,8 +196,8 @@ function createMainPopup() {
                         <div id="fptCustomSoundEditor" style="display:none;margin-top:8px;">
                             <div id="fptWaveWrap" style="position:relative;height:64px;background:#070810;border:1px solid #22253a;border-radius:8px;overflow:hidden;user-select:none;cursor:pointer;">
                                 <canvas id="fptWaveCanvas" style="position:absolute;inset:0;width:100%;height:100%;"></canvas>
-                                <div id="fptWaveSel" style="position:absolute;top:0;bottom:0;background:rgba(192,38,211,0.22);border-left:2px solid #C026D3;border-right:2px solid #C026D3;box-sizing:border-box;"></div>
-                                <div id="fptWavePlayhead" style="position:absolute;top:0;bottom:0;width:2px;background:#ffd24a;display:none;"></div>
+                                <div id="fptWaveSel" style="position:absolute;top:0;bottom:0;background:rgba(91,134,216,0.18);border-left:2px solid #5b86d8;border-right:2px solid #5b86d8;box-sizing:border-box;"></div>
+                                <div id="fptWavePlayhead" style="position:absolute;top:0;bottom:0;width:2px;background:#d2a85e;display:none;"></div>
                                 <div id="fptWaveSelHandleL" style="position:absolute;top:0;bottom:0;width:8px;margin-left:-4px;cursor:ew-resize;"></div>
                                 <div id="fptWaveSelHandleR" style="position:absolute;top:0;bottom:0;width:8px;margin-left:-4px;cursor:ew-resize;"></div>
                             </div>
@@ -265,8 +265,8 @@ function createMainPopup() {
                     </div>
                     <p class="template-info">При включении к исходящим сообщениям добавляется невидимый символ. Если собеседник тоже использует FPT - рядом с его ником появится пометка. Символ не виден обычным пользователям. Не добавляется в ссылки и скопированный текст.</p>
 
-                    <div class="support-promo" style="background: rgba(255, 152, 0, 0.1); border-color: rgba(255, 152, 0, 0.3); margin-top: 15px;">
-                        <span class="nav-icon material-symbols-rounded" style="color: #ff9800;">warning</span>
+                    <div class="support-promo fpt-callout-warn" style="margin-top: 15px;">
+                        <span class="nav-icon material-symbols-rounded fpt-callout-icon">warning</span>
                         <span>Для корректной работы расширения рекомендуется использовать FunPay на <strong>русском языке</strong>, так как большинство функций не будут работать на других языках.</span>
                     </div>
                 </div> <!-- КОНЕЦ ВКЛАДКИ "ОБЩИЕ" -->
@@ -274,15 +274,15 @@ function createMainPopup() {
                 <!-- НАЧАЛО ВКЛАДКИ "ЭПИЧЕСКИЕ НИКИ" -->
                 <div class="fp-tools-page-content" data-page="epic_nicks">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <h3>Эпический никнейм <span class="material-symbols-rounded" style="vertical-align:-3px;color:#e9a8ff;">diamond</span></h3>
+                        <h3>Эпический никнейм <span class="material-symbols-rounded" style="vertical-align:-3px;color:var(--fpt-accent);">diamond</span></h3>
                     </div>
                     <p class="template-info" style="font-size: 14px; line-height: 1.5;">
                         Выделитесь среди конкурентов! Ваш никнейм будет светиться, переливаться и излучать частицы <b>у всех пользователей расширения FP Tools</b> (более 15 000 человек).
                     </p>
 
-                    <div style="background: rgba(192, 38, 211, 0.1); border: 1px solid rgba(192, 38, 211, 0.3); border-radius: 12px; padding: 18px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
-                        <div style="font-size: 15px; margin-bottom: 12px; color: #fff;">Приобрести уникальный стиль можно навсегда по очень низкой цене.</div>
-                        <div style="font-size: 13px; color: #a0a0a0; margin-bottom: 15px;">Больше 6 способов оплаты на выбор. Нажав на кнопку ниже, вы перейдёте в Telegram-бота, где сможете нажать на "Украсить ник на сайте FunPay"</div>
+                    <div class="support-promo fpt-callout-premium" style="margin-bottom: 25px; padding: 18px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+                        <div style="font-size: 15px; margin-bottom: 12px; color: var(--fpt-text);">Приобрести уникальный стиль можно навсегда по очень низкой цене.</div>
+                        <div style="font-size: 13px; color: var(--fpt-text-dim); margin-bottom: 15px;">Больше 6 способов оплаты на выбор. Нажав на кнопку ниже, вы перейдёте в Telegram-бота, где сможете нажать на "Украсить ник на сайте FunPay"</div>
                         <a href="https://t.me/FPToolsBot" target="_blank" class="btn" style="text-decoration:none; display:flex; align-items:center; justify-content:center; gap:8px; font-size: 14px; padding: 10px;">
                             <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-1.37.2-1.64l16.44-5.99c.73-.27 1.36.17 1.15.99l-2.28 10.82c-.15.71-.56 1.01-1.2 1.01l-4.82-.01-1.15 4.35c-.32.74-1.23.46-1.42-.47z"/></svg>
                             Получить уникальный ник
@@ -290,8 +290,8 @@ function createMainPopup() {
                     </div>
 
                     <h4 style="margin-bottom: 15px;">Вот несколько примеров для того, чтобы вы посмотрели, как это будет выглядеть у всех пользователей расширения:</h4>
-                    <div id="fpt-epic-previews-container" style="display: flex; flex-direction: column; gap: 30px; margin-top: 10px; background: #0e0f16; border: 1px solid #1e2030; border-radius: 8px; padding: 20px;">
-                        <div style="text-align: center; color: #5a5f7a; font-size: 12px;">Загрузка движка частиц...</div>
+                    <div id="fpt-epic-previews-container" style="display: flex; flex-direction: column; gap: 30px; margin-top: 10px; background: var(--fpt-bg-deep); border: 1px solid var(--fpt-line); border-radius: 12px; padding: 20px;">
+                        <div style="text-align: center; color: var(--fpt-text-faint); font-size: 12px;">Загрузка движка частиц...</div>
                     </div>
                 </div> <!-- КОНЕЦ ВКЛАДКИ "ЭПИЧЕСКИЕ НИКИ" -->
 
@@ -299,8 +299,8 @@ function createMainPopup() {
                 <div class="fp-tools-page-content" data-page="accounts">
                     <h3>Управление аккаунтами</h3>
                     <p class="template-info">Добавьте текущий аккаунт в список, чтобы быстро переключаться между профилями без ввода пароля.</p>
-                    <div class="support-promo" style="background: rgba(192,38,211,0.08); border-color: rgba(192,38,211,0.25); margin-bottom: 20px;">
-                        <span class="nav-icon material-symbols-rounded" style="color: #C026D3;">info</span>
+                    <div class="support-promo fpt-callout-info" style="margin-bottom: 20px;">
+                        <span class="nav-icon material-symbols-rounded fpt-callout-icon">info</span>
                         <span>Нажмите «+ Добавить текущий аккаунт» для каждого профиля. Переключение происходит мгновенно без ввода паролей.</span>
                     </div>
                     <button id="addCurrentAccountBtn" class="btn">+ Добавить текущий аккаунт</button>
@@ -328,7 +328,7 @@ function createMainPopup() {
                             <h4 style="margin:0;">Все добавленные элементы</h4>
                             <input type="text" id="fptNeedsFilter" class="fpt-needs-filter" placeholder="Поиск по названию…">
                         </div>
-                        <p class="template-info" style="margin-top:6px;">Галочка = элемент показывается. Снимите галочку, чтобы убрать его со страниц - сохраняется и применяется сразу, без перезагрузки и без кнопки «применить». Нажмите <span class="material-symbols-rounded" style="font-size:15px;vertical-align:-3px;color:#e9a8ff;">visibility</span>, чтобы увидеть, как элемент выглядит.</p>
+                        <p class="template-info" style="margin-top:6px;">Галочка = элемент показывается. Снимите галочку, чтобы убрать его со страниц - сохраняется и применяется сразу, без перезагрузки и без кнопки «применить». Нажмите <span class="material-symbols-rounded" style="font-size:15px;vertical-align:-3px;color:var(--fpt-accent);">visibility</span>, чтобы увидеть, как элемент выглядит.</p>
                         <div id="fptNeedsList" class="fpt-needs-list"></div>
                         <div class="fpt-needs-footer">
                             <span class="fpt-needs-autosave-note"><span class="material-symbols-rounded">bolt</span>Изменения сохраняются автоматически</span>
@@ -360,8 +360,8 @@ function createMainPopup() {
                             <label class="fp-tools-radio-option"><input type="radio" name="fptSlashKey" value="enter"><span>Только Enter</span></label>
                         </div>
 
-                        <div class="support-promo" style="background:rgba(192,38,211,0.07);border-color:rgba(192,38,211,0.2);margin:16px 0;">
-                            <span class="material-symbols-rounded" style="font-size:16px;color:#f4c84a;vertical-align:-3px;">lightbulb</span>
+                        <div class="support-promo fpt-callout-info" style="margin:16px 0;">
+                            <span class="material-symbols-rounded fpt-callout-icon" style="font-size:16px;vertical-align:-3px;">lightbulb</span>
                             <span>Переменные в ответе: <code>{buyername}</code> - имя собеседника, <code>{date}</code>, <code>{time}</code>.</span>
                         </div>
 
@@ -379,8 +379,8 @@ function createMainPopup() {
                     <h3>Управление через Telegram</h3>
                     <p class="template-info">Управляйте FP Tools и получайте уведомления (новые заказы и сообщения) прямо в Telegram-боте. Создайте бота, вставьте токен — и всё работает.</p>
 
-                    <div class="support-promo" style="background:rgba(192,38,211,0.08);border-color:rgba(192,38,211,0.25);margin-bottom:16px;">
-                        <span class="nav-icon material-symbols-rounded" style="color:#C026D3;">info</span>
+                    <div class="support-promo fpt-callout-info" style="margin-bottom:16px;">
+                        <span class="nav-icon material-symbols-rounded fpt-callout-icon">info</span>
                         <span>Как настроить: 1) создайте бота через <b>@BotFather</b> и скопируйте токен; 2) <b>напишите своему боту любое сообщение</b> в Telegram; 3) вставьте токен ниже и нажмите «Подключить».</span>
                     </div>
 
@@ -468,10 +468,10 @@ function createMainPopup() {
                         <div class="fpt-appx-block">
                             <div class="fpt-appx-cap">Заливка</div>
                             <div class="fpt-seg fpt-seg-fill" data-fpt-opt="fill">
-                                <button type="button" data-val="solid" title="Сплошная"><span class="fpt-fill-prev" style="background:#C026D3;"></span><span class="fpt-fill-name">Сплошная</span></button>
-                                <button type="button" data-val="soft" title="Мягкая"><span class="fpt-fill-prev" style="background:rgba(192,38,211,.28);"></span><span class="fpt-fill-name">Мягкая</span></button>
-                                <button type="button" data-val="outline" title="Контур"><span class="fpt-fill-prev" style="background:transparent;border:2px solid #C026D3;"></span><span class="fpt-fill-name">Контур</span></button>
-                                <button type="button" data-val="ghost" title="Призрачная"><span class="fpt-fill-prev" style="background:transparent;border:1px dashed #C026D3;"></span><span class="fpt-fill-name">Призрак</span></button>
+                                <button type="button" data-val="solid" title="Сплошная"><span class="fpt-fill-prev" style="background:#5b86d8;"></span><span class="fpt-fill-name">Сплошная</span></button>
+                                <button type="button" data-val="soft" title="Мягкая"><span class="fpt-fill-prev" style="background:rgba(91,134,216,.22);"></span><span class="fpt-fill-name">Мягкая</span></button>
+                                <button type="button" data-val="outline" title="Контур"><span class="fpt-fill-prev" style="background:transparent;border:2px solid #5b86d8;"></span><span class="fpt-fill-name">Контур</span></button>
+                                <button type="button" data-val="ghost" title="Призрачная"><span class="fpt-fill-prev" style="background:transparent;border:1px dashed #5b86d8;"></span><span class="fpt-fill-name">Призрак</span></button>
                             </div>
                         </div>
 
@@ -514,9 +514,9 @@ function createMainPopup() {
                         <div class="fpt-appx-block">
                             <div class="fpt-appx-cap">Живой предпросмотр</div>
                             <div id="fpt-appearance-preview" class="chat-buttons-container" data-fpt-shape="rounded" data-fpt-size="m" data-fpt-fill="solid" data-fpt-align="center" data-fpt-fullwidth="0" data-fpt-uppercase="0" data-fpt-compact="0">
-                                <button type="button" class="chat-template-btn" style="background-color:#C026D3;--btn-color:#C026D3;">Приветствие</button>
-                                <button type="button" class="chat-template-btn" style="background-color:#FF6B6B;--btn-color:#FF6B6B;">Спасибо за заказ</button>
-                                <button type="button" class="custom-chat-template-btn" style="background-color:#7c4dff;--btn-color:#7c4dff;">Свой шаблон</button>
+                                <button type="button" class="chat-template-btn" style="background-color:#5b86d8;--btn-color:#5b86d8;">Приветствие</button>
+                                <button type="button" class="chat-template-btn" style="background-color:#3f9e7c;--btn-color:#3f9e7c;">Спасибо за заказ</button>
+                                <button type="button" class="custom-chat-template-btn" style="background-color:#6b7280;--btn-color:#6b7280;">Свой шаблон</button>
                             </div>
                         </div>
                     </div>
@@ -720,10 +720,10 @@ function createMainPopup() {
                         </div>
                         <div id="fp-wp-loader" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;">
                             <span id="fp-wp-emoji" style="font-size:24px;"></span>
-                            <div style="width:60px;height:3px;background:#1e2030;border-radius:2px;overflow:hidden;"><div id="fp-wp-bar" style="height:100%;width:0%;background:#C026D3;transition:width .15s linear;border-radius:2px;"></div></div>
+                            <div style="width:60px;height:3px;background:#1e2030;border-radius:2px;overflow:hidden;"><div id="fp-wp-bar" style="height:100%;width:0%;background:#5b86d8;transition:width .15s linear;border-radius:2px;"></div></div>
                             <span id="fp-wp-pct" style="font-size:10px;color:#4a4f68;">0%</span>
                         </div>
-                        <button id="fp-wp-apply-cur" style="position:absolute;top:6px;right:6px;background:rgba(192,38,211,.85);border:none;color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:12px;cursor:pointer;z-index:2;display:none;">Применить</button>
+                        <button id="fp-wp-apply-cur" style="position:absolute;top:6px;right:6px;background:rgba(91,134,216,.9);border:none;color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:12px;cursor:pointer;z-index:2;display:none;">Применить</button>
                     </div>
                     <div class="template-container">
                         <label>Фоновое изображение:</label>
@@ -846,8 +846,8 @@ function createMainPopup() {
                     <!-- START STATE -->
                     <div id="fp-audit-start-wrap">
                         <p class="template-info">ИИ прочитает все ваши лоты и последние 30 отзывов, сгенерирует ~40 вопросов и на основе ваших ответов выдаст конкретные рекомендации.</p>
-                        <div class="support-promo" style="background:rgba(192,38,211,0.07);border-color:rgba(192,38,211,0.2);margin-bottom:16px;">
-                            <span class="material-symbols-rounded" style="font-size:16px;color:#f4c84a;vertical-align:-3px;">lightbulb</span>
+                        <div class="support-promo fpt-callout-info" style="margin-bottom:16px;">
+                            <span class="material-symbols-rounded fpt-callout-icon" style="font-size:16px;vertical-align:-3px;">lightbulb</span>
                             <span>Вопросы будут именно о ваших лотах - ИИ внимательно их изучит перед генерацией.</span>
                         </div>
                         <button id="fp-audit-start-btn" class="btn" style="width:100%;padding:12px;"><span class="material-symbols-rounded" style="font-size:18px;vertical-align:-4px;margin-right:6px;">search_insights</span>Начать аудит</button>
@@ -864,7 +864,7 @@ function createMainPopup() {
                             <span id="fp-audit-skip" style="font-size:11px;color:#3a3d52;cursor:pointer;" onclick="document.getElementById('fp-audit-next-btn')?.click()">Пропустить →</span>
                         </div>
                         <div style="height:4px;background:#1e2030;border-radius:2px;margin-bottom:16px;overflow:hidden;">
-                            <div id="fp-audit-progress-bar" style="height:100%;background:#C026D3;width:0;transition:width .3s;border-radius:2px;"></div>
+                            <div id="fp-audit-progress-bar" style="height:100%;background:#5b86d8;width:0;transition:width .3s;border-radius:2px;"></div>
                         </div>
                         <div id="fp-audit-q-container" style="min-height:120px;"></div>
                         <div style="display:flex;gap:8px;margin-top:16px;">
@@ -919,8 +919,8 @@ function createMainPopup() {
                 <div class="fp-tools-page-content" data-page="auto_delivery">
                     <h3>Авто-выдача товаров</h3>
                     <p class="template-info">При новом заказе расширение автоматически отправит покупателю товар. Укажите что именно отправлять для каждого лота, или используйте поле «Секреты» лота как источник.</p>
-                    <div class="support-promo" style="background:rgba(192,38,211,0.07);border-color:rgba(192,38,211,0.2);margin-bottom:16px;">
-                        <span class="material-symbols-rounded" style="font-size:16px;color:#f4c84a;vertical-align:-3px;">lightbulb</span>
+                    <div class="support-promo fpt-callout-info" style="margin-bottom:16px;">
+                        <span class="material-symbols-rounded fpt-callout-icon" style="font-size:16px;vertical-align:-3px;">lightbulb</span>
                         <span>Используйте переменные: <code>{buyername}</code>, <code>{orderid}</code>, <code>{orderlink}</code>, <code>$username</code>, <code>$order_link</code>, <code>$order_id</code>, <code>$sleep=3</code> (пауза в секундах).</span>
                     </div>
 
@@ -950,13 +950,13 @@ function createMainPopup() {
                         #fp-ticket-max-orders::-webkit-inner-spin-button,#fp-ticket-max-orders::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
                         #fp-ticket-age-hours,#fp-ticket-max-orders{-moz-appearance:textfield}
                         .fp-tkt-card{background:#0d0e18;border:1px solid #1a1c2e;border-radius:8px;padding:10px 12px;cursor:pointer;transition:border-color .15s,background .15s;}
-                        .fp-tkt-card:hover{border-color:#C026D3;background:#11122a;}
+                        .fp-tkt-card:hover{border-color:#5b86d8;background:#11162a;}
                         .fp-tkt-status{display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.3px;}
                         #fp-new-ticket-fields::-webkit-scrollbar{width:4px}
                         #fp-new-ticket-fields::-webkit-scrollbar-track{background:transparent}
                         #fp-new-ticket-fields::-webkit-scrollbar-thumb{background:#2a2d44;border-radius:4px}
                         .fp-field-input{width:100%;background:#0d0e18;border:1px solid #1a1c2e;border-radius:6px;color:#d8dae8;padding:7px 10px;font-size:13px;box-sizing:border-box;outline:none;transition:border-color .15s;}
-                        .fp-field-input:focus{border-color:#C026D3;}
+                        .fp-field-input:focus{border-color:#5b86d8;}
                         .fp-field-input option{background:#0d0e18;color:#d8dae8;}
                     </style>
 
@@ -967,7 +967,7 @@ function createMainPopup() {
                     </div>
 
                     <!-- Auto ticket block -->
-                    <div style="background:rgba(192,38,211,0.06);border:1px solid rgba(192,38,211,0.18);border-radius:8px;padding:11px 12px;margin-bottom:12px;">
+                    <div class="support-promo fpt-callout-info" style="padding:11px 12px;margin-bottom:12px;">
                         <div style="font-weight:600;font-size:13px;margin-bottom:4px;color:#f0c4ff;"><span class="material-symbols-rounded" style="font-size:15px;vertical-align:-3px;margin-right:5px;">mail</span>Подтверждение заказов</div>
                         <p style="font-size:12px;color:#6a7090;margin:0 0 10px;line-height:1.5;">FunPay не всегда подтверждает заказы автоматически. Кнопка ниже соберёт все ваши неподтверждённые заказы и отправит заявку в ТП с просьбой их подтвердить - вручную делать не надо.</p>
                         <div style="display:flex;gap:10px;margin-bottom:10px;">
@@ -1002,15 +1002,15 @@ function createMainPopup() {
                         <style>
                             #fp-tdm::-webkit-scrollbar{width:3px}
                             #fp-tdm::-webkit-scrollbar-thumb{background:#2a2d3a;border-radius:3px}
-                            #fp-tri{outline:none;caret-color:#C026D3;background:#23243a !important;border:none !important;box-shadow:none !important;border-radius:0 !important;padding:0 !important;margin:0 !important;}
+                            #fp-tri{outline:none;caret-color:#5b86d8;background:#23243a !important;border:none !important;box-shadow:none !important;border-radius:0 !important;padding:0 !important;margin:0 !important;}
                             #fp-tri::-webkit-scrollbar{width:2px}
                             #fp-tri::-webkit-scrollbar-thumb{background:#2a2d3a;}
                             .fp-msg-img{max-width:100%;border-radius:8px;margin-top:4px;display:block;cursor:pointer;}
                         </style>
                         <!-- Top bar -->
                         <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#1a1b22;flex-shrink:0;border-bottom:1px solid #0d0e14;">
-                            <button id="fp-ticket-detail-back" style="all:unset;position:relative;overflow:hidden;color:#C026D3;cursor:pointer;font-size:22px;line-height:1;padding:2px 6px 2px 0;flex-shrink:0;">&#8249;</button>
-                            <div id="fp-tkt-av" style="width:32px;height:32px;border-radius:50%;background:#23243a;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#C026D3;overflow:hidden;"></div>
+                            <button id="fp-ticket-detail-back" style="all:unset;position:relative;overflow:hidden;color:#5b86d8;cursor:pointer;font-size:22px;line-height:1;padding:2px 6px 2px 0;flex-shrink:0;">&#8249;</button>
+                            <div id="fp-tkt-av" style="width:32px;height:32px;border-radius:50%;background:#23243a;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#5b86d8;overflow:hidden;"></div>
                             <div style="flex:1;min-width:0;">
                                 <div id="fp-ticket-detail-title" style="font-size:14px;font-weight:600;color:#e8eaf0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;"></div>
                                 <div id="fp-ticket-detail-status" style="font-size:11px;margin-top:1px;line-height:1;"></div>
@@ -1034,7 +1034,7 @@ function createMainPopup() {
                             <div style="flex:1;background:#23243a;border-radius:20px;padding:7px 14px;display:flex;align-items:flex-end;min-height:36px;box-sizing:border-box;">
                                 <textarea id="fp-tri" placeholder="Сообщение..." style="all:unset;-webkit-appearance:none;appearance:none;width:100%;color:#e8eaf0;font-size:13px;line-height:1.45;height:20px;max-height:90px;overflow-y:hidden;font-family:inherit;display:block;resize:none;background:#23243a !important;" rows="1"></textarea>
                             </div>
-                            <button id="fp-ticket-reply-btn" style="all:unset;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:#C026D3;cursor:pointer;flex-shrink:0;">
+                            <button id="fp-ticket-reply-btn" style="all:unset;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:#5b86d8;cursor:pointer;flex-shrink:0;">
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="#fff" style="margin-left:2px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
                             </button>
                         </div>
@@ -1064,7 +1064,7 @@ function createMainPopup() {
                 </div>
 
                 <div class="fp-tools-page-content" data-page="support">
-                    <h3>Оставьте отзыв! <span class="material-symbols-rounded" style="color:#f4c84a;vertical-align:-3px;">star</span></h3>
+                    <h3>Оставьте отзыв! <span class="material-symbols-rounded" style="color:#d2a85e;vertical-align:-3px;">star</span></h3>
                     <div class="support-container">
                         <p>Это <strong>самый важный</strong> вклад, который вы можете сделать. Ваш положительный отзыв - это топливо для новых обновлений и лучшая мотивация для разработчика.</p>
                         <p>Хорошие оценки помогают другим пользователям найти FP Tools. Пожалуйста, уделите всего минуту, чтобы поделиться своим мнением. Это действительно имеет огромное значение!</p>
