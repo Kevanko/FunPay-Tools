@@ -140,6 +140,12 @@
     function addFpToolsButton() {
         const existingButton = document.getElementById('fpToolsButton');
         if (existingButton?.dataset?.fptLocation === 'header') {
+            // Кнопка уже вставлена ранним плейсхолдером (theme_flash_fix.js) —
+            // навешиваем обработчики, если ещё не навешаны.
+            if (!existingButton.dataset.fptWired) {
+                existingButton.dataset.fptWired = '1';
+                wireFpToolsButton(existingButton);
+            }
             return true;
         }
 
@@ -162,43 +168,10 @@
         }
 
         const button = toolsMenu.querySelector('#fpToolsButton');
-
-        button?.addEventListener('click', async () => {
-            // Build the popup on first click (perf: avoids a permanent heavy DOM subtree).
-            if (typeof window.__fpEnsurePopup === 'function') {
-                await window.__fpEnsurePopup();
-            }
-            const popup = document.querySelector('.fp-tools-popup');
-            if (popup) {
-                await loadLastActivePage();
-                popup.classList.add('active');
-                if (typeof applyFptMenuTransparency === 'function') applyFptMenuTransparency();
-                if (typeof syncFptMenuControls === 'function') syncFptMenuControls();
-            }
-        });
-        
-        let hoverTimeout;
-        button?.addEventListener('mouseenter', () => {
-            hoverTimeout = setTimeout(() => {
-                if (typeof showHeaderButtonTooltip === 'function') {
-                    showHeaderButtonTooltip(button);
-                }
-            }, 2000);
-        });
-
-        button?.addEventListener('mouseleave', () => {
-            clearTimeout(hoverTimeout);
-            if (typeof hideHeaderButtonTooltip === 'function') {
-                hideHeaderButtonTooltip();
-            }
-        });
-
-        button?.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            if (typeof showButtonStyler === 'function') {
-                showButtonStyler(e.clientX, e.clientY);
-            }
-        });
+        if (button) {
+            button.dataset.fptWired = '1';
+            wireFpToolsButton(button);
+        }
 
         console.log("FP Tools: Кнопка в хедере успешно добавлена.");
         return true;

@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
     "name": "FunPay Tools",
-    "version": "2.8",
-    "description": "Глобальное расширение для FunPay ⚡ 120+ инструментов • ИИ-помощник • Автоответчик • Аналитика • Автоматизация • Больше продаж",
+    "version": "3.0",
+    "description": "Инструменты продавца для FunPay: статистика продаж, автоматизация, авто-выдача, массовые действия с лотами, темы оформления.",
     "permissions": [
         "storage",
         "tabs",
@@ -55,6 +55,7 @@
                 "https://funpay.com/*"
             ],
             "js": [
+                "content/theme_core.js",
                 "content/theme_flash_fix.js"
             ],
             "run_at": "document_start",
@@ -127,7 +128,8 @@
                 "content/features/sales_modes.js",
                 "content/features/slash_commands.js",
                 "content/features/category_peek_panel.js",
-                "content/features/chat_reply.js"
+                "content/features/chat_reply.js",
+                "content/zz_reveal.js"
             ],
             "css": [
                 "css/content_styles.css",

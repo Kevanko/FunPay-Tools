@@ -56,7 +56,7 @@ function renderNavbarIcon() {
         dropdownContent += `
             <div class="pb-dropdown-item ${pb.isMain ? 'main' : ''}">
                 <div class="pb-dropdown-header">
-                    <span class="pb-dropdown-title">${pb.isMain ? '⭐' : ''} ${pb.name}</span>
+                    <span class="pb-dropdown-title">${pb.isMain ? '<span class="material-symbols-rounded" style="font-size:15px;vertical-align:-2px;color:#e6b46b;">star</span> ' : ''}${pb.name}</span>
                     <span class="pb-dropdown-percentage">${percentage.toFixed(1)}%</span>
                 </div>
                 <div class="pb-dropdown-progress-bar">
@@ -70,7 +70,7 @@ function renderNavbarIcon() {
     });
     
     piggyBankLi.innerHTML = `
-        <a>🐷</a>
+        <a><span class="material-symbols-rounded" style="font-size:18px;vertical-align:-3px;">savings</span></a>
         <div class="fp-tools-piggy-bank-dropdown">
             ${dropdownContent}
             <div class="pb-dropdown-footer">
@@ -110,9 +110,9 @@ function renderPiggyBankSettings() {
                 <span class="piggy-bank-item-name">${pb.name}</span>
                 ${pb.isMain ? '<span class="piggy-bank-item-main-badge">Основная</span>' : ''}
                 <div class="piggy-bank-item-actions">
-                    <button class="btn btn-default btn-sm edit-btn" title="Редактировать">✏️</button>
-                    <button class="btn btn-default btn-sm delete-btn" title="Удалить">🗑️</button>
-                    ${!pb.isMain ? '<button class="btn btn-default btn-sm set-main-btn" title="Сделать основной">⭐</button>' : ''}
+                    <button class="btn btn-default btn-sm edit-btn" title="Редактировать"><span class="material-symbols-rounded" style="font-size:16px;">edit</span></button>
+                    <button class="btn btn-default btn-sm delete-btn" title="Удалить"><span class="material-symbols-rounded" style="font-size:16px;">delete</span></button>
+                    ${!pb.isMain ? '<button class="btn btn-default btn-sm set-main-btn" title="Сделать основной"><span class="material-symbols-rounded" style="font-size:16px;">star</span></button>' : ''}
                 </div>
             </div>
             <div class="piggy-bank-progress-info">

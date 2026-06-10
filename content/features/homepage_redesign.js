@@ -6,6 +6,24 @@
     return `hsl(${hash % 360}, ${s}%, ${l}%)`;
 }
 
+// Strip emoji, box-drawing, geometric/decorative symbols and collapse the result.
+// Sellers pad lot titles with ▂▃▄█🔥🔮❖►◄ etc.; we show clean readable text only.
+function cleanText(str) {
+    return String(str ?? '')
+        .replace(/[\u{1F000}-\u{1FAFF}]/gu, '')   // emoji & symbols
+        .replace(/[\u{2600}-\u{27BF}]/gu, '')      // misc symbols, dingbats
+        .replace(/[\u{2B00}-\u{2BFF}]/gu, '')      // arrows/stars
+        .replace(/[\u{2190}-\u{21FF}]/gu, '')      // arrows
+        .replace(/[\u{2300}-\u{23FF}]/gu, '')      // technical
+        .replace(/[\u{2500}-\u{259F}]/gu, '')      // box drawing + block elements ▂▃▄█
+        .replace(/[\u{25A0}-\u{25FF}]/gu, '')      // geometric shapes ■●◆
+        .replace(/[\u{FE00}-\u{FE0F}\u{200D}]/gu, '') // variation selectors, ZWJ
+        .replace(/[\u{2000}-\u{200A}]/gu, ' ')     // exotic spaces
+        .replace(/\s{2,}/g, ' ')
+        .replace(/^[\s,·|—–\-]+|[\s,·|—–\-]+$/g, '')
+        .trim();
+}
+
 function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>"']/g, char => ({
         '&': '&amp;',
@@ -21,7 +39,7 @@ function loadRedesignFonts() {
     const link = document.createElement('link');
     link.id = 'fpt-home-redesign-fonts';
     link.rel = 'stylesheet';
-    link.href = 'https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap';
+    link.href = 'https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=optional';
     document.head.appendChild(link);
 }
 
@@ -67,6 +85,239 @@ function extractGamesFromContainer(container) {
     return data;
 }
 
+// ── Real data scraping ────────────────────────────────────────────────────────
+async function getHomepageRealData() {
+    const result = { balance: null, username: '', ordersActive: null, recentOrders: null };
+
+    // Username from app data JSON embedded in page
+    try {
+        const raw = document.body?.dataset?.appData;
+        if (raw) {
+            const d = JSON.parse(raw);
+            const ad = Array.isArray(d) ? d[0] : d;
+            if (ad?.userName) result.username = ad.userName;
+        }
+    } catch(e) {}
+    if (!result.username) result.username = getSellerDisplayName();
+
+    // Balance from header badge
+    const balEl = document.querySelector('.badge-balance, .balances-value, .user-balance-sum, .navbar-balance');
+    if (balEl) {
+        const txt = balEl.textContent.replace(/[^\d\s.,₽]/g, '').replace(/\s+/g, ' ').trim();
+        if (txt) result.balance = txt + (txt.includes('₽') ? '' : ' ₽');
+    }
+
+    // Orders + automation toggle states from chrome.storage
+    try {
+        const store = await chrome.storage.local.get([
+            'fpToolsSalesData', 'autoBumpEnabled', 'fpToolsSmartBumpEnabled', 'fpToolsAutoReplies', 'fpToolsSlashCommands'
+        ]);
+        const fpToolsSalesData = store.fpToolsSalesData;
+        if (fpToolsSalesData && typeof fpToolsSalesData === 'object') {
+            const all = Object.values(fpToolsSalesData);
+            result.salesCount = all.length;
+            result.ordersActive = all.filter(o => ['new', 'paid'].includes(o.orderStatus)).length;
+            result.recentOrders = [...all]
+                .sort((a, b) => (b.orderDate || 0) - (a.orderDate || 0))   // newest first
+                .slice(0, 4)
+                .map(o => {
+                    const clean = cleanText(o.description) || cleanText(o.subcategoryName) || 'Заказ';
+                    return {
+                        id: '#' + (o.orderId || '—'),
+                        name: clean.length > 64 ? clean.slice(0, 63) + '…' : clean,
+                        amt: o.price != null ? Math.round(o.price).toLocaleString('ru-RU') + ' ₽' : '—',
+                        status: o.orderStatus === 'paid' ? 'Оплачен' : o.orderStatus === 'closed' ? 'Закрыт' : o.orderStatus === 'refunded' ? 'Возврат' : 'Новый',
+                        tone: o.orderStatus === 'paid' ? 'ok' : o.orderStatus === 'closed' ? 'done' : o.orderStatus === 'refunded' ? 'ref' : 'new',
+                    };
+                });
+        }
+        result.toggles = fptHomeTogglesFrom(store);
+    } catch(e) {}
+
+    return result;
+}
+
+// Флаги «Авто-ответы» — все подфункции вкладки; тоггл главной показывает,
+// включена ли ХОТЬ ОДНА, и гасит все разом при выключении.
+const FPT_AR_FLAGS = ['autoReviewEnabled', 'greetingEnabled', 'keywordsEnabled',
+    'newOrderReplyEnabled', 'orderConfirmReplyEnabled', 'bonusForReviewEnabled'];
+
+function fptHomeTogglesFrom(store) {
+    const ar = store.fpToolsAutoReplies || {};
+    return {
+        // авто-поднятие включено, если работает любой из режимов (умное или по таймеру)
+        autobump: !!store.autoBumpEnabled || !!store.fpToolsSmartBumpEnabled,
+        delivery: !!ar.autoDeliveryEnabled,
+        autoreview: FPT_AR_FLAGS.some(f => !!ar[f]),
+        // слэш-команды живут в объекте fpToolsSlashCommands; включены по умолчанию
+        slash: (store.fpToolsSlashCommands || {}).enabled !== false,
+    };
+}
+
+// Переключение автоматизаций прямо с главной (как в funpay-redesign).
+// Каждый ключ пишется именно туда, откуда его читает соответствующая фича.
+async function setHomeAutomation(key, on) {
+    if (key === 'autobump') {
+        // вкл — таймерный режим; выкл — гасим оба режима
+        if (on) await chrome.storage.local.set({ autoBumpEnabled: true });
+        else await chrome.storage.local.set({ autoBumpEnabled: false, fpToolsSmartBumpEnabled: false });
+    } else if (key === 'slash') {
+        const { fpToolsSlashCommands = {} } = await chrome.storage.local.get('fpToolsSlashCommands');
+        fpToolsSlashCommands.enabled = on;
+        await chrome.storage.local.set({ fpToolsSlashCommands });
+    } else if (key === 'delivery') {
+        const { fpToolsAutoReplies = {} } = await chrome.storage.local.get('fpToolsAutoReplies');
+        fpToolsAutoReplies.autoDeliveryEnabled = on;
+        await chrome.storage.local.set({ fpToolsAutoReplies });
+    } else if (key === 'autoreview') {
+        const { fpToolsAutoReplies = {} } = await chrome.storage.local.get('fpToolsAutoReplies');
+        if (on) fpToolsAutoReplies.autoReviewEnabled = true;
+        else FPT_AR_FLAGS.forEach(f => { fpToolsAutoReplies[f] = false; });
+        await chrome.storage.local.set({ fpToolsAutoReplies });
+    }
+}
+
+// Live-синк тогглов главной с настройками: изменил в панели — обновилось тут.
+function fptWatchHomeToggles() {
+    if (window.__fptHomeTglWatch) return;
+    window.__fptHomeTglWatch = true;
+    try {
+        chrome.storage.onChanged.addListener(async (changes, area) => {
+            if (area !== 'local') return;
+            if (!changes.autoBumpEnabled && !changes.fpToolsSmartBumpEnabled &&
+                !changes.fpToolsAutoReplies && !changes.fpToolsSlashCommands) return;
+            const store = await chrome.storage.local.get([
+                'autoBumpEnabled', 'fpToolsSmartBumpEnabled', 'fpToolsAutoReplies', 'fpToolsSlashCommands']);
+            const tg = fptHomeTogglesFrom(store);
+            for (const [key, on] of Object.entries(tg)) {
+                const row = document.querySelector('.cc-action[data-auto-key="' + key + '"]');
+                if (!row) continue;
+                const t = row.querySelector('.tgl');
+                if (t) { t.setAttribute('data-on', String(on)); t.setAttribute('aria-checked', String(on)); }
+                const meta = row.querySelector('.cc-action-meta');
+                if (meta) meta.textContent = on ? 'включено' : 'выключено';
+            }
+        });
+    } catch(e) {}
+}
+
+// ── Mini FPT Global Chat (homepage widget) ────────────────────────────────────
+const FPT_HOME_GC_URL = 'https://fpt-chat.starobinskiy01.workers.dev';
+let _hgcLastTs = 0;
+let _hgcTimer = null;
+let _hgcRenderedIds = new Set();
+
+function _hgcEsc(s) {
+    const d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+}
+
+async function _hgcPost(payload) {
+    const r = await fetch(FPT_HOME_GC_URL, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    return r.json().catch(() => ({}));
+}
+
+function _hgcRender(msgs) {
+    const feed = document.getElementById('fpt-home-gc-feed');
+    if (!feed) return;
+    feed.querySelector('.fpt-home-gc-loading')?.remove();
+
+    let added = false;
+    (msgs || []).forEach(m => {
+        if (!m?.id || _hgcRenderedIds.has(m.id)) return;
+        _hgcRenderedIds.add(m.id);
+        added = true;
+        if (m.ts && m.ts > _hgcLastTs) _hgcLastTs = m.ts;
+
+        const av = _hgcEsc((m.nick || 'U').charAt(0).toUpperCase());
+        const time = m.ts ? new Date(m.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        const row = document.createElement('div');
+        row.className = 'cc-secret-row';
+        row.innerHTML =
+            `<div class="cc-secret-av">${av}</div>` +
+            `<div class="cc-secret-body">` +
+              `<div class="cc-secret-top">` +
+                `<span class="cc-secret-name">${_hgcEsc(m.nick || 'Аноним')}</span>` +
+                `<span class="cc-secret-time faint mono">${_hgcEsc(time)}</span>` +
+              `</div>` +
+              `<div class="cc-secret-text">${_hgcEsc(m.text || '')}</div>` +
+            `</div>`;
+        feed.appendChild(row);
+    });
+
+    if (added && feed.scrollHeight - feed.scrollTop - feed.clientHeight < 120)
+        feed.scrollTop = feed.scrollHeight;
+}
+
+async function _hgcFetch() {
+    try {
+        const data = await _hgcPost({ action: 'fetch', since: _hgcLastTs });
+        if (Array.isArray(data?.messages)) _hgcRender(data.messages);
+    } catch(e) {}
+}
+
+async function _hgcSend() {
+    const input = document.getElementById('fpt-home-gc-input');
+    const btn = document.getElementById('fpt-home-gc-send');
+    if (!input) return;
+    const text = (input.value || '').trim();
+    if (!text) return;
+
+    let token = null;
+    try {
+        const d = await chrome.storage.local.get('fpToolsGCToken');
+        token = d.fpToolsGCToken;
+    } catch(e) {}
+
+    if (!token) {
+        // Open FPT popup → global chat tab
+        document.getElementById('fpToolsButton')?.click();
+        setTimeout(() => document.querySelector('.fp-tools-popup li[data-page="global_chat"]')?.click(), 350);
+        return;
+    }
+
+    let nick = '';
+    try {
+        const raw = document.body?.dataset?.appData;
+        const ad = JSON.parse(raw || '{}');
+        nick = (Array.isArray(ad) ? ad[0] : ad)?.userName || '';
+    } catch(e) {}
+    if (!nick) nick = getSellerDisplayName() || 'FunPay user';
+
+    if (btn) btn.disabled = true;
+    try {
+        const r = await fetch(FPT_HOME_GC_URL, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'send', token, nick, avatar: '', url: '', text }),
+        });
+        if (r.ok) { input.value = ''; await _hgcFetch(); }
+    } catch(e) {}
+    if (btn) btn.disabled = false;
+}
+
+function initHomeGlobalChat() {
+    _hgcRenderedIds = new Set();
+    _hgcLastTs = 0;
+    const feed = document.getElementById('fpt-home-gc-feed');
+    if (feed) feed.innerHTML = '<div class="fpt-home-gc-loading home-secret-time" style="padding:14px 16px;">Загрузка…</div>';
+
+    _hgcFetch();
+    if (_hgcTimer) clearInterval(_hgcTimer);
+    _hgcTimer = setInterval(() => {
+        const rail = document.querySelector('.cc-chat');
+        if (rail && !rail.classList.contains('is-collapsed')) _hgcFetch();
+    }, 15000);
+
+    document.getElementById('fpt-home-gc-send')?.addEventListener('click', _hgcSend);
+    document.getElementById('fpt-home-gc-input')?.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _hgcSend(); }
+    });
+}
+
 function createGameIcon(game) {
     const link = document.createElement('a');
     link.href = game.url;
@@ -93,323 +344,304 @@ function createGameIcon(game) {
     return link;
 }
 
-function createRedesignedUI(allGamesData, yourGamesData) {
-    const uiWrapper = document.createElement('div');
-    uiWrapper.className = 'redesign-container';
+// ── Lucide inline icons (thin line, matches funpay-redesign reference) ──────────
+const HOME_ICON_PATHS = {
+    Activity: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+    ArrowUpRight: '<path d="M7 7h10v10"/><path d="M7 17 17 7"/>',
+    ArrowUpNarrowWide: '<path d="m3 8 4-4 4 4"/><path d="M7 4v16"/><path d="M11 12h4"/><path d="M11 16h7"/><path d="M11 20h10"/>',
+    Zap: '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+    MessageSquareText: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M13 8H7"/><path d="M17 12H7"/>',
+    TerminalSquare: '<path d="m7 11 2-2-2-2"/><path d="M11 13h4"/><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>',
+    Lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+    ChevronsRight: '<path d="m6 17 5-5-5-5"/><path d="m13 17 5-5-5-5"/>',
+    ArrowUp: '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
+    ShieldAlert: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
+    Search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+    X: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+};
+function hic(name, size) {
+    const p = HOME_ICON_PATHS[name] || '';
+    const s = size || 16;
+    return `<svg class="fpt-ico" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+}
 
-    const displayName = getSellerDisplayName();
-    const titleText = displayName ? `С возвращением, ${escapeHtml(displayName)}` : 'Командный центр FunPay';
-    const actionMode = yourGamesData.length > 0 ? 'Кабинет продавца' : 'Витрина без входа';
+function gameDomain(name) {
+    if (name.toLowerCase() === 'telegram') return 'web.telegram.org';
+    const clean = name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9-]/g, '');
+    return `${clean}.com`;
+}
+
+function createRedesignedUI(allGamesData, yourGamesData, realData) {
+    const rd = realData || {};
+    const tg = rd.toggles || {};
+    const displayName = rd.username || getSellerDisplayName();
+    const titleText = displayName ? `С возвращением, ${escapeHtml(displayName)}` : 'FunPay';
     const categoryCount = getUniqueCategoryCount(allGamesData);
 
-    const statCards = [
-        { label: 'Продажи', value: '14 320 ₽', sub: 'сегодня', trend: '+18%', tone: 'up' },
-        { label: 'Заказов', value: '23', sub: '4 в работе', trend: '+9%', tone: 'up' },
-        { label: 'Баланс', value: '24 180 ₽', sub: 'к выводу', trend: null, tone: 'neutral' },
-    ];
+    const balanceText = rd.balance || '—';
+    const ordersActive = rd.ordersActive != null ? String(rd.ordersActive) : '—';
+    const salesTotal = rd.salesCount != null ? String(rd.salesCount) : '—';
 
+    // Реальные автоматизации: тоггл показывает сохранённое состояние и
+    // переключает его кликом; клик по строке открывает вкладку FP Tools.
     const automationActions = [
-        { icon: '↑', label: 'Поднять все лоты', meta: 'через 14 мин', on: true },
-        { icon: '⚡', label: 'Авто-выдача', meta: '32 лота активно', on: true },
-        { icon: '✉', label: 'Авто-ответы', meta: 'включены', on: true },
-        { icon: '⛨', label: 'Защита от просадки', meta: 'мониторинг цен', on: false },
+        { icon: 'ArrowUpNarrowWide', label: 'Авто-поднятие', page: 'autobump', key: 'autobump', on: !!tg.autobump },
+        { icon: 'Zap', label: 'Авто-выдача', page: 'auto_delivery', key: 'delivery', on: !!tg.delivery },
+        { icon: 'MessageSquareText', label: 'Авто-ответы', page: 'auto_review', key: 'autoreview', on: !!tg.autoreview },
+        { icon: 'TerminalSquare', label: 'Слэш-команды', page: 'slash_commands', key: 'slash', on: !!tg.slash },
     ];
 
-    const recentOrders = [
-        { id: '#FP-90241', name: 'ChatGPT Plus · 30 дней', amt: '189 ₽', status: 'Оплачен', tone: 'ok' },
-        { id: '#FP-90238', name: 'DBD · снятие HWID', amt: '961 ₽', status: 'Выдан', tone: 'done' },
-        { id: '#FP-90235', name: 'Brawl · 30k кубков', amt: '2 100 ₽', status: 'Новый', tone: 'new' },
-    ];
+    const recentOrders = (rd.recentOrders && rd.recentOrders.length > 0) ? rd.recentOrders : null;
 
-    const chatFeed = [
-        { u: 'Покупатель #01', av: 'П', text: 'Дарова, кто по DBD шарит?', t: '02:09' },
-        { u: 'Покупатель #02', av: 'П', text: 'Сообщение скрыто', t: '02:07', hidden: true },
-        { u: 'Покупатель #03', av: 'П', text: 'кто продаёт чатгпт дёшево', t: '02:41' },
-        { u: 'Покупатель #04', av: 'П', text: 'тут норм цены, рекомендую', t: '02:51' },
-        { u: 'Покупатель #05', av: 'П', text: 'Сообщение скрыто', t: '03:02', hidden: true },
-        { u: 'Покупатель #06', av: 'П', text: 'всем добра, как торговля?', t: '03:14' },
-    ];
-
-    const statsHTML = statCards.map(stat => `
-        <div class="home-stat-card">
-            <span class="home-stat-label">${escapeHtml(stat.label)}</span>
-            <strong class="home-stat-value">${escapeHtml(stat.value)}</strong>
-            <div class="home-stat-sub">
-                ${stat.trend ? `<span class="home-stat-trend ${stat.tone || 'up'}">${escapeHtml(stat.trend)}</span>` : ''}
-                <span>${escapeHtml(stat.sub)}</span>
-            </div>
+    const statsHTML = `
+        <div class="cc-stat">
+            <span class="cc-stat-label eyebrow">Баланс</span>
+            <div class="cc-stat-value mono" id="fpt-home-stat-balance">${escapeHtml(balanceText)}</div>
+            <div class="cc-stat-sub"><span class="faint">к выводу</span></div>
         </div>
-    `).join('');
-
-    const actionsHTML = automationActions.map(action => `
-        <button type="button" class="home-action" aria-pressed="${String(action.on)}">
-            <span class="home-action-ic"><span>${escapeHtml(action.icon)}</span></span>
-            <span class="home-action-txt">
-                <span class="home-action-label">${escapeHtml(action.label)}</span>
-                <span class="home-action-meta">${escapeHtml(action.meta)}</span>
-            </span>
-            <span class="tgl" data-on="${String(action.on)}" aria-hidden="true"></span>
-        </button>
-    `).join('');
-
-    const ordersHTML = recentOrders.map(order => `
-        <div class="home-order">
-            <div class="home-order-main">
-                <span class="home-order-id">${escapeHtml(order.id)}</span>
-                <span class="home-order-name">${escapeHtml(order.name)}</span>
-            </div>
-            <div class="home-order-right">
-                <span class="home-order-amount">${escapeHtml(order.amt)}</span>
-                <span class="home-status home-status-${escapeHtml(order.tone)}">${escapeHtml(order.status)}</span>
-            </div>
+        <div class="cc-stat">
+            <span class="cc-stat-label eyebrow">Заказов в работе</span>
+            <div class="cc-stat-value mono" id="fpt-home-stat-orders">${escapeHtml(ordersActive)}</div>
+            <div class="cc-stat-sub"><span class="faint">ожидают</span></div>
         </div>
-    `).join('');
-
-    const chatHTML = chatFeed.map(msg => `
-        <div class="home-secret-row">
-            <div class="home-secret-av" aria-hidden="true">${escapeHtml(msg.av)}</div>
-            <div class="home-secret-body">
-                <div class="home-secret-top">
-                    <span class="home-secret-name">${escapeHtml(msg.u)}</span>
-                    <span class="home-secret-time">${escapeHtml(msg.t)}</span>
-                </div>
-                <div class="home-secret-text${msg.hidden ? ' is-hidden' : ''}">${escapeHtml(msg.text)}</div>
-            </div>
-        </div>
-    `).join('');
-
-    const heroBlock = document.createElement('div');
-    heroBlock.className = 'redesign-hero';
-    heroBlock.innerHTML = `
-        <div class="hero-text">
-            <span class="home-eyebrow">FUNPAY · ${escapeHtml(actionMode)}</span>
-            <h1>${titleText}</h1>
-            <p>Биржа игровых ценностей без визуального шума. Все, что нужно для торговли, собрано в одном спокойном интерфейсе.</p>
-            <div class="hero-trust-row">
-                <span>анонимный чат</span>
-                <span>быстрый поиск</span>
-                <span>локальные настройки</span>
-            </div>
+        <div class="cc-stat">
+            <span class="cc-stat-label eyebrow">Продаж всего</span>
+            <div class="cc-stat-value mono">${escapeHtml(salesTotal)}</div>
+            <div class="cc-stat-sub"><span class="faint">за всё время</span></div>
         </div>
     `;
 
-    const commandCenter = document.createElement('section');
-    commandCenter.className = 'home-command-center';
-    commandCenter.innerHTML = `
-        <div class="home-command-head">
-            <div class="home-command-head-left">
-                <span class="home-command-badge">FP</span>
-                <div>
-                    <strong>Командный центр</strong>
-                    <small>Сводка за сегодня · обновлено только что</small>
+    const actionsHTML = automationActions.map(a => `
+        <button type="button" class="cc-action" data-open-page="${a.page}" data-auto-key="${a.key}">
+            <span class="cc-action-ic">${hic(a.icon, 17)}</span>
+            <span class="cc-action-txt">
+                <span class="cc-action-label">${escapeHtml(a.label)}</span>
+                <span class="cc-action-meta faint">${a.on ? 'включено' : 'выключено'}</span>
+            </span>
+            <span class="tgl" data-on="${String(a.on)}" role="switch" aria-checked="${String(a.on)}" tabindex="0"></span>
+        </button>`).join('');
+
+    const ordersHTML = recentOrders
+        ? recentOrders.map(o => `
+            <div class="cc-order">
+                <div class="cc-order-main">
+                    <span class="cc-order-id mono faint">${escapeHtml(o.id)}</span>
+                    <span class="cc-order-name">${escapeHtml(o.name)}</span>
                 </div>
+                <div class="cc-order-r">
+                    <span class="cc-order-amt mono">${escapeHtml(o.amt)}</span>
+                    <span class="cc-status cc-status-${escapeHtml(o.tone)}">${escapeHtml(o.status)}</span>
+                </div>
+            </div>`).join('')
+        : '<div class="cc-orders-empty faint">Откройте «Продажи», чтобы здесь появились заказы</div>';
+
+    const uiWrapper = document.createElement('div');
+    uiWrapper.className = 'fpt-home fpx-root';
+    uiWrapper.innerHTML = `
+        <div class="home-inner">
+            <div class="home-hero">
+                <span class="home-eyebrow eyebrow">FunPay · кабинет продавца</span>
+                <h1 class="home-h1">${titleText}</h1>
+                <p class="home-lead">Биржа игровых ценностей без визуального шума. Всё, что нужно для торговли — в одном спокойном интерфейсе.</p>
             </div>
-            <button type="button" class="home-command-open" data-home-open-tools>
-                Открыть FP Tools <span>↗</span>
-            </button>
-        </div>
-        <div class="home-command-stats">
-            ${statsHTML}
-        </div>
-        <div class="home-command-body">
-            <div class="home-control-main">
-                <div class="home-command-actions">
-                    <div class="home-command-colhead">Автоматизация</div>
-                    ${actionsHTML}
-                </div>
-                <div class="home-command-orders">
-                    <div class="home-command-colhead">Последние заказы</div>
-                    ${ordersHTML}
-                </div>
-            </div>
-            <aside class="home-secret-chat" aria-label="Секретный чат">
-                <div class="home-secret-head">
-                    <div class="home-secret-peer">
-                        <span class="home-secret-lock">◈</span>
-                        <div class="home-secret-peer-txt">
-                            <strong class="home-secret-name">Секретный чат</strong>
-                            <small class="home-secret-auto"><span class="home-dot-live"></span>1 248 онлайн</small>
+
+            <section class="cc card-glass">
+                <div class="cc-left">
+                    <div class="cc-head">
+                        <div class="cc-head-l">
+                            <div class="cc-badge">${hic('Activity', 17)}</div>
+                            <div>
+                                <div class="cc-title">Командный центр</div>
+                                <div class="cc-sub faint">Сводка · обновлено только что</div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-soft btn-sm" data-home-open-tools>Открыть FP Tools ${hic('ArrowUpRight', 15)}</button>
+                    </div>
+                    <div class="cc-stats">${statsHTML}</div>
+                    <div class="cc-body">
+                        <div class="cc-actions">
+                            <div class="cc-colhead eyebrow">Автоматизация</div>
+                            ${actionsHTML}
+                        </div>
+                        <div class="cc-orders">
+                            <div class="cc-colhead eyebrow">Последние заказы</div>
+                            ${ordersHTML}
                         </div>
                     </div>
-                    <button type="button" class="home-secret-toggle" data-home-secret-toggle title="Свернуть чат">››</button>
                 </div>
-                <div class="home-secret-msgs fpx-scroll">${chatHTML}</div>
-                <div class="home-secret-input">
-                    <input type="text" placeholder="Сообщение в общий чат…" aria-label="Сообщение в общий чат">
-                    <button type="button" class="home-secret-send" aria-label="Отправить сообщение">↑</button>
-                </div>
-                <div class="home-secret-foot">
-                    <span class="home-secret-hint">Торговля в чате запрещена</span>
-                </div>
-            </aside>
-        </div>
-    `;
 
-    const searchHTML = `
-        <div class="redesign-search-container">
-             <span class="home-search-kicker">Поиск по каталогу</span>
-             <input type="text" id="redesignGameSearchInput" class="redesign-search-input" placeholder="Начните вводить название игры или категории...">
-        </div>`;
-    const catalogPanel = document.createElement('section');
-    catalogPanel.className = 'home-catalog-panel';
-    catalogPanel.id = 'fpt-home-catalog';
-    catalogPanel.innerHTML = `
-        <div class="home-catalog-head">
-            <div>
-                <span class="home-eyebrow">Каталог</span>
-                <h2 class="section-title">Каталог игр</h2>
+                <div class="cc-chat is-collapsed" aria-label="Секретный чат">
+                    <button type="button" class="cc-chat-tab" data-secret-toggle>
+                        <span class="cc-chat-tab-ic">${hic('Lock', 16)}</span>
+                        <span class="cc-chat-tab-label">Секретный чат</span>
+                    </button>
+                    <div class="cc-chat-open">
+                        <div class="cc-chat-head">
+                            <div class="cc-chat-peer">
+                                <span class="cc-chat-lockav">${hic('Lock', 15)}</span>
+                                <div class="cc-chat-peer-txt">
+                                    <span class="cc-chat-name">Секретный чат</span>
+                                    <span class="cc-chat-auto"><span class="cc-dot-live"></span>сообщество</span>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-quiet btn-sm btn-icon" data-secret-toggle title="Свернуть">${hic('ChevronsRight', 16)}</button>
+                        </div>
+                        <div class="cc-chat-msgs cc-secret-msgs fpx-scroll" id="fpt-home-gc-feed">
+                            <div class="fpt-home-gc-loading faint" style="padding:14px;">Загрузка…</div>
+                        </div>
+                        <div class="cc-chat-input cc-secret-input">
+                            <input type="text" id="fpt-home-gc-input" placeholder="Сообщение в общий чат…" aria-label="Сообщение в общий чат">
+                            <button type="button" class="cc-send-btn" id="fpt-home-gc-send" aria-label="Отправить">${hic('ArrowUp', 16)}</button>
+                        </div>
+                        <div class="cc-chat-foot cc-secret-foot">
+                            <span class="faint cc-foot-hint">${hic('ShieldAlert', 13)} Торговля в чате запрещена</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="home-catalog">
+                <div class="home-cat-head">
+                    <div>
+                        <h2 class="home-h2">Каталог игр</h2>
+                        <p class="home-h2-sub faint">${allGamesData.length.toLocaleString('ru-RU')} игр · ${categoryCount.toLocaleString('ru-RU')} разделов · фильтр без перезагрузки</p>
+                    </div>
+                    <div class="home-search">
+                        ${hic('Search', 17)}
+                        <input type="text" class="home-search-input" id="fpt-home-search" placeholder="Начните вводить название игры или категории…" autocomplete="off" spellcheck="false">
+                        <button type="button" class="home-search-x" id="fpt-home-search-x" style="display:none;">${hic('X', 15)}</button>
+                    </div>
+                </div>
+                <div class="gcards" id="fpt-gcards"></div>
+                <div class="home-empty" id="fpt-home-empty" style="display:none;">${hic('Search', 22)}<span></span></div>
             </div>
-            <p>${allGamesData.length.toLocaleString('ru-RU')} игр · ${categoryCount.toLocaleString('ru-RU')} разделов · фильтр без перезагрузки</p>
         </div>
-        ${searchHTML}
     `;
 
-    const gameGrid = document.createElement('div');
-    gameGrid.className = 'game-grid';
+    // Build game cards (real games scraped from the page)
+    const grid = uiWrapper.querySelector('#fpt-gcards');
     allGamesData.forEach(game => {
         const card = document.createElement('div');
-        card.className = 'game-card';
-        const firstLetter = escapeHtml((game.name.charAt(0) || 'G').toUpperCase());
-        const avatarColor = stringToHslColor(game.name);
-        const safeGameName = escapeHtml(game.name);
-        let domain;
-        if (game.name.toLowerCase() === 'telegram') {
-            domain = 'web.telegram.org';
-        } else {
-            const cleanGameName = game.name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9-]/g, '');
-            domain = `${cleanGameName}.com`;
-        }
-        const iconUrl = `https://www.google.com/s2/favicons?sz=64&domain=${domain}`;
-        const visibleCategories = game.categories.slice(0, 6);
-        const categoriesHTML = visibleCategories.map(cat => `<a href="${cat.url}" class="category-tag">${escapeHtml(cat.name)}</a>`).join('');
-        const hiddenCategories = game.categories.length - visibleCategories.length;
+        card.className = 'gcard';
+        const letter = escapeHtml((game.name.charAt(0) || 'G').toUpperCase());
+        const safeName = escapeHtml(game.name);
+        const iconUrl = `https://www.google.com/s2/favicons?sz=64&domain=${gameDomain(game.name)}`;
+        const vis = game.categories.slice(0, 5);
+        const catsHTML = vis.map(c => `<a href="${c.url}" class="gcard-cat">${escapeHtml(c.name)}</a>`).join('');
+        const hidden = game.categories.length - vis.length;
         card.innerHTML = `
-            <a href="${game.url}" class="game-card-main-link"></a>
-            <div class="game-card-header">
-                <div class="game-card-avatar">
-                    <div class="fp-fallback-icon" style="background-color: ${avatarColor};">${firstLetter}</div>
-                    <img class="fp-game-icon" data-src="${iconUrl}" alt="${safeGameName}" style="display: none;">
+            <a href="${game.url}" class="gcard-link" aria-label="${safeName}"></a>
+            <div class="gcard-top">
+                <div class="gcard-mark">
+                    <span class="gcard-mono mono">${letter}</span>
+                    <img class="gcard-favicon" data-src="${iconUrl}" alt="" style="display:none;">
                 </div>
-                <div class="game-card-titlewrap">
-                    <h3 class="game-card-title">${safeGameName}</h3>
-                    <span class="game-card-meta">${game.categories.length} разделов · быстрый переход</span>
+                <div class="gcard-titlewrap">
+                    <div class="gcard-title">${safeName}</div>
+                    <div class="gcard-meta faint"><span class="mono">${game.categories.length} разделов</span></div>
                 </div>
-                <span class="game-card-arrow">↗</span>
+                <span class="gcard-go">${hic('ArrowUpRight', 16)}</span>
             </div>
-            <div class="game-card-categories">${categoriesHTML}${hiddenCategories > 0 ? `<span class="category-more">+${hiddenCategories}</span>` : ''}</div>
+            <div class="gcard-cats">${catsHTML}${hidden > 0 ? `<span class="gcard-cat gcard-cat-more">+${hidden}</span>` : ''}</div>
         `;
-        gameGrid.appendChild(card);
+        grid.appendChild(card);
     });
 
-    uiWrapper.appendChild(heroBlock);
-    uiWrapper.appendChild(commandCenter);
-    catalogPanel.appendChild(gameGrid);
-    uiWrapper.appendChild(catalogPanel);
+    // ── events ──
+    uiWrapper.querySelectorAll('[data-home-open-tools]').forEach(b =>
+        b.addEventListener('click', () => document.getElementById('fpToolsButton')?.click()));
 
-    uiWrapper.querySelectorAll('[data-home-open-tools]').forEach(button => {
-        button.addEventListener('click', () => {
-            const fpButton = document.getElementById('fpToolsButton');
-            if (fpButton) fpButton.click();
-        });
-    });
+    uiWrapper.querySelectorAll('[data-open-page]').forEach(b =>
+        b.addEventListener('click', (e) => {
+            // Клик по тогглу переключает функцию на месте, не открывая панель.
+            const tgl = e.target.closest('.tgl');
+            if (tgl) {
+                e.preventDefault();
+                e.stopPropagation();
+                const next = tgl.getAttribute('data-on') !== 'true';
+                tgl.setAttribute('data-on', String(next));
+                tgl.setAttribute('aria-checked', String(next));
+                const meta = b.querySelector('.cc-action-meta');
+                if (meta) meta.textContent = next ? 'включено' : 'выключено';
+                setHomeAutomation(b.getAttribute('data-auto-key'), next);
+                return;
+            }
+            const page = b.getAttribute('data-open-page');
+            document.getElementById('fpToolsButton')?.click();
+            setTimeout(() => document.querySelector(`.fp-tools-popup li[data-page="${page}"] a`)?.click(), 320);
+        }));
 
-    uiWrapper.querySelectorAll('.home-action').forEach(button => {
-        const toggle = button.querySelector('.tgl');
-        if (!toggle) return;
-        button.addEventListener('click', () => {
-            const next = toggle.getAttribute('data-on') !== 'true';
-            toggle.setAttribute('data-on', String(next));
-            button.setAttribute('aria-pressed', String(next));
-        });
-    });
+    function toggleSecretChat() {
+        const rail = uiWrapper.querySelector('.cc-chat');
+        if (!rail) return;
+        const willExpand = rail.classList.contains('is-collapsed');
+        rail.classList.toggle('is-collapsed');
+        if (willExpand) initHomeGlobalChat();
+    }
+    uiWrapper.querySelectorAll('[data-secret-toggle]').forEach(b => b.addEventListener('click', toggleSecretChat));
 
-    uiWrapper.querySelectorAll('[data-home-secret-toggle]').forEach(button => {
-        button.addEventListener('click', () => {
-            const chatRail = uiWrapper.querySelector('.home-secret-chat');
-            if (!chatRail) return;
-            chatRail.classList.toggle('is-collapsed');
-            button.title = chatRail.classList.contains('is-collapsed') ? 'Развернуть чат' : 'Свернуть чат';
-        });
-    });
+    fptWatchHomeToggles();
 
     return uiWrapper;
 }
 
 function setupLazyLoadObserver() {
-    const itemsToLoad = document.querySelectorAll('.game-card, .hero-game-icon');
+    const itemsToLoad = document.querySelectorAll('.gcard');
     if (!itemsToLoad.length) return;
     const observer = new IntersectionObserver((entries, observer) => {
         entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                const item = entry.target;
-                const img = item.querySelector('.fp-game-icon');
-                const fallback = item.querySelector('.fp-fallback-icon');
-                const dataSrc = img.getAttribute('data-src');
-                if (dataSrc) {
-                    img.src = dataSrc;
-                    img.removeAttribute('data-src');
-                    img.onload = () => {
-                        if (img.naturalWidth > 16 && img.naturalHeight > 16) {
-                            fallback.style.display = 'none';
-                            img.style.display = 'block';
-                            img.style.animation = 'fadeInIcon 0.5s';
-                        }
-                    };
-                }
-                observer.unobserve(item);
+            if (!entry.isIntersecting) return;
+            const item = entry.target;
+            const img = item.querySelector('.gcard-favicon');
+            const fallback = item.querySelector('.gcard-mono');
+            const dataSrc = img && img.getAttribute('data-src');
+            if (dataSrc) {
+                img.src = dataSrc;
+                img.removeAttribute('data-src');
+                img.onload = () => {
+                    if (img.naturalWidth > 16 && img.naturalHeight > 16) {
+                        if (fallback) fallback.style.display = 'none';
+                        img.style.display = 'block';
+                    }
+                };
             }
+            observer.unobserve(item);
         });
-    }, {
-        root: null,
-        rootMargin: '0px 0px 200px 0px'
-    });
-    itemsToLoad.forEach(item => {
-        observer.observe(item);
-    });
+    }, { root: null, rootMargin: '0px 0px 200px 0px' });
+    itemsToLoad.forEach(item => observer.observe(item));
 }
 
 function setupSearchFilter() {
-    const searchInput = document.getElementById('redesignGameSearchInput');
+    const searchInput = document.getElementById('fpt-home-search');
     if (!searchInput) return;
+    const clearBtn = document.getElementById('fpt-home-search-x');
+    const empty = document.getElementById('fpt-home-empty');
 
-    // 1. Кэшируем элементы и их текст
-    const gameCards = Array.from(document.querySelectorAll('.game-grid .game-card')).map(card => {
-        const title = card.querySelector('.game-card-title').textContent.toLowerCase();
-        const tags = Array.from(card.querySelectorAll('.category-tag')).map(tag => tag.textContent.toLowerCase());
-        return {
-            element: card,
-            title: title,
-            tags: tags,
-            fullText: [title, ...tags].join(' ') // Соединяем весь текст для простого поиска
-        };
+    const cards = Array.from(document.querySelectorAll('#fpt-gcards .gcard')).map(card => {
+        const title = (card.querySelector('.gcard-title')?.textContent || '').toLowerCase();
+        const tags = Array.from(card.querySelectorAll('.gcard-cat')).map(t => t.textContent.toLowerCase());
+        return { element: card, fullText: [title, ...tags].join(' ') };
     });
 
-    // 2. Создаем функцию Debounce
-    let debounceTimer;
-    const debounce = (func, delay) => {
-        return function(...args) {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => func.apply(this, args), delay);
-        };
-    };
-
-    const filterGames = () => {
-        const searchTerm = searchInput.value.toLowerCase().trim();
-        
-        gameCards.forEach(cardData => {
-            const isMatch = searchTerm === '' || cardData.fullText.includes(searchTerm);
-            cardData.element.style.display = isMatch ? 'flex' : 'none';
-
-            // Подсветка тегов (опционально, но делает поиск лучше)
-            cardData.element.querySelectorAll('.category-tag').forEach((tag, index) => {
-                const isTagMatch = searchTerm && cardData.tags[index].includes(searchTerm);
-                tag.classList.toggle('category-tag--highlighted', isTagMatch);
-            });
+    let t;
+    const filter = () => {
+        const q = searchInput.value.toLowerCase().trim();
+        if (clearBtn) clearBtn.style.display = q ? 'flex' : 'none';
+        let shown = 0;
+        cards.forEach(c => {
+            const match = q === '' || c.fullText.includes(q);
+            c.element.style.display = match ? '' : 'none';
+            if (match) shown++;
         });
+        if (empty) {
+            empty.style.display = shown === 0 ? 'flex' : 'none';
+            const label = empty.querySelector('span');
+            if (label) label.textContent = `Ничего не нашлось по запросу «${searchInput.value.trim()}»`;
+        }
     };
 
-    // 3. Вешаем обработчик с Debounce
-    searchInput.addEventListener('input', debounce(filterGames, 200));
+    searchInput.addEventListener('input', () => { clearTimeout(t); t = setTimeout(filter, 160); });
+    if (clearBtn) clearBtn.addEventListener('click', () => { searchInput.value = ''; filter(); searchInput.focus(); });
 }
 
 function anonymizeHomepageChat(chatElement) {
@@ -476,7 +708,7 @@ function anonymizeHomepageChat(chatElement) {
     }
 }
 
-function initializeRedesign() {
+async function initializeRedesign() {
     loadRedesignFonts();
 
     const promoFilterForm = document.querySelector('.promo-games-filter');
@@ -501,27 +733,44 @@ function initializeRedesign() {
         return;
     }
 
-    const newUI = createRedesignedUI(allGamesData, yourGamesData);
+    // Fetch real data before building UI
+    let realData = {};
+    try { realData = await getHomepageRealData(); } catch(e) {}
+
+    const newUI = createRedesignedUI(allGamesData, yourGamesData, realData);
     originalContentContainer.innerHTML = '';
     originalContentContainer.appendChild(newUI);
     originalContentContainer.classList.add('redesigned-content-container');
     document.body.classList.add('funpay-redesigned');
     setupSearchFilter();
     setupLazyLoadObserver();
+
+    // Re-check balance after DOM is ready (might have been hidden by theme_flash_fix)
+    setTimeout(() => {
+        const balEl = document.querySelector('.badge-balance, .balances-value, .user-balance-sum');
+        if (balEl) {
+            const txt = balEl.textContent.replace(/[^\d\s.,₽]/g, '').replace(/\s+/g, ' ').trim();
+            if (txt) {
+                const el = document.getElementById('fpt-home-stat-balance');
+                if (el) el.textContent = txt + (txt.includes('₽') ? '' : ' ₽');
+            }
+        }
+    }, 1200);
 }
 
 async function handleHomepageRedesign() {
     const {
         enableRedesignedHomepage = true,
-        enableCustomTheme = true
-    } = await chrome.storage.local.get(['enableRedesignedHomepage', 'enableCustomTheme']);
+        enableCustomTheme = true,
+        fpToolsTheme = {}
+    } = await chrome.storage.local.get(['enableRedesignedHomepage', 'enableCustomTheme', 'fpToolsTheme']);
     const path = window.location.pathname;
     const isHomepage = path === '/' || path === '/en' || path === '/en/';
-    // 3.0: улучшенная главная завязана на цвета кастомной темы. Если кастомная тема
-    // выключена - редизайн даёт белые артефакты на тёмном фоне, поэтому отключаем его
-    // вместе с темой.
+    // Редизайн-главная работает на всех пресетах: её токены переключаются
+    // селектором [data-fpt-preset] (включая светлый). Отключается только
+    // вместе с кастомной темой.
     if (enableRedesignedHomepage && enableCustomTheme && isHomepage) {
-        initializeRedesign();
+        await initializeRedesign();
     } else {
         const content = document.querySelector('#content');
         if (content) content.style.visibility = 'visible';

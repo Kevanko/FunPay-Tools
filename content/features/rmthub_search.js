@@ -209,8 +209,8 @@
         </div>
         <div class="rmth-foot">
             <div class="rmth-links">
-                <a href="${esc(fpUrl)}" target="_blank">🔗 FunPay</a>
-                <a href="${esc(rmtUrl)}" target="_blank">📊 RMTHub</a>
+                <a href="${esc(fpUrl)}" target="_blank"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:-2px;">link</span> FunPay</a>
+                <a href="${esc(rmtUrl)}" target="_blank"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:-2px;">analytics</span> RMTHub</a>
             </div>
             <span class="rmth-credit">Данные: RMTHub.com</span>
         </div>`;

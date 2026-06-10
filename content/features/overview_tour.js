@@ -28,7 +28,7 @@ const SCENES = [
         visualization: `
             <div class="tour-chat-mockup-3d">
                 <div class="tour-chat-bubble before">привет, данные скинь</div>
-                <div class="tour-chat-bubble after">Здравствуйте! 👋 Ожидаю данные для выполнения заказа.</div>
+                <div class="tour-chat-bubble after">Здравствуйте! Ожидаю данные для выполнения заказа.</div>
             </div>`,
         duration: 6000
     },
@@ -40,8 +40,8 @@ const SCENES = [
              <div class="tour-lot-gen-mockup">
                 <div class="tour-lot-gen-input">Идея: <span>Крутой аккаунт Genshin</span></div>
                 <div class="tour-lot-gen-output">
-                    <div>🔥 ТОПОВЫЙ АККАУНТ GENSHIN 🔥</div>
-                    <div>✅ Много лег • ✅ Быстрая выдача</div>
+                    <div>ТОПОВЫЙ АККАУНТ GENSHIN</div>
+                    <div>Много лег • Быстрая выдача</div>
                 </div>
             </div>`,
         duration: 7000

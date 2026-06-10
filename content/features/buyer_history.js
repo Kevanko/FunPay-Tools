@@ -62,7 +62,7 @@ function renderHistoryPanel(orders, name, anchor) {
     panel.innerHTML = `
         <div class="fp-bh-header">
             <div class="fp-bh-title">
-                <span class="fp-bh-icon">📦</span>
+                <span class="fp-bh-icon"><span class="material-symbols-rounded" style="font-size:16px;vertical-align:-3px;">inventory_2</span></span>
                 <span>История покупок <strong>${name}</strong></span>
             </div>
             <button class="fp-bh-close" title="Закрыть">✕</button>
@@ -204,7 +204,7 @@ function attachChatMenuItems(chatHeader) {
 
         // 1. История покупок
         const histLi = document.createElement('li');
-        histLi.innerHTML = '<a href="#" id="fp-buyer-hist-menu-btn">📦 История покупок</a>';
+        histLi.innerHTML = '<a href="#" id="fp-buyer-hist-menu-btn">История покупок</a>';
         histLi.querySelector('a').addEventListener('click', async (e) => {
             e.preventDefault();
             const a = e.currentTarget;
@@ -214,7 +214,7 @@ function attachChatMenuItems(chatHeader) {
             document.getElementById('fp-buyer-hist-panel')?.remove();
             a.textContent = '⏳ Загрузка...';
             const orders = await loadBuyerHistory(_name);
-            a.textContent = '📦 История покупок';
+            a.textContent = 'История покупок';
             if (!orders || !orders.length) {
                 if (typeof showNotification === 'function') showNotification('Покупок у этого покупателя не найдено');
                 return;
@@ -225,16 +225,16 @@ function attachChatMenuItems(chatHeader) {
 
         // 2. Режим перевода
         const transLi = document.createElement('li');
-        transLi.innerHTML = '<a href="#" id="fp-translate-menu-btn">🌐 Включить перевод</a>';
+        transLi.innerHTML = '<a href="#" id="fp-translate-menu-btn">Включить перевод</a>';
         transLi.querySelector('a').addEventListener('click', (e) => {
             e.preventDefault();
             const a = e.currentTarget;
             _translateMode = !_translateMode;
             if (_translateMode) {
-                a.textContent = '🌐 Выключить перевод';
+                a.textContent = 'Выключить перевод';
                 startRealtimeTranslation();
             } else {
-                a.textContent = '🌐 Включить перевод';
+                a.textContent = 'Включить перевод';
                 stopRealtimeTranslation();
             }
         });
@@ -242,7 +242,7 @@ function attachChatMenuItems(chatHeader) {
 
         // 3. Экспорт чата
         const exportLi = document.createElement('li');
-        exportLi.innerHTML = '<a href="#" id="fp-export-chat-menu-btn">💾 Экспортировать чат</a>';
+        exportLi.innerHTML = '<a href="#" id="fp-export-chat-menu-btn">Экспортировать чат</a>';
         exportLi.querySelector('a').addEventListener('click', (e) => {
             e.preventDefault();
             const msgs = [];
@@ -266,7 +266,7 @@ function attachChatMenuItems(chatHeader) {
             a.download = `funpay_chat_${partner}_${dateStr}.txt`;
             a.click();
             URL.revokeObjectURL(a.href);
-            if (typeof showNotification === 'function') showNotification('Чат экспортирован ✓');
+            if (typeof showNotification === 'function') showNotification('Чат экспортирован');
         });
         menu.appendChild(exportLi);
 
@@ -280,7 +280,7 @@ function attachChatMenuItems(chatHeader) {
 
         const syncBlText = async () => {
             const inList = (typeof isInBlacklist === 'function') ? await isInBlacklist(buyerName) : false;
-            blA.textContent = inList ? '✅ Удалить из ЧС' : '🚫 Добавить в ЧС';
+            blA.textContent = inList ? 'Удалить из ЧС' : 'Добавить в ЧС';
             blA.style.color = inList ? '#5cff8f' : '#ff5c5c';
         };
         syncBlText();

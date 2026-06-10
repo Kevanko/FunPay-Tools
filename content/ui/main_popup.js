@@ -53,7 +53,7 @@ function createMainPopup() {
         const s = document.createElement('style');
         s.id = 'fp-popup-extra-styles';
         s.textContent = `
-            .fp-tools-site-link{color:inherit;text-decoration:none;display:inline-block;transition:all .25s ease;position:relative;}
+            .fp-tools-site-link{color:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:11px;transition:all .25s ease;position:relative;}
             .fp-tools-site-link::after{content:'';position:absolute;left:0;bottom:-2px;width:0;height:2px;background:linear-gradient(90deg,#5b86d8,#8ea7df);transition:width .3s ease;border-radius:2px;}
             .fp-tools-site-link:hover{background:linear-gradient(90deg,#5b86d8,#8ea7df,#5b86d8);background-size:200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:fp-shimmer 1.2s linear infinite;}
             .fp-tools-site-link:hover::after{width:100%;}
@@ -63,7 +63,7 @@ function createMainPopup() {
             .fp-wallpaper-card img{pointer-events:none;}
             .fp-site-footer-link{display:inline-flex;align-items:center;gap:6px;padding:6px 16px;border:1px solid rgba(91,134,216,.35);border-radius:20px;color:#7fa1df;text-decoration:none;font-size:12px;font-weight:600;letter-spacing:.5px;transition:all .2s;}
             .fp-site-footer-link:hover{background:rgba(91,134,216,.12);border-color:#5b86d8;color:#a9bde6;transform:translateY(-1px);box-shadow:0 4px 12px rgba(91,134,216,.2);}
-            .fp-nav-divider{padding:10px 16px 3px!important;font-size:10px!important;font-weight:700!important;color:#3a3d52!important;text-transform:uppercase;letter-spacing:1px;cursor:default!important;pointer-events:none;margin-top:10px!important;}
+            .fp-nav-divider{padding:10px 16px 3px!important;font-size:10px!important;font-weight:700!important;color:var(--fpt-text-faint, #3a3d52)!important;text-transform:uppercase;letter-spacing:1px;cursor:default!important;pointer-events:none;margin-top:10px!important;}
             .fp-nav-divider:first-child{margin-top:0!important;}
             .fp-nav-divider:hover{background:none!important;}
             .fp-dark-preset-btn{width:100%;margin-bottom:12px;background:rgba(0,0,0,.3)!important;border-color:rgba(255,255,255,.1)!important;display:flex;align-items:center;justify-content:center;gap:8px;}
@@ -98,34 +98,31 @@ function createMainPopup() {
                 </label>
                 <div class="fpt-nav-empty" hidden>Ничего не найдено</div>
                 <ul>
-                    <li class="fp-nav-divider">Основное</li>
-                    <li data-page="general" class="active"><a><span class="nav-icon material-symbols-rounded">settings</span><span>Общие</span></a></li>
-                    <li data-page="accounts"><a><span class="nav-icon material-symbols-rounded">group</span><span>Аккаунты</span></a></li>
-                    <li data-page="needs"><a><span class="nav-icon material-symbols-rounded">tune</span><span>Что тебе нужно</span></a></li>
-                    <li data-page="slash_commands"><a><span class="nav-icon material-symbols-rounded">terminal</span><span>Слэш-команды</span></a></li>
-                    <li data-page="telegram"><a><span class="nav-icon material-symbols-rounded">send</span><span>Telegram</span></a></li>
-                    <li class="fp-nav-divider">Эксклюзив</li>
-                    <li data-page="epic_nicks"><a><span class="nav-icon material-symbols-rounded">diamond</span><span>Это увидят все</span></a></li>
-                    <li class="fp-nav-divider">Интерфейс</li>
-                    <li data-page="theme"><a><span class="nav-icon material-symbols-rounded">palette</span><span>Кастомизация</span></a></li>
-                    <li data-page="effects"><a><span class="nav-icon material-symbols-rounded">auto_awesome</span><span>Эффекты</span></a></li>
-                    <li class="fp-nav-divider">Чат и продажи</li>
-                    <li data-page="global_chat"><a><span class="nav-icon material-symbols-rounded">forum</span><span>Общий чат</span></a></li>
-                    <li data-page="templates"><a><span class="nav-icon material-symbols-rounded">description</span><span>Шаблоны</span></a></li>
-                    <li data-page="auto_review"><a><span class="nav-icon material-symbols-rounded">smart_toy</span><span>Авто-ответы</span></a></li>
-                    <li data-page="auto_delivery"><a><span class="nav-icon material-symbols-rounded">bolt</span><span>Авто-выдача</span></a></li>
-                    <li class="fp-nav-divider">Торговля</li>
+                    <li class="fp-nav-divider">Рабочий стол</li>
+                    <li data-page="general" class="active"><a><span class="nav-icon material-symbols-rounded">grid_view</span><span>Обзор</span></a></li>
                     <li data-page="lot_io"><a><span class="nav-icon material-symbols-rounded">inventory_2</span><span>Лоты</span></a></li>
                     <li data-page="autobump"><a><span class="nav-icon material-symbols-rounded">rocket_launch</span><span>Авто-поднятие</span></a></li>
-                    <li data-page="ai_audit"><a><span class="nav-icon material-symbols-rounded">search_insights</span><span>ИИ-аудит</span></a></li>
+                    <li data-page="auto_delivery"><a><span class="nav-icon material-symbols-rounded">bolt</span><span>Авто-выдача</span></a></li>
+                    <li class="fp-nav-divider">Чат и продажи</li>
+                    <li data-page="templates"><a><span class="nav-icon material-symbols-rounded">description</span><span>Шаблоны</span></a></li>
+                    <li data-page="auto_review"><a><span class="nav-icon material-symbols-rounded">smart_toy</span><span>Авто-ответы</span></a></li>
+                    <li data-page="slash_commands"><a><span class="nav-icon material-symbols-rounded">terminal</span><span>Слэш-команды</span></a></li>
+                    <li data-page="global_chat"><a><span class="nav-icon material-symbols-rounded">forum</span><span>Общий чат</span></a></li>
                     <li data-page="blacklist"><a><span class="nav-icon material-symbols-rounded">block</span><span>Чёрный список</span></a></li>
+                    <li data-page="ai_audit"><a><span class="nav-icon material-symbols-rounded">search_insights</span><span>ИИ-аудит</span></a></li>
                     <li class="fp-nav-divider">Финансы</li>
+                    <li data-page="currency_calc"><a><span class="nav-icon material-symbols-rounded">currency_exchange</span><span>Валюты</span></a></li>
                     <li data-page="piggy_banks"><a><span class="nav-icon material-symbols-rounded">savings</span><span>Копилки</span></a></li>
                     <li data-page="calculator"><a><span class="nav-icon material-symbols-rounded">calculate</span><span>Калькулятор</span></a></li>
-                    <li data-page="currency_calc"><a><span class="nav-icon material-symbols-rounded">currency_exchange</span><span>Валюты</span></a></li>
-                    <li class="fp-nav-divider">Прочее</li>
+                    <li class="fp-nav-divider">Система</li>
+                    <li data-page="theme"><a><span class="nav-icon material-symbols-rounded">palette</span><span>Оформление</span></a></li>
+                    <li data-page="effects"><a><span class="nav-icon material-symbols-rounded">auto_awesome</span><span>Эффекты</span></a></li>
+                    <li data-page="accounts"><a><span class="nav-icon material-symbols-rounded">group</span><span>Аккаунты</span></a></li>
+                    <li data-page="needs"><a><span class="nav-icon material-symbols-rounded">tune</span><span>Что тебе нужно</span></a></li>
+                    <li data-page="epic_nicks"><a><span class="nav-icon material-symbols-rounded">diamond</span><span>Это увидят все</span></a></li>
+                    <li data-page="telegram"><a><span class="nav-icon material-symbols-rounded">send</span><span>Telegram</span></a></li>
                     <li data-page="notes"><a><span class="nav-icon material-symbols-rounded">edit_note</span><span>Заметки</span></a></li>
-                    <li data-page="overview"><a><span class="nav-icon material-symbols-rounded">movie</span><span>Обзор</span></a></li>
+                    <li data-page="overview"><a><span class="nav-icon material-symbols-rounded">movie</span><span>Обзор функций</span></a></li>
                     <li data-page="settings_io"><a><span class="nav-icon material-symbols-rounded">database</span><span>Настройки</span></a></li>
                     <li data-page="tickets"><a><span class="nav-icon material-symbols-rounded">confirmation_number</span><span>Тикеты</span></a></li>
                     <li data-page="support"><a><span class="nav-icon material-symbols-rounded">favorite</span><span>Поддержка</span></a></li>
@@ -137,23 +134,20 @@ function createMainPopup() {
                         <div class="fpt-command-copy">
                             <span class="fpt-eyebrow">FP Tools · локальная панель</span>
                             <h3>Командный центр</h3>
-                            <p>Быстрый доступ к автоматизации, чату, лотам, финансам и внешнему виду. Интерфейс собран спокойнее: меньше шума, больше контроля, все старые функции остаются на своих вкладках.</p>
+                            <p>Быстрый доступ к автоматизации, чату, лотам, финансам и внешнему виду. Все функции — на своих вкладках слева.</p>
                         </div>
                         <div class="fpt-command-metrics">
                             <button type="button" class="fpt-metric-card" data-nav-to="autobump">
-                                <span class="material-symbols-rounded">rocket_launch</span>
-                                <strong>Авто-поднятие</strong>
-                                <small>таймеры и категории</small>
+                                <span class="fpt-metric-ic material-symbols-rounded">rocket_launch</span>
+                                <span class="fpt-metric-txt"><strong>Авто-поднятие</strong><small>таймеры и категории</small></span>
                             </button>
                             <button type="button" class="fpt-metric-card" data-nav-to="templates">
-                                <span class="material-symbols-rounded">quickreply</span>
-                                <strong>Шаблоны</strong>
-                                <small>ответы и позиции</small>
+                                <span class="fpt-metric-ic material-symbols-rounded">description</span>
+                                <span class="fpt-metric-txt"><strong>Шаблоны</strong><small>ответы и позиции</small></span>
                             </button>
                             <button type="button" class="fpt-metric-card" data-nav-to="lot_io">
-                                <span class="material-symbols-rounded">inventory_2</span>
-                                <strong>Лоты</strong>
-                                <small>импорт и экспорт</small>
+                                <span class="fpt-metric-ic material-symbols-rounded">inventory_2</span>
+                                <span class="fpt-metric-txt"><strong>Лоты</strong><small>импорт и экспорт</small></span>
                             </button>
                         </div>
                     </section>
@@ -183,18 +177,18 @@ function createMainPopup() {
                     </div>
 
                     <!-- Загрузка своей мелодии + обрезка до 5 секунд -->
-                    <div id="fptCustomSoundBlock" style="margin-top:12px;background:#0e0f16;border:1px solid #1e2030;border-radius:10px;padding:14px;display:none;">
+                    <div id="fptCustomSoundBlock" style="margin-top:12px;background:var(--fpt-bg-deep, #0e0f16);border:1px solid var(--fpt-line, #1e2030);border-radius:10px;padding:14px;display:none;">
                         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
                             <button id="fptCustomSoundUploadBtn" class="btn btn-default" style="padding:6px 12px;font-size:13px;">
                                 <span class="material-symbols-rounded" style="font-size:16px;vertical-align:-3px;margin-right:5px;">upload_file</span>Выбрать аудио
                             </button>
                             <input type="file" id="fptCustomSoundInput" accept="audio/*" style="display:none;">
-                            <span id="fptCustomSoundFileName" style="font-size:12px;color:#9099b8;">Файл не выбран</span>
+                            <span id="fptCustomSoundFileName" style="font-size:12px;color:var(--fpt-text-dim, #9099b8);">Файл не выбран</span>
                         </div>
                         <p class="template-info" style="margin-top:10px;">Можно выбрать любые <span class="fpt-sec-spin"><input type="text" id="fptClipSeconds" value="5" inputmode="numeric" maxlength="1"><span class="fpt-sec-spin-btns"><button type="button" id="fptClipSecUp" tabindex="-1">▲</button><button type="button" id="fptClipSecDown" tabindex="-1">▼</button></span></span> сек. из вашего трека: перетащите выделение по дорожке, прослушайте и сохраните. Уведомление будет проигрывать именно этот отрезок.</p>
 
                         <div id="fptCustomSoundEditor" style="display:none;margin-top:8px;">
-                            <div id="fptWaveWrap" style="position:relative;height:64px;background:#070810;border:1px solid #22253a;border-radius:8px;overflow:hidden;user-select:none;cursor:pointer;">
+                            <div id="fptWaveWrap" style="position:relative;height:64px;background:var(--fpt-bg-deep, #070810);border:1px solid var(--fpt-line-strong, #22253a);border-radius:8px;overflow:hidden;user-select:none;cursor:pointer;">
                                 <canvas id="fptWaveCanvas" style="position:absolute;inset:0;width:100%;height:100%;"></canvas>
                                 <div id="fptWaveSel" style="position:absolute;top:0;bottom:0;background:rgba(91,134,216,0.18);border-left:2px solid #5b86d8;border-right:2px solid #5b86d8;box-sizing:border-box;"></div>
                                 <div id="fptWavePlayhead" style="position:absolute;top:0;bottom:0;width:2px;background:#d2a85e;display:none;"></div>
@@ -202,7 +196,7 @@ function createMainPopup() {
                                 <div id="fptWaveSelHandleR" style="position:absolute;top:0;bottom:0;width:8px;margin-left:-4px;cursor:ew-resize;"></div>
                             </div>
                             <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;gap:10px;flex-wrap:wrap;">
-                                <span id="fptCustomSoundRange" style="font-size:11px;color:#5a5f7a;">0:00 – 0:05</span>
+                                <span id="fptCustomSoundRange" style="font-size:11px;color:var(--fpt-text-faint, #5a5f7a);">0:00 – 0:05</span>
                                 <div style="display:flex;gap:8px;align-items:center;">
                                     <button id="fptCustomSoundPreviewBtn" class="fpt-icon-play-btn" title="Прослушать отрезок">
                                         <span class="material-symbols-rounded">play_arrow</span>
@@ -396,7 +390,7 @@ function createMainPopup() {
                             <button id="fptTgConnectBtn" class="btn" style="flex:1;">Подключить</button>
                             <button id="fptTgTestBtn" class="btn btn-default" style="flex:1;">Тест уведомления</button>
                         </div>
-                        <div id="fptTgStatus" style="font-size:12px;margin-top:8px;color:#9099b8;"></div>
+                        <div id="fptTgStatus" style="font-size:12px;margin-top:8px;color:var(--fpt-text-dim, #9099b8);"></div>
 
                         <label for="fptTgChatId" style="margin-top:14px;">Chat ID (определяется автоматически):</label>
                         <input type="text" id="fptTgChatId" class="template-input" placeholder="Будет заполнено после «Подключить»" autocomplete="off" spellcheck="false">
@@ -628,7 +622,7 @@ function createMainPopup() {
                                 <input type="checkbox" id="ignoreSystemMessages">
                                 <label for="ignoreSystemMessages" style="margin-bottom:0;"><span>Не приветствовать при системных сообщениях (заказы, отзывы)</span></label>
                             </div>
-                            <label style="font-size:12px;color:#5a5f7a;margin-top:6px;display:block;">Кулдаун повторного приветствия (дней, 0 = без кулдауна):</label>
+                            <label style="font-size:12px;color:var(--fpt-text-faint, #5a5f7a);margin-top:6px;display:block;">Кулдаун повторного приветствия (дней, 0 = без кулдауна):</label>
                             <input type="number" id="greetingCooldownDays" min="0" max="365" value="0" class="template-input" style="width:80px;" placeholder="0">
                         </div>
                     </div>
@@ -669,7 +663,7 @@ function createMainPopup() {
 
                 <div class="fp-tools-page-content" data-page="lot_io">
                     <h3>Управление лотами</h3>
-                    <div class="template-info" style="padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+                    <div class="template-info" style="padding: 15px; background: var(--fpt-surface-2, rgba(0,0,0,0.2)); border-radius: 8px;">
                         <p style="margin-top:0;">Здесь собраны инструменты для массовой работы с вашими лотами.</p>
                         <ul style="padding-left: 20px; margin-bottom: 0;">
                             <li><strong>Экспорт/Импорт:</strong> Сохраняйте все свои лоты в файл и восстанавливайте их на любом аккаунте.</li>
@@ -704,33 +698,49 @@ function createMainPopup() {
                     <div id="piggy-banks-list-container" class="piggy-banks-list-container"></div>
                 </div>
                 <div class="fp-tools-page-content" data-page="theme">
-                    <h3>Кастомизация темы</h3>
+                    <h3>Оформление</h3>
                     <div class="checkbox-label-inline" style="margin-bottom:15px;"><input type="checkbox" id="enableCustomThemeCheckbox"><label for="enableCustomThemeCheckbox" style="margin-bottom:0;"><span>Включить кастомную тему</span></label></div>
-                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                        <span style="font-size:12px;color:#5a5f7a;flex:1;">Готовые обои:</span>
-                        <button id="fp-apply-dark-preset" class="btn btn-default" style="padding:3px 10px;font-size:12px;"><span class="material-symbols-rounded" style="font-size:15px;vertical-align:-3px;margin-right:4px;">dark_mode</span>Чёрная</button>
+
+                    <div class="fpt-eyebrow fpt-blocklabel">Тема</div>
+                    <div class="fpt-theme-swatches">
+                        <button type="button" class="fpt-theme-sw" data-fpt-theme="graphite"><span class="fpt-theme-prev" data-t="graphite"></span><span class="fpt-theme-sw-label">Графит</span></button>
+                        <button type="button" class="fpt-theme-sw" data-fpt-theme="obsidian"><span class="fpt-theme-prev" data-t="obsidian"></span><span class="fpt-theme-sw-label">Обсидиан</span></button>
+                        <button type="button" class="fpt-theme-sw" data-fpt-theme="slate"><span class="fpt-theme-prev" data-t="slate"></span><span class="fpt-theme-sw-label">Сине-серый</span></button>
+                        <button type="button" class="fpt-theme-sw" data-fpt-theme="light"><span class="fpt-theme-prev" data-t="light"></span><span class="fpt-theme-sw-label">Светлая</span></button>
                     </div>
-                    <div id="fp-wallpaper-carousel" style="position:relative;width:100%;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:#0e0f16;contain:layout style paint;">
-                        <div id="fp-wp-img-slot" style="position:absolute;inset:0;"></div>
-                        <button id="fp-wp-prev" style="position:absolute;left:6px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.55);border:none;color:#fff;font-size:18px;width:28px;height:28px;border-radius:50%;cursor:pointer;z-index:2;display:flex;align-items:center;justify-content:center;line-height:1;">&#8249;</button>
-                        <button id="fp-wp-next" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.55);border:none;color:#fff;font-size:18px;width:28px;height:28px;border-radius:50%;cursor:pointer;z-index:2;display:flex;align-items:center;justify-content:center;line-height:1;">&#8250;</button>
-                        <div id="fp-wp-label" style="position:absolute;bottom:0;left:0;right:0;padding:4px 8px;background:rgba(0,0,0,.6);font-size:11px;color:#ccc;display:flex;align-items:center;justify-content:space-between;">
-                            <span id="fp-wp-name"></span>
-                            <span id="fp-wp-counter" style="color:#5a5f7a;font-size:10px;"></span>
-                        </div>
-                        <div id="fp-wp-loader" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;">
-                            <span id="fp-wp-emoji" style="font-size:24px;"></span>
-                            <div style="width:60px;height:3px;background:#1e2030;border-radius:2px;overflow:hidden;"><div id="fp-wp-bar" style="height:100%;width:0%;background:#5b86d8;transition:width .15s linear;border-radius:2px;"></div></div>
-                            <span id="fp-wp-pct" style="font-size:10px;color:#4a4f68;">0%</span>
-                        </div>
-                        <button id="fp-wp-apply-cur" style="position:absolute;top:6px;right:6px;background:rgba(91,134,216,.9);border:none;color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:12px;cursor:pointer;z-index:2;display:none;">Применить</button>
+
+                    <div class="fpt-eyebrow fpt-blocklabel">Акцент</div>
+                    <div class="accentpick" id="fpt-accentpick">
+                        <button type="button" class="accentpick-sw" data-accent="#5b86d8" style="--sw:#5b86d8" title="Стальной синий"></button>
+                        <button type="button" class="accentpick-sw" data-accent="#3f9e7c" style="--sw:#3f9e7c" title="Зелёный"></button>
+                        <button type="button" class="accentpick-sw" data-accent="#8b7fd0" style="--sw:#8b7fd0" title="Лавандовый"></button>
+                        <button type="button" class="accentpick-sw" data-accent="#c2703d" style="--sw:#c2703d" title="Терракота"></button>
+                        <button type="button" class="accentpick-sw" data-accent="#6b7280" style="--sw:#6b7280" title="Серый"></button>
+                        <button type="button" class="accentpick-wheel" id="fpt-accent-wheel" title="Свой цвет">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/></svg>
+                            <input type="color" class="accentpick-input" value="#5b86d8" aria-label="Свой цвет акцента">
+                        </button>
+                        <button type="button" class="accentpick-rainbow" id="fpt-accent-rainbow" title="Радужный (RGB)"></button>
                     </div>
+
+                    <div class="fpt-eyebrow fpt-blocklabel">Обои</div>
+                    <div class="fpt-walls" id="fp-wallpaper-grid">
+                        <button type="button" class="fpt-wall" data-wall="none"><span class="fpt-wall-prev wall-none"></span><span class="fpt-wall-label">Нет</span></button>
+                        <button type="button" class="fpt-wall" data-wall="dunes"><span class="fpt-wall-prev wall-dunes"></span><span class="fpt-wall-label">Дюны</span></button>
+                        <button type="button" class="fpt-wall" data-wall="mesh"><span class="fpt-wall-prev wall-mesh"></span><span class="fpt-wall-label">Меш</span></button>
+                        <button type="button" class="fpt-wall" data-wall="grid"><span class="fpt-wall-prev wall-grid"></span><span class="fpt-wall-label">Сетка</span></button>
+                        <button type="button" class="fpt-wall" data-wall="cobalt"><span class="fpt-wall-prev wall-cobalt"></span><span class="fpt-wall-label">Кобальт</span></button>
+                        <button type="button" class="fpt-wall" data-wall="aurora"><span class="fpt-wall-prev wall-aurora"></span><span class="fpt-wall-label">Аврора <span class="fpt-live">live</span></span></button>
+                        <button type="button" class="fpt-wall" data-wall="drift"><span class="fpt-wall-prev wall-drift"></span><span class="fpt-wall-label">Дрейф <span class="fpt-live">live</span></span></button>
+                    </div>
+
+                    <div class="fpt-eyebrow fpt-blocklabel">Свои обои</div>
                     <div class="template-container">
-                        <label>Фоновое изображение:</label>
-                        <div id="bg-image-preview" style="width:100%; height:60px; background-color:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.1); border-radius:8px; margin-bottom:10px; background-size:cover; background-position:center; display:flex; align-items:center; justify-content:center; color: #888; font-size:12px;">Нет изображения</div>
-                        <button id="uploadBgImageBtn" class="btn" title="Можно загружать анимированные GIF">Загрузить</button>
+                        <label>Фото или видео-обои:</label>
+                        <div id="bg-image-preview" style="width:100%; height:60px; background-color: var(--fpt-surface-2, rgba(0,0,0,0.2)); border:1px solid rgba(255,255,255,0.1); border-radius:8px; margin-bottom:10px; background-size:cover; background-position:center; display:flex; align-items:center; justify-content:center; color: #888; font-size:12px;">Нет файла</div>
+                        <button id="uploadBgImageBtn" class="btn" title="Фото, GIF или видео до 7 МБ (mp4/webm)">Загрузить</button>
                         <button id="removeBgImageBtn" class="btn btn-default" style="margin-left: 10px;">Удалить</button>
-                        <input type="file" id="bgImageInput" accept="image/*,image/gif" style="display: none;">
+                        <input type="file" id="bgImageInput" accept="image/*,image/gif,video/mp4,video/webm" style="display: none;">
                         <div class="bg-image-info"><span id="bgImageInfoToggle" class="info-toggle">Откуда брать анимации? ⓘ</span><div id="bgImageInfoContent" class="info-content"><p>Вы можете загрузать анимированные GIF. Примеры сайтов, где можно найти подходящие фоны:</p><ul><li><a href="https://www.behance.net/gallery/35096329/Ambient-animations" target="_blank" rel="noopener noreferrer">Behance - Ambient Animations</a></li><li><a href="https://tenor.com/ru/search/looping-gifs-anime-aesthetic-gifs" target="_blank" rel="noopener noreferrer">Tenor - Looping Aesthetic Gifs</a></li><li><a href="https://www.pinterest.com/pin/678565868836311444/" target="_blank" rel="noopener noreferrer">Pinterest - Pixel Art</a></li><li><a href="https://tenor.com/ru/search/anime-rain-wallpaper-gifs" target="_blank" rel="noopener noreferrer">Tenor - Anime Rain Wallpaper</a></li></ul></div></div>
                     </div>
                     <div class="template-container color-input-grid">
@@ -746,7 +756,7 @@ function createMainPopup() {
                     <div class="template-container"><div class="range-label"><label for="themeBorderRadius">Закругление углов:</label><span id="themeBorderRadiusValue">8px</span></div><input type="range" id="themeBorderRadius" min="0" max="30" step="1"></div>
                     <div class="setting-group"><div class="checkbox-label-inline"><input type="checkbox" id="enableGlassmorphism"><label for="enableGlassmorphism">Эффект "матового стекла"</label></div><div id="glassmorphismControls" style="display:none;"><div class="template-container"><div class="range-label"><label for="themeContainerBgOpacity">Прозрачность блоков:</label><span id="themeContainerBgOpacityValue">100%</span></div><input type="range" id="themeContainerBgOpacity" min="0" max="100" step="1"></div><div class="template-container"><div class="range-label"><label for="glassmorphismBlur">Размытие стекла:</label><span id="glassmorphismBlurValue">10px</span></div><input type="range" id="glassmorphismBlur" min="0" max="30" step="1"></div></div></div>
                     <div class="setting-group"><div class="checkbox-label-inline"><input type="checkbox" id="enableCustomScrollbar"><label for="enableCustomScrollbar">Кастомный скроллбар</label></div><div id="customScrollbarControls" style="display:none;"><div class="template-container color-input-grid"><div><label for="scrollbarThumbColor">Цвет ползунка:</label><input type="color" id="scrollbarThumbColor" class="theme-color-input"></div><div><label for="scrollbarTrackColor">Цвет фона:</label><input type="color" id="scrollbarTrackColor" class="theme-color-input"></div></div><div class="template-container"><div class="range-label"><label for="scrollbarWidth">Ширина:</label><span id="scrollbarWidthValue">8px</span></div><input type="range" id="scrollbarWidth" min="2" max="20" step="1"></div></div></div>
-                    <div class="setting-group"><h4 style="margin-top: 0;">Кругляшки</h4><div class="template-container"><label>Предпросмотр:</label><div style="display: flex; justify-content: center; align-items: center; height: 150px; background: rgba(0,0,0,0.2); border-radius: 10px; overflow: hidden; margin-bottom: 15px;"><div id="circlePreviewContainer" style="transition: opacity 0.3s ease;"><div id="circlePreview" style="position: relative; width: 140px; height: 140px; transform-origin: center center; transition: transform 0.3s ease, filter 0.3s ease, opacity 0.3s ease;"><img src="https://funpay.com/img/circles/funpay_poke.jpg" alt="" style="width: 100%; height: 100%; border-radius: 50%;"><svg viewBox="0 0 200 200" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"><defs><path id="text_path_preview" d="M 10, 100 a 90,90 0 1,0 180,0 a 90,90 0 1,0 -180,0"></path></defs><g fill="white" font-size="14px"><text text-anchor="end"><textPath xlink:href="#text_path_preview" startOffset="100%">Example</textPath></text></g></svg></div></div></div></div><div class="checkbox-label-inline"><input type="checkbox" id="enableCircleCustomization"><label for="enableCircleCustomization" style="margin-bottom:0;"><span>Включить кастомизацию</span></label></div><div id="circleCustomizationControls" style="display: none;"><div class="checkbox-label-inline"><input type="checkbox" id="showCircles"><label for="showCircles" style="margin-bottom:0;"><span>Отображать</span></label></div><div class="template-container"><div class="range-label"><label for="circleSize">Размер:</label><span id="circleSizeValue">100%</span></div><input type="range" id="circleSize" min="50" max="150" step="1"></div><div class="template-container"><div class="range-label"><label for="circleOpacity">Прозрачность:</label><span id="circleOpacityValue">100%</span></div><input type="range" id="circleOpacity" min="0" max="100" step="1"></div><div class="template-container"><div class="range-label"><label for="circleBlur">Размытие:</label><span id="circleBlurValue">0px</span></div><input type="range" id="circleBlur" min="0" max="50" step="1"></div></div></div>
+                    <div class="setting-group"><h4 style="margin-top: 0;">Кругляшки</h4><div class="template-container"><label>Предпросмотр:</label><div style="display: flex; justify-content: center; align-items: center; height: 150px; background: var(--fpt-surface-2, rgba(0,0,0,0.2)); border-radius: 10px; overflow: hidden; margin-bottom: 15px;"><div id="circlePreviewContainer" style="transition: opacity 0.3s ease;"><div id="circlePreview" style="position: relative; width: 140px; height: 140px; transform-origin: center center; transition: transform 0.3s ease, filter 0.3s ease, opacity 0.3s ease;"><img src="https://funpay.com/img/circles/funpay_poke.jpg" alt="" style="width: 100%; height: 100%; border-radius: 50%;"><svg viewBox="0 0 200 200" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"><defs><path id="text_path_preview" d="M 10, 100 a 90,90 0 1,0 180,0 a 90,90 0 1,0 -180,0"></path></defs><g fill="white" font-size="14px"><text text-anchor="end"><textPath xlink:href="#text_path_preview" startOffset="100%">Example</textPath></text></g></svg></div></div></div></div><div class="checkbox-label-inline"><input type="checkbox" id="enableCircleCustomization"><label for="enableCircleCustomization" style="margin-bottom:0;"><span>Включить кастомизацию</span></label></div><div id="circleCustomizationControls" style="display: none;"><div class="checkbox-label-inline"><input type="checkbox" id="showCircles"><label for="showCircles" style="margin-bottom:0;"><span>Отображать</span></label></div><div class="template-container"><div class="range-label"><label for="circleSize">Размер:</label><span id="circleSizeValue">100%</span></div><input type="range" id="circleSize" min="50" max="150" step="1"></div><div class="template-container"><div class="range-label"><label for="circleOpacity">Прозрачность:</label><span id="circleOpacityValue">100%</span></div><input type="range" id="circleOpacity" min="0" max="100" step="1"></div><div class="template-container"><div class="range-label"><label for="circleBlur">Размытие:</label><span id="circleBlurValue">0px</span></div><input type="range" id="circleBlur" min="0" max="50" step="1"></div></div></div>
                     <div class="setting-group"><h4 style="margin-top: 0;">Разделители</h4><div class="checkbox-label-inline"><input type="checkbox" id="enableImprovedSeparators"><label for="enableImprovedSeparators" style="margin-bottom:0;"><span>Включить улучшенные</span></label></div></div>
                     <div class="setting-group"><h4 style="margin-top: 0;">Главная страница</h4><div class="checkbox-label-inline"><input type="checkbox" id="enableRedesignedHomepage"><label for="enableRedesignedHomepage" style="margin-bottom:0;"><span>Включить улучшенную</span></label></div><small style="font-size: 12px; opacity: 0.7; display: block; margin-top: -10px;">Заменяет главную страницу на более современный вид с поиском. Требуется перезагрузка.</small></div>
                     <div class="setting-group"><h4 style="margin-top: 0;">Расположение</h4><div class="template-container"><div class="range-label"><label for="headerPositionSelect">Верхняя панель:</label></div><select id="headerPositionSelect"><option value="top">Вверх (по умолчанию)</option><option value="bottom">Вниз</option></select></div></div>
@@ -756,7 +766,7 @@ function createMainPopup() {
                 </div>
                 <div class="fp-tools-page-content" data-page="autobump">
                     <h3>Авто-поднятие лотов</h3>
-                    <div class="fpt-smart-bump-card" style="border:1px solid rgba(168,85,247,0.30);border-radius:12px;padding:14px 16px;margin-bottom:16px;background:linear-gradient(135deg, rgba(236,72,153,0.06), rgba(139,92,246,0.06)), #0c0c10;">
+                    <div class="fpt-smart-bump-card" style="border:1px solid rgba(91,134,216,0.30);border-radius:12px;padding:14px 16px;margin-bottom:16px;background:linear-gradient(135deg, rgba(91,134,216,0.10), rgba(91,134,216,0.04)), var(--fpt-surface, #0c0c10);">
                         <div class="checkbox-label-inline" style="margin:0;"><input type="checkbox" id="fpToolsSmartBumpEnabled"><label for="fpToolsSmartBumpEnabled" style="margin-bottom:0;"><span>Умное авто-поднятие</span></label></div>
                         <small style="font-size:12px;opacity:0.75;display:block;margin-top:8px;margin-left:30px;">Поднимает каждую категорию ровно тогда, когда это разрешает FunPay - читает точное время ожидания из ответа сервера по каждой категории отдельно (умная логика тайминга по каждой категории). Не тратит лишние запросы и не ловит лимиты. Заменяет таймер ниже, пока включено.</small>
                     </div>
@@ -767,7 +777,7 @@ function createMainPopup() {
                     <button id="configureSelectiveBumpBtn" class="btn btn-default" style="width: auto; padding: 8px 16px; font-size: 14px;">выбрать...</button>
                     
                     <div class="checkbox-label-inline" style="margin-top: 15px;"><input type="checkbox" id="bumpOnlyAutoDelivery"><label for="bumpOnlyAutoDelivery" style="margin-bottom:0;"><span>Поднимать только категории с автовыдачей</span></label></div>
-                    <small style="font-size: 12px; opacity: 0.7; display: block; margin-top: -10px; margin-left: 30px;">Будут подняты только те категории, в которых есть хотя бы один лот с иконкой автовыдачи (⚡️).</small>
+                    <small style="font-size: 12px; opacity: 0.7; display: block; margin-top: -10px; margin-left: 30px;">Будут подняты только те категории, в которых есть хотя бы один лот с иконкой автовыдачи (<span class="material-symbols-rounded" style="font-size:14px;vertical-align:-3px;">bolt</span>).</small>
 
                     <label style="margin-top: 20px;">Консоль логов:</label>
                     <div id="autoBumpConsole" class="fp-tools-console"></div>
@@ -787,7 +797,7 @@ function createMainPopup() {
                             <span class="material-symbols-rounded" style="color:#e05252;">shield</span>
                             <span>Это чат сообщества FP Tools. Будьте вежливы и уважайте других участников. За нарушения - блокировка в чате.</span>
                         </div>
-                        <div style="background: rgba(0,0,0,0.2); border: 1px dashed rgba(224, 82, 82, 0.4); border-radius: 6px; padding: 10px; font-size: 11px;">
+                        <div style="background: var(--fpt-surface-2, rgba(0,0,0,0.2)); border: 1px dashed rgba(224, 82, 82, 0.4); border-radius: 6px; padding: 10px; font-size: 11px;">
                             <b style="color: #ff6b6b; display: block; margin-bottom: 4px;">ЗАПРЕЩЕНО:</b>
                             Спам и флуд, реклама, оскорбления, разжигание, обман. Соблюдайте порядок - чат для общения по FP Tools.
                         </div>
@@ -821,7 +831,27 @@ function createMainPopup() {
                 <div class="fp-tools-page-content" data-page="currency_calc">
                     <h3>Калькулятор валют</h3>
                     <p class="template-info">Курсы обновляются раз в день. Используется открытый API.</p>
-                    <div class="currency-converter-container"><div class="currency-input-group"><input type="number" id="currencyAmountFrom" class="template-input currency-input" value="100"><select id="currencySelectFrom" class="template-input currency-select"></select></div><div class="currency-swap-container"><button id="currencySwapBtn" class="currency-swap-btn">⇅</button><div id="currencyRateDisplay" class="currency-rate-display"></div></div><div class="currency-input-group"><input type="text" id="currencyAmountTo" class="template-input currency-input" readonly><select id="currencySelectTo" class="template-input currency-select"></select></div></div><div id="currency-error-display" class="currency-error"></div>
+                    <div class="fpt-cur-card">
+                        <div class="fpt-cur-row">
+                            <div class="fpt-cur-field">
+                                <label class="fpt-cur-label" for="currencyAmountFrom">Отдаёте</label>
+                                <div class="fpt-cur-group">
+                                    <input type="number" id="currencyAmountFrom" class="fpt-cur-input" value="100" min="0">
+                                    <select id="currencySelectFrom" class="fpt-cur-select" aria-label="Исходная валюта"></select>
+                                </div>
+                            </div>
+                            <button type="button" id="currencySwapBtn" class="fpt-cur-swap" title="Поменять местами"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg></button>
+                            <div class="fpt-cur-field">
+                                <label class="fpt-cur-label" for="currencyAmountTo">Получаете</label>
+                                <div class="fpt-cur-group">
+                                    <input type="text" id="currencyAmountTo" class="fpt-cur-input" readonly>
+                                    <select id="currencySelectTo" class="fpt-cur-select" aria-label="Целевая валюта"></select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="fpt-cur-foot"><span id="currencyRateDisplay" class="fpt-cur-rate"></span></div>
+                    </div>
+                    <div id="currency-error-display" class="currency-error"></div>
                 </div>
                 <div class="fp-tools-page-content" data-page="effects">
                     <h3>Эффекты частиц</h3>
@@ -834,10 +864,10 @@ function createMainPopup() {
                     <div style="border-top: 1px solid rgba(255,255,255,0.1); margin: 25px 0;"></div>
                     <h3>Пользовательский курсор</h3>
                     <div class="checkbox-label-inline"><input type="checkbox" id="customCursorEnabled"><label for="customCursorEnabled" style="margin-bottom:0;"><span>Включить свой курсор</span></label></div>
-                    <div id="customCursorControls" style="display: none;"><div class="template-container"><label>Изображение курсора:</label><div id="cursor-image-preview" style="width:64px; height:64px; background-color:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.1); border-radius:8px; margin-bottom:10px; background-size:contain; background-position:center; background-repeat: no-repeat; display:flex; align-items:center; justify-content:center; color: #888; font-size:12px;">Нет</div><button id="uploadCursorImageBtn" class="btn">Загрузить</button><button id="removeCursorImageBtn" class="btn btn-default" style="margin-left: 10px;">Удалить</button><input type="file" id="cursorImageInput" accept="image/*" style="display: none;"></div><div class="checkbox-label-inline"><input type="checkbox" id="hideSystemCursor" checked><label for="hideSystemCursor" style="margin-bottom:0;"><span>Скрыть системный курсор</span></label></div><div class="template-container"><div class="range-label"><label for="customCursorSize">Размер:</label><span id="customCursorSizeValue">32px</span></div><input type="range" id="customCursorSize" min="16" max="128" step="1" value="32"></div><div class="template-container"><div class="range-label"><label for="customCursorOpacity">Прозрачность:</label><span id="customCursorOpacityValue">100%</span></div><input type="range" id="customCursorOpacity" min="0" max="100" step="1" value="100"></div></div>
+                    <div id="customCursorControls" style="display: none;"><div class="template-container"><label>Изображение курсора:</label><div id="cursor-image-preview" style="width:64px; height:64px; background-color: var(--fpt-surface-2, rgba(0,0,0,0.2)); border:1px solid rgba(255,255,255,0.1); border-radius:8px; margin-bottom:10px; background-size:contain; background-position:center; background-repeat: no-repeat; display:flex; align-items:center; justify-content:center; color: #888; font-size:12px;">Нет</div><button id="uploadCursorImageBtn" class="btn">Загрузить</button><button id="removeCursorImageBtn" class="btn btn-default" style="margin-left: 10px;">Удалить</button><input type="file" id="cursorImageInput" accept="image/*" style="display: none;"></div><div class="checkbox-label-inline"><input type="checkbox" id="hideSystemCursor" checked><label for="hideSystemCursor" style="margin-bottom:0;"><span>Скрыть системный курсор</span></label></div><div class="template-container"><div class="range-label"><label for="customCursorSize">Размер:</label><span id="customCursorSizeValue">32px</span></div><input type="range" id="customCursorSize" min="16" max="128" step="1" value="32"></div><div class="template-container"><div class="range-label"><label for="customCursorOpacity">Прозрачность:</label><span id="customCursorOpacityValue">100%</span></div><input type="range" id="customCursorOpacity" min="0" max="100" step="1" value="100"></div></div>
                 </div>
                 <div class="fp-tools-page-content" data-page="overview">
-                    <div class="overview-container"><h3 style="border:none">Видео-обзор функций</h3><p class="template-info">Посмотрите короткий кинематографический ролик, демонстрирующий все возможности FP Tools в действии. Откройте для себя инструменты, о которых вы могли не знать!</p><div class="overview-promo-art"></div><button id="start-overview-tour-btn" class="btn">▶️ Начать обзор</button></div>
+                    <div class="overview-container"><h3 style="border:none">Видео-обзор функций</h3><p class="template-info">Посмотрите короткий кинематографический ролик, демонстрирующий все возможности FP Tools в действии. Откройте для себя инструменты, о которых вы могли не знать!</p><div class="overview-promo-art"></div><button id="start-overview-tour-btn" class="btn"><span class="material-symbols-rounded" style="font-size:18px;vertical-align:-4px;margin-right:6px;">play_arrow</span>Начать обзор</button></div>
                     <div class="feature-list-container"><h3>Справочник по функциям</h3><div class="feature-item"><div class="feature-title"><span class="material-icons">smart_toy</span>ИИ-Ассистент в чате</div><div class="feature-location"><strong>Где найти:</strong> В любом чате, кнопка "AI" рядом с полем ввода.</div><div class="feature-desc">Улучшает ваш текст, делая его вежливым и профессиональным. Активируйте режим и нажмите Enter для обработки. Также предупреждает о грубости.</div></div><div class="feature-item"><div class="feature-title"><span class="material-icons">auto_fix_high</span>AI-Генератор лотов</div><div class="feature-location"><strong>Где найти:</strong> На странице создания/редактирования лота.</div><div class="feature-desc">Создает название и описание для лота на основе ваших идей, анализируя и копируя стиль ваших существующих предложений.</div></div><div class="feature-item"><div class="feature-title"><span class="material-icons">add_photo_alternate</span>AI-Генератор изображений</div><div class="feature-location"><strong>Где найти:</strong> На странице создания/редактирования лота, в разделе "Изображения".</div><div class="feature-desc">Создавайте уникальные и стильные превью для ваших предложений с помощью встроенного генератора, в том числе по текстовому запросу.</div></div><div class="feature-item"><div class="feature-title"><span class="material-icons">palette</span>Полная кастомизация</div><div class="feature-location"><strong>Где найти:</strong> Вкладка "Кастомизация".</div><div class="feature-desc">Измените внешний вид FunPay: установите анимированный фон, настройте цвета, шрифты, прозрачность блоков и даже расположение верхней панели.</div></div><div class="feature-item"><div class="feature-title"><span class="material-icons">auto_fix_normal</span>"Кастомизатор (режим редактора)</div><div class="feature-location"><strong>Где найти:</strong> Вкладка "Кастомизация".</div><div class="feature-desc">Редактируйте любой элемент сайта в реальном времени. Меняйте цвета, размеры или скрывайте ненужное, сохраняя стили навсегда.</div></div><div class="feature-item"><div class="feature-title"><span class="material-icons">description</span>Шаблоны и AI-переменные</div><div class="feature-location"><strong>Где найти:</strong> Под полем ввода в чате. Настраиваются во вкладке "Шаблоны".</div><div class="feature-desc">Быстрая вставка готовых сообщений. Поддерживают переменные {buyername}, {date} и даже генерацию текста через {ai:ваш запрос}.</div></div><div class="feature-item"><div class="feature-title"><span class="material-icons">checklist</span>Управление лотами и ценами</div><div class="feature-location"><strong>Где найти:</strong> На странице вашего профиля (funpay.com/users/...).</div><div class="feature-desc">Кнопка "Выбрать" позволяет выделить несколько лотов для массового удаления, дублирования, отключения или редактирования цен.</div></div><div class="feature-item"><div class="feature-title"><span class="material-icons">control_point_duplicate</span>Клонирование лотов</div><div class="feature-location"><strong>Где найти:</strong> На странице редактирования любого вашего лота.</div><div class="feature-desc">Кнопка "Копировать" позволяет создать точную копию лота или массово размножить его по разным категориям (например, по разным серверам).</div></div><div class="feature-item"><div class="feature-title"><span class="material-icons">public</span>Глобальный импорт лотов</div><div class="feature-location"><strong>Где найти:</strong> На странице редактирования лота, кнопка "Импорт".</div><div class="feature-desc">Импортируйте название и описание любого лота с FunPay, чтобы анализировать конкурентов или использовать как основу.</div></div><div class="feature-item"><div class="feature-title"><span class="material-icons">sort_by_alpha</span>Сортировка по отзывам</div><div class="feature-location"><strong>Где найти:</strong> На любой странице со списком лотов.</div><div class="feature-desc">Кликните на заголовок "Продавец" в таблице, чтобы отсортировать все предложения по количеству отзывов у продавцов.</div></div><div class="feature-item"><div class="feature-title"><span class="material-icons">label</span>Пометки для пользователей</div><div class="feature-location"><strong>Где найти:</strong> В выпадающем меню в заголовке чата с человеком.</div><div class="feature-desc">Устанавливайте настраиваемые цветные метки для пользователей, которые будут видны в вашем списке контактов.</div></div><div class="feature-item"><div class="feature-title"><span class="material-icons">rocket_launch</span>Авто-поднятие лотов</div><div class="feature-location"><strong>Где найти:</strong> Вкладка "Авто-поднятие".</div><div class="feature-desc">Настройте автоматическое поднятие лотов по таймеру. Можно выбрать для поднятия только определенные категории.</div></div><div class="feature-item"><div class="feature-title"><span class="material-icons">monitoring</span>Статистика</div><div class="feature-location"><strong>Где найти:</strong> Страница "Продажи" - статистика продаж, кнопка "Аналитика рынка" на странице игры.</div><div class="feature-desc">Получайте детальную статистику по своим продажам и анализируйте рыночную ситуацию в любой категории.</div></div><div class="feature-item"><div class="feature-title"><span class="material-icons">savings</span>Финансовые копилки</div><div class="feature-location"><strong>Где найти:</strong> Вкладка "Копилки" и иконка в шапке сайта.</div><div class="feature-desc">Устанавливайте финансовые цели и отслеживайте их достижение. Копилка синхронизируется с балансом FunPay.</div></div></div>
                 </div>
                 <div class="fp-tools-page-content" data-page="ai_audit">
@@ -851,19 +881,19 @@ function createMainPopup() {
                             <span>Вопросы будут именно о ваших лотах - ИИ внимательно их изучит перед генерацией.</span>
                         </div>
                         <button id="fp-audit-start-btn" class="btn" style="width:100%;padding:12px;"><span class="material-symbols-rounded" style="font-size:18px;vertical-align:-4px;margin-right:6px;">search_insights</span>Начать аудит</button>
-                        <p id="fp-audit-cooldown-msg" style="display:none;text-align:center;font-size:12px;color:#5a5f7a;margin-top:8px;"></p>
+                        <p id="fp-audit-cooldown-msg" style="display:none;text-align:center;font-size:12px;color:var(--fpt-text-faint, #5a5f7a);margin-top:8px;"></p>
                     </div>
 
                     <!-- LOADING STATE -->
-                    <div id="fp-audit-loading" style="display:none;font-size:13px;color:#5a5f7a;margin-top:10px;white-space:pre-line;text-align:center;line-height:1.7;padding:20px 0;"></div>
+                    <div id="fp-audit-loading" style="display:none;font-size:13px;color:var(--fpt-text-faint, #5a5f7a);margin-top:10px;white-space:pre-line;text-align:center;line-height:1.7;padding:20px 0;"></div>
 
                     <!-- SURVEY STATE -->
                     <div id="fp-audit-survey" style="display:none;">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                            <span id="fp-audit-q-num" style="font-size:12px;color:#5a5f7a;"></span>
-                            <span id="fp-audit-skip" style="font-size:11px;color:#3a3d52;cursor:pointer;" onclick="document.getElementById('fp-audit-next-btn')?.click()">Пропустить →</span>
+                            <span id="fp-audit-q-num" style="font-size:12px;color:var(--fpt-text-faint, #5a5f7a);"></span>
+                            <span id="fp-audit-skip" style="font-size:11px;color:var(--fpt-text-faint, #3a3d52);cursor:pointer;" onclick="document.getElementById('fp-audit-next-btn')?.click()">Пропустить →</span>
                         </div>
-                        <div style="height:4px;background:#1e2030;border-radius:2px;margin-bottom:16px;overflow:hidden;">
+                        <div style="height:4px;background:var(--fpt-line, #1e2030);border-radius:2px;margin-bottom:16px;overflow:hidden;">
                             <div id="fp-audit-progress-bar" style="height:100%;background:#5b86d8;width:0;transition:width .3s;border-radius:2px;"></div>
                         </div>
                         <div id="fp-audit-q-container" style="min-height:120px;"></div>
@@ -874,7 +904,7 @@ function createMainPopup() {
                     </div>
 
                     <!-- PROCESSING STATE -->
-                    <div id="fp-audit-processing" style="display:none;text-align:center;padding:30px 0;color:#5a5f7a;font-size:13px;">
+                    <div id="fp-audit-processing" style="display:none;text-align:center;padding:30px 0;color:var(--fpt-text-faint, #5a5f7a);font-size:13px;">
                         ИИ анализирует ваши ответы и готовит рекомендации...
                     </div>
 
@@ -909,8 +939,8 @@ function createMainPopup() {
                     <h3>Чёрный список покупателей</h3>
                     <p class="template-info">Добавьте ненадёжных покупателей. Вы сможете заблокировать на них автоматизаию и уведомления.</p>
                     <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;">
-                        <input type="text" id="fp-bl-name-input" placeholder="Имя пользователя FunPay" style="background:#0e0f16;border:1px solid #22253a;border-radius:6px;padding:8px;color:#d8dae8;font-size:13px;outline:none;">
-                        <input type="text" id="fp-bl-note-input" placeholder="Причина (необязательно)" style="background:#0e0f16;border:1px solid #22253a;border-radius:6px;padding:8px;color:#d8dae8;font-size:13px;outline:none;">
+                        <input type="text" id="fp-bl-name-input" placeholder="Имя пользователя FunPay" style="background:var(--fpt-bg-deep, #0e0f16);border:1px solid var(--fpt-line-strong, #22253a);border-radius:6px;padding:8px;color:#d8dae8;font-size:13px;outline:none;">
+                        <input type="text" id="fp-bl-note-input" placeholder="Причина (необязательно)" style="background:var(--fpt-bg-deep, #0e0f16);border:1px solid var(--fpt-line-strong, #22253a);border-radius:6px;padding:8px;color:#d8dae8;font-size:13px;outline:none;">
                         <button id="fp-bl-add-btn" class="btn btn-default">+ Добавить в ЧС</button>
                     </div>
                     <div id="fp-bl-list"></div>
@@ -949,21 +979,21 @@ function createMainPopup() {
                         #fp-ticket-age-hours::-webkit-inner-spin-button,#fp-ticket-age-hours::-webkit-outer-spin-button,
                         #fp-ticket-max-orders::-webkit-inner-spin-button,#fp-ticket-max-orders::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
                         #fp-ticket-age-hours,#fp-ticket-max-orders{-moz-appearance:textfield}
-                        .fp-tkt-card{background:#0d0e18;border:1px solid #1a1c2e;border-radius:8px;padding:10px 12px;cursor:pointer;transition:border-color .15s,background .15s;}
+                        .fp-tkt-card{background:var(--fpt-surface, #0d0e18);border:1px solid var(--fpt-surface-2, #1a1c2e);border-radius:8px;padding:10px 12px;cursor:pointer;transition:border-color .15s,background .15s;}
                         .fp-tkt-card:hover{border-color:#5b86d8;background:#11162a;}
                         .fp-tkt-status{display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.3px;}
                         #fp-new-ticket-fields::-webkit-scrollbar{width:4px}
                         #fp-new-ticket-fields::-webkit-scrollbar-track{background:transparent}
                         #fp-new-ticket-fields::-webkit-scrollbar-thumb{background:#2a2d44;border-radius:4px}
-                        .fp-field-input{width:100%;background:#0d0e18;border:1px solid #1a1c2e;border-radius:6px;color:#d8dae8;padding:7px 10px;font-size:13px;box-sizing:border-box;outline:none;transition:border-color .15s;}
+                        .fp-field-input{width:100%;background:var(--fpt-surface, #0d0e18);border:1px solid var(--fpt-surface-2, #1a1c2e);border-radius:6px;color:#d8dae8;padding:7px 10px;font-size:13px;box-sizing:border-box;outline:none;transition:border-color .15s;}
                         .fp-field-input:focus{border-color:#5b86d8;}
-                        .fp-field-input option{background:#0d0e18;color:#d8dae8;}
+                        .fp-field-input option{background:var(--fpt-surface, #0d0e18);color:#d8dae8;}
                     </style>
 
                     <!-- Header -->
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
                         <h3 style="margin:0;font-size:15px;">Техподдержка FunPay</h3>
-                        <button id="fp-ticket-refresh-btn" title="Обновить" style="background:none;border:none;color:#5a5f7a;cursor:pointer;font-size:16px;padding:2px 6px;transition:color .15s;" onmouseover="this.style.color='#d8dae8'" onmouseout="this.style.color='#5a5f7a'">↻</button>
+                        <button id="fp-ticket-refresh-btn" title="Обновить" style="background:none;border:none;color:var(--fpt-text-faint, #5a5f7a);cursor:pointer;font-size:16px;padding:2px 6px;transition:color .15s;" onmouseover="this.style.color='#d8dae8'" onmouseout="this.style.color='var(--fpt-text-faint, #5a5f7a)'">↻</button>
                     </div>
 
                     <!-- Auto ticket block -->
@@ -982,20 +1012,20 @@ function createMainPopup() {
                         </div>
                         <div style="display:flex;align-items:center;gap:8px;">
                             <button id="fp-send-auto-ticket-btn" class="btn" style="padding:6px 14px;font-size:12px;">Отправить заявку в ТП</button>
-                            <span id="fp-auto-ticket-status" style="font-size:11px;color:#5a5f7a;"></span>
+                            <span id="fp-auto-ticket-status" style="font-size:11px;color:var(--fpt-text-faint, #5a5f7a);"></span>
                         </div>
                     </div>
 
                     <!-- Tickets list header -->
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-                        <span style="font-size:11px;font-weight:600;color:#3a3d52;text-transform:uppercase;letter-spacing:.5px;">Ваши заявки</span>
+                        <span style="font-size:11px;font-weight:600;color:var(--fpt-text-faint, #3a3d52);text-transform:uppercase;letter-spacing:.5px;">Ваши заявки</span>
                         <button id="fp-create-ticket-btn" class="btn btn-default" style="padding:3px 10px;font-size:11px;">+ Создать заявку</button>
                     </div>
 
                     <!-- List -->
                     <div id="fp-tickets-list" style="display:flex;flex-direction:column;gap:5px;max-height:240px;overflow-y:auto;"></div>
-                    <div id="fp-tickets-empty" style="display:none;text-align:center;color:#3a3d52;font-size:13px;padding:18px 0;">Заявок нет</div>
-                    <div id="fp-tickets-loading" style="text-align:center;color:#3a3d52;font-size:12px;padding:14px 0;">Загрузка...</div>
+                    <div id="fp-tickets-empty" style="display:none;text-align:center;color:var(--fpt-text-faint, #3a3d52);font-size:13px;padding:18px 0;">Заявок нет</div>
+                    <div id="fp-tickets-loading" style="text-align:center;color:var(--fpt-text-faint, #3a3d52);font-size:12px;padding:14px 0;">Загрузка...</div>
 
                     <!-- Ticket detail panel -->
                     <div id="fp-ticket-detail-panel" style="display:none;position:absolute;inset:0;background:#111318;z-index:20;box-sizing:border-box;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
@@ -1022,7 +1052,7 @@ function createMainPopup() {
                         <div id="fp-tapr" style="display:none;flex-shrink:0;padding:6px 12px 0;background:#1a1b22;">
                             <div style="position:relative;display:inline-block;">
                                 <img id="fp-tath" style="height:48px;border-radius:6px;border:1px solid #2a2d3a;display:block;" src="" alt="">
-                                <button id="fp-tarm" style="all:unset;position:absolute;top:-5px;right:-5px;background:#2a2d3a;border-radius:50%;width:16px;height:16px;color:#9099b8;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">&#x2715;</button>
+                                <button id="fp-tarm" style="all:unset;position:absolute;top:-5px;right:-5px;background:#2a2d3a;border-radius:50%;width:16px;height:16px;color:var(--fpt-text-dim, #9099b8);font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">&#x2715;</button>
                             </div>
                         </div>
                         <!-- Input bar -->
@@ -1043,7 +1073,7 @@ function createMainPopup() {
                     <div id="fp-ticket-confirm-overlay" style="display:none;position:absolute;inset:0;background:rgba(5,6,12,0.96);z-index:10;border-radius:8px;padding:18px;box-sizing:border-box;flex-direction:column;gap:10px;">
                         <div style="font-weight:600;font-size:14px;">Проверьте заявку перед отправкой</div>
                         <div style="font-size:11px;color:#6a7090;">Именно это будет отправлено в техподдержку FunPay:</div>
-                        <div id="fp-ticket-confirm-text" style="background:#0d0e18;border:1px solid #1a1c2e;border-radius:6px;padding:10px;font-size:12px;color:#c8cadc;white-space:pre-wrap;flex:1;overflow-y:auto;min-height:80px;max-height:180px;line-height:1.5;"></div>
+                        <div id="fp-ticket-confirm-text" style="background:var(--fpt-surface, #0d0e18);border:1px solid var(--fpt-surface-2, #1a1c2e);border-radius:6px;padding:10px;font-size:12px;color:#c8cadc;white-space:pre-wrap;flex:1;overflow-y:auto;min-height:80px;max-height:180px;line-height:1.5;"></div>
                         <div style="display:flex;gap:8px;margin-top:2px;">
                             <button id="fp-ticket-confirm-yes" class="btn" style="flex:1;font-size:13px;">Отправить</button>
                             <button id="fp-ticket-confirm-no" class="btn btn-default" style="flex:1;font-size:13px;">Отмена</button>
@@ -1052,25 +1082,24 @@ function createMainPopup() {
 
                     <!-- New ticket panel (slides in from bottom) -->
                     <div id="fp-new-ticket-panel" style="display:none;position:absolute;inset:0;background:#0a0b14;z-index:20;border-radius:0;box-sizing:border-box;flex-direction:column;overflow:hidden;">
-                        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px 8px;border-bottom:1px solid #1a1c2e;flex-shrink:0;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px 8px;border-bottom:1px solid var(--fpt-surface-2, #1a1c2e);flex-shrink:0;">
                             <span style="font-weight:600;font-size:14px;">Новая заявка</span>
-                            <button id="fp-new-ticket-close" style="background:none;border:none;color:#5a5f7a;cursor:pointer;font-size:18px;padding:0 4px;line-height:1;" onmouseover="this.style.color='#d8dae8'" onmouseout="this.style.color='#5a5f7a'">✕</button>
+                            <button id="fp-new-ticket-close" style="background:none;border:none;color:var(--fpt-text-faint, #5a5f7a);cursor:pointer;font-size:18px;padding:0 4px;line-height:1;" onmouseover="this.style.color='#d8dae8'" onmouseout="this.style.color='var(--fpt-text-faint, #5a5f7a)'">✕</button>
                         </div>
                         <div id="fp-new-ticket-fields" style="display:flex;flex-direction:column;gap:6px;flex:1;overflow-y:auto;padding:10px 14px;"></div>
-                        <div style="flex-shrink:0;padding:8px 14px 12px;border-top:1px solid #1a1c2e;background:#0a0b14;">
+                        <div style="flex-shrink:0;padding:8px 14px 12px;border-top:1px solid var(--fpt-surface-2, #1a1c2e);background:#0a0b14;">
                             <button id="fp-new-ticket-submit" class="btn" style="width:100%;font-size:13px;">Далее →</button>
                         </div>
                     </div>
                 </div>
 
                 <div class="fp-tools-page-content" data-page="support">
-                    <h3>Оставьте отзыв! <span class="material-symbols-rounded" style="color:#d2a85e;vertical-align:-3px;">star</span></h3>
+                    <h3>Оставить отзыв</h3>
                     <div class="support-container">
-                        <p>Это <strong>самый важный</strong> вклад, который вы можете сделать. Ваш положительный отзыв - это топливо для новых обновлений и лучшая мотивация для разработчика.</p>
-                        <p>Хорошие оценки помогают другим пользователям найти FP Tools. Пожалуйста, уделите всего минуту, чтобы поделиться своим мнением. Это действительно имеет огромное значение!</p>
+                        <p>Положительный отзыв помогает другим пользователям найти FP Tools и поддерживает дальнейшее развитие расширения. Это займёт около минуты.</p>
                         <a href="https://chromewebstore.google.com/detail/funpay-tools/pibmnjjfpojnakckilflcboodkndkibb/reviews" target="_blank" class="btn review-btn"><span class="material-icons" style="font-size: 20px; margin-right: 8px;">rate_review</span>Оставить отзыв в Chrome Store</a>
                     </div>
-                    <div style="margin-top:24px;text-align:center;border-top:1px solid rgba(255,255,255,0.06);padding-top:16px;">
+                    <div style="margin-top:24px;text-align:left;border-top:1px solid rgba(255,255,255,0.06);padding-top:16px;">
                         <a href="https://funpay.tools" target="_blank" class="fp-site-footer-link"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:-2px;margin-right:4px;">link</span>funpay.tools</a>
                     </div>
                 </div>
@@ -1083,188 +1112,10 @@ function createMainPopup() {
     return toolsPopup;
 }
 
-const FP_WALLPAPER_PRESETS = [
-    { name: 'Горы и озеро', emoji: '🏔️', url: 'https://isorepublic.com/wp-content/uploads/2023/03/iso-republic-mountain-winter-lake.jpg', palette: { bgColor1: '#1a3050', bgColor2: '#4a7aaa', containerBgColor: '#0d1828', textColor: '#dde8f4', linkColor: '#7aaad8' } },
-    { name: 'Туманные горы', emoji: '🌫️', url: 'https://isorepublic.com/wp-content/uploads/2023/02/iso-republic-napa-hill-fog.jpg', palette: { bgColor1: '#1e2830', bgColor2: '#5a7888', containerBgColor: '#101820', textColor: '#d8e4ec', linkColor: '#7aaac0' } },
-    { name: 'Каньон', emoji: '🪨', url: 'https://isorepublic.com/wp-content/uploads/2023/03/iso-republic-rough-rocky-landscape.jpg', palette: { bgColor1: '#2a1808', bgColor2: '#a85030', containerBgColor: '#180e04', textColor: '#f0ddd0', linkColor: '#e08060' } },
-    { name: 'Горный туман', emoji: '☁️', url: 'https://isorepublic.com/wp-content/uploads/2022/10/iso-republic-mist-mountains-clouds.jpg', palette: { bgColor1: '#151e2a', bgColor2: '#3a6090', containerBgColor: '#0a1018', textColor: '#dce8f8', linkColor: '#6090c8' } },
-    { name: 'Закат', emoji: '🌅', url: 'https://isorepublic.com/wp-content/uploads/2022/11/iso-republic-clouds-sky-trees.jpg', palette: { bgColor1: '#280a18', bgColor2: '#c84810', containerBgColor: '#180508', textColor: '#f8ddd0', linkColor: '#f08060' } },
-    { name: 'Пустыня', emoji: '🏜️', url: 'https://isorepublic.com/wp-content/uploads/2023/06/iso-republic-desert-barren-sky.jpg', palette: { bgColor1: '#201808', bgColor2: '#c89840', containerBgColor: '#100c04', textColor: '#f8ead8', linkColor: '#e0b860' } },
-    { name: 'Побережье', emoji: '🌊', url: 'https://isorepublic.com/wp-content/uploads/2023/05/iso-republic-scenic-coast-beach-03.jpg', palette: { bgColor1: '#082028', bgColor2: '#2888a0', containerBgColor: '#041018', textColor: '#d8eef8', linkColor: '#50a8c8' } },
-    { name: 'Млечный путь', emoji: '🌌', url: 'https://isorepublic.com/wp-content/uploads/2025/02/isorepublic-milky-way.jpg', palette: { bgColor1: '#080618', bgColor2: '#4030a0', containerBgColor: '#04030e', textColor: '#e0d8f8', linkColor: '#8070e0' } },
-    { name: 'Звёзды', emoji: '⭐', url: 'https://isorepublic.com/wp-content/uploads/2022/12/iso-republic-mikly-way-trees-sky.jpg', palette: { bgColor1: '#040a18', bgColor2: '#103868', containerBgColor: '#020508', textColor: '#d8e8f8', linkColor: '#4080b8' } },
-    { name: 'Синий дуотон', emoji: '🔵', url: 'https://isorepublic.com/wp-content/uploads/2022/10/iso-republic-abstract-wallpaper-duotone.jpg', palette: { bgColor1: '#080e28', bgColor2: '#1840c0', containerBgColor: '#040818', textColor: '#d8e0f8', linkColor: '#4868e8' } },
-    { name: 'Тёмно-синий', emoji: '💙', url: 'https://isorepublic.com/wp-content/uploads/2024/05/iso-republic-abstract-wallpaper-dark-blues.jpg', palette: { bgColor1: '#030610', bgColor2: '#0c2890', containerBgColor: '#020408', textColor: '#d0d8f0', linkColor: '#3060c8' } },
-    { name: 'Мягкий боке', emoji: '🎨', url: 'https://isorepublic.com/wp-content/uploads/2022/10/iso-republic-abstract-wallpaper-soft-blur.jpg', palette: { bgColor1: '#0e0618', bgColor2: '#6030b0', containerBgColor: '#06030c', textColor: '#e8d8f8', linkColor: '#9060e0' } }
-];
-
-const FP_WP_CACHE_KEY = 'fpToolsWallpaperCache';
-const FP_WP_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
-const _fpWpImgCache = new Map();
-
-async function _getWpCache() {
-    try { const r = await chrome.storage.local.get(FP_WP_CACHE_KEY); return r[FP_WP_CACHE_KEY] || {}; } catch { return {}; }
-}
-async function _markWpCached(url) {
-    try { const c = await _getWpCache(); c[url] = { ts: Date.now() }; await chrome.storage.local.set({ [FP_WP_CACHE_KEY]: c }); } catch {}
-}
-
-let _wpIndex = 0;
-let _wpLoading = false;
-
-async function _loadCarouselSlide(index) {
-    if (_wpLoading) return;
-    const preset = FP_WALLPAPER_PRESETS[index];
-    if (!preset) return;
-    _wpLoading = true;
-
-    const slot    = document.getElementById('fp-wp-img-slot');
-    const loaderEl= document.getElementById('fp-wp-loader');
-    const bar     = document.getElementById('fp-wp-bar');
-    const pct     = document.getElementById('fp-wp-pct');
-    const emoji   = document.getElementById('fp-wp-emoji');
-    const nameEl  = document.getElementById('fp-wp-name');
-    const counter = document.getElementById('fp-wp-counter');
-    const applyBtn= document.getElementById('fp-wp-apply-cur');
-    if (!slot) { _wpLoading = false; return; }
-
-    nameEl.textContent  = preset.name;
-    counter.textContent = `${index + 1} / ${FP_WALLPAPER_PRESETS.length}`;
-    emoji.textContent   = preset.emoji;
-    if (applyBtn) applyBtn.style.display = 'none';
-
-    if (_fpWpImgCache.has(preset.url)) {
-        const img = _fpWpImgCache.get(preset.url).cloneNode();
-        _showCarouselImg(img, slot, loaderEl);
-        _wpLoading = false;
-        return;
-    }
-
-    loaderEl.style.display = 'flex';
-    slot.innerHTML = '';
-    bar.style.width = '0%'; pct.textContent = '0%';
-
-    const storageCache = await _getWpCache();
-    const cached = storageCache[preset.url] && Date.now() - storageCache[preset.url].ts < FP_WP_CACHE_TTL;
-
-    if (!cached) {
-        let fakeP = 0;
-        slot._fakeIv = setInterval(() => {
-            fakeP = Math.min(fakeP + Math.random() * 10, 88);
-            bar.style.width = Math.round(fakeP) + '%';
-            pct.textContent = Math.round(fakeP) + '%';
-        }, 150);
-    } else {
-        bar.style.width = '90%'; pct.textContent = '…';
-    }
-
-    const img = new Image();
-    img.referrerPolicy = 'no-referrer';
-    img.decoding = 'async';
-    img.width = 160;
-    img.src = preset.url;
-
-    try {
-        await img.decode();
-        if (slot._fakeIv) { clearInterval(slot._fakeIv); delete slot._fakeIv; }
-        bar.style.width = '100%'; pct.textContent = '100%';
-        _fpWpImgCache.set(preset.url, img);
-        if (!cached) _markWpCached(preset.url);
-        _showCarouselImg(img.cloneNode(), slot, loaderEl);
-    } catch {
-        if (slot._fakeIv) { clearInterval(slot._fakeIv); delete slot._fakeIv; }
-        _wpLoading = false;
-        _wpIndex = (index + 1) % FP_WALLPAPER_PRESETS.length;
-        _loadCarouselSlide(_wpIndex);
-        return;
-    }
-    _wpLoading = false;
-}
-
-function _showCarouselImg(img, slot, loaderEl) {
-    img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;image-rendering:pixelated;opacity:0;transition:opacity .35s ease;pointer-events:none;';
-    slot.innerHTML = '';
-    slot.appendChild(img);
-    const applyBtn = document.getElementById('fp-wp-apply-cur');
-    if (applyBtn) applyBtn.style.display = 'block';
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-        img.style.opacity = '1';
-        if (loaderEl) loaderEl.style.display = 'none';
-    }));
-}
-
-function initializeWallpaperPresets() {
-    const carousel = document.getElementById('fp-wallpaper-carousel');
-    if (!carousel || carousel.dataset.initialized) return;
-    carousel.dataset.initialized = '1';
-
-    _wpIndex = 0;
-    _loadCarouselSlide(0);
-
-    document.getElementById('fp-wp-prev')?.addEventListener('click', () => {
-        if (_wpLoading) return;
-        _wpIndex = (_wpIndex - 1 + FP_WALLPAPER_PRESETS.length) % FP_WALLPAPER_PRESETS.length;
-        _loadCarouselSlide(_wpIndex);
-    });
-    document.getElementById('fp-wp-next')?.addEventListener('click', () => {
-        if (_wpLoading) return;
-        _wpIndex = (_wpIndex + 1) % FP_WALLPAPER_PRESETS.length;
-        _loadCarouselSlide(_wpIndex);
-    });
-    document.getElementById('fp-wp-apply-cur')?.addEventListener('click', () => {
-        const preset = FP_WALLPAPER_PRESETS[_wpIndex];
-        if (preset) applyWallpaperPreset(preset);
-    });
-    document.getElementById('fp-apply-dark-preset')?.addEventListener('click', applyBlackThemePreset);
-}
-
-async function applyWallpaperPreset(preset, cardEl) {
-    const { fpToolsTheme = {} } = await chrome.storage.local.get('fpToolsTheme');
-    const newTheme = { ...fpToolsTheme, bgImage: preset.url, enableCustomTheme: true, ...preset.palette };
-    await chrome.storage.local.set({ fpToolsTheme: newTheme, enableCustomTheme: true });
-
-    const previewDiv = document.getElementById('bg-image-preview');
-    if (previewDiv) { previewDiv.style.backgroundImage = `url(${preset.url})`; previewDiv.textContent = ''; }
-
-    _updateColorInputs(preset.palette);
-    const cb = document.getElementById('enableCustomThemeCheckbox');
-    if (cb) cb.checked = true;
-
-    if (typeof applyCustomTheme === 'function') applyCustomTheme();
-    if (typeof showNotification === 'function') showNotification(`Обои «${preset.name}» применены ✓`);
-}
-
-async function applyBlackThemePreset() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 2; canvas.height = 2;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(0, 0, 2, 2);
-    const base64 = canvas.toDataURL('image/png');
-
-    const darkPalette = { bgColor1: '#0a0a0a', bgColor2: '#222222', containerBgColor: '#111111', textColor: '#cccccc', linkColor: '#888888' };
-    const { fpToolsTheme = {} } = await chrome.storage.local.get('fpToolsTheme');
-    const newTheme = { ...fpToolsTheme, bgImage: base64, enableCustomTheme: true, ...darkPalette };
-    await chrome.storage.local.set({ fpToolsTheme: newTheme, enableCustomTheme: true });
-
-    const previewDiv = document.getElementById('bg-image-preview');
-    if (previewDiv) { previewDiv.style.backgroundImage = `url(${base64})`; previewDiv.style.backgroundColor = '#1a1a1a'; previewDiv.textContent = ''; }
-
-    _updateColorInputs(darkPalette);
-    const cb = document.getElementById('enableCustomThemeCheckbox');
-    if (cb) cb.checked = true;
-    document.querySelectorAll('.fp-wallpaper-card').forEach(c => c.style.borderColor = 'transparent');
-
-    if (typeof applyCustomTheme === 'function') applyCustomTheme();
-    if (typeof showNotification === 'function') showNotification('Чёрная тема применена ✓');
-}
-
-function _updateColorInputs(palette) {
-    const map = { bgColor1: 'themeColor1', bgColor2: 'themeColor2', containerBgColor: 'themeContainerBgColor', textColor: 'themeTextColor', linkColor: 'themeLinkColor' };
-    Object.entries(map).forEach(([key, id]) => { if (palette[key]) { const el = document.getElementById(id); if (el) el.value = palette[key]; } });
-}
-
-
+// Темы/обои/акцент управляются ЕДИНСТВЕННЫМ слоем в theme.js
+// (setupRedesignThemeControls). Старый дублирующий слой здесь удалён:
+// его обработчики висели на тех же кнопках и затирали fpToolsTheme
+// своим снапшотом — пресеты «не доезжали» до storage (гонка двух set).
 
 function setupPopupNavigation() {
     const toolsPopup = document.querySelector('.fp-tools-popup');
@@ -1297,14 +1148,9 @@ function setupPopupNavigation() {
             if (pageId === 'telegram') { if (typeof initializeTelegramUI === 'function') initializeTelegramUI(); }
             if (pageId === 'blacklist') { if (typeof initializeBlacklist === 'function') initializeBlacklist(); }
             if (pageId === 'tickets') { initTicketsTab(); }
-            if (pageId === 'theme') {
-                initializeWallpaperPresets();
-                const g = document.getElementById('fp-wallpaper-carousel');
-                if (g) g.style.display = 'block';
-            } else {
-                const g = document.getElementById('fp-wallpaper-carousel');
-                if (g) g.style.display = 'none';
-            }
+            // Темы/обои/акцент инициализируются один раз в theme.js
+            // (setupRedesignThemeControls) — на вкладке ничего доинициализировать
+            // не нужно.
 
             chrome.storage.local.set({ fpToolsLastPage: pageId });
         });

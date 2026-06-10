@@ -222,6 +222,27 @@ class CursorFX {
 }
 const cursorFx = new CursorFX();
 
+// Применяем сохранённые настройки сразу при загрузке страницы.
+// Раньше конфиг прилетал только из loadSavedSettings() при открытии панели
+// FP Tools — до этого эффект после перезагрузки страницы не работал.
+(async () => {
+    try {
+        const { fpToolsCursorFx = {}, fpToolsCustomCursor = {} } =
+            await chrome.storage.local.get(['fpToolsCursorFx', 'fpToolsCustomCursor']);
+        cursorFx.updateConfig({ enabled: false, type: 'sparkle', color1: '#5b86d8', color2: '#8fb0e8', rgb: false, count: 50, ...fpToolsCursorFx });
+        cursorFx.updateCustomCursor({ enabled: false, image: null, size: 32, opacity: 100, hideSystem: true, ...fpToolsCustomCursor });
+    } catch (_) {}
+})();
+
+// Live-синк: изменения из других вкладок применяются без перезагрузки
+try {
+    chrome.storage.onChanged.addListener((changes, area) => {
+        if (area !== 'local') return;
+        if (changes.fpToolsCursorFx) cursorFx.updateConfig(changes.fpToolsCursorFx.newValue || {});
+        if (changes.fpToolsCustomCursor) cursorFx.updateCustomCursor(changes.fpToolsCustomCursor.newValue || {});
+    });
+} catch (_) {}
+
 function setupCursorFxHandlers() {
     const settingsToUpdate = {};
     const inputs = {

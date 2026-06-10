@@ -69,7 +69,7 @@ function renderDeliveryLots(lots, config, container) {
                     <span style="font-size:13px;font-weight:600;color:#d8dae8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%;">${lot.title}</span>
                     <div style="display:flex;gap:6px;align-items:center;">
                         <span class="fp-ad-product-count" data-lot-id="${lot.id}" style="font-size:11px;color:#5a5f7a;">
-                            ${lotConfig.productCount !== undefined ? `📦 ${lotConfig.productCount} шт.` : ''}
+                            ${lotConfig.productCount !== undefined ? `${lotConfig.productCount} шт.` : ''}
                         </span>
                         <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#5a5f7a;cursor:pointer;">
                             <input type="checkbox" class="fp-ad-enabled" data-lot-id="${lot.id}" ${lotConfig.enabled ? 'checked' : ''} style="accent-color:#C026D3;">
@@ -105,7 +105,7 @@ function renderDeliveryLots(lots, config, container) {
                     </div>
                     <button class="btn btn-default fp-ad-save-btn" data-lot-id="${lot.id}"
                         style="padding:5px 12px;font-size:12px;margin-top:8px;">
-                        💾 Сохранить
+                        Сохранить
                     </button>
                 </div>
             `;
@@ -137,10 +137,10 @@ function renderDeliveryLots(lots, config, container) {
     container.querySelectorAll('.fp-ad-save-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
             const lotId = btn.dataset.lotId;
-            btn.textContent = '✓ Сохранено';
+            btn.textContent = 'Сохранено';
             btn.style.color = '#4caf82';
             await autoSaveDeliveryLot(lotId, container);
-            setTimeout(() => { btn.textContent = '💾 Сохранить'; btn.style.color = ''; }, 1500);
+            setTimeout(() => { btn.textContent = 'Сохранить'; btn.style.color = ''; }, 1500);
         });
     });
 }
@@ -193,7 +193,7 @@ async function initStockCounterDisplay() {
             border:1px solid ${count > 3 ? 'rgba(76,175,130,0.3)' : count > 0 ? 'rgba(255,152,0,0.3)' : 'rgba(224,82,82,0.3)'};
             vertical-align:middle;
         `;
-        badge.textContent = count > 0 ? `📦 ${count}` : '📭 0';
+        badge.textContent = count > 0 ? `${count}` : '0';
         badge.title = count > 0 ? `${count} товаров в авто-выдаче` : 'Товары закончились!';
         priceEl.appendChild(badge);
     });

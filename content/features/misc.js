@@ -290,7 +290,6 @@ function initializeToolsPopup() {
                 showSalesStats: document.getElementById('showSalesStatsCheckbox').checked,
                 hideBalance: document.getElementById('hideBalanceCheckbox').checked,
                 viewSellersPromo: document.getElementById('viewSellersPromoCheckbox').checked,
-                notificationSound: selectedSound ? selectedSound.value : 'default',
                 notificationVolume: (function(){ const v = document.getElementById('notificationVolume'); return v ? (parseInt(v.value,10)/100) : 1; })(),
 
                 // Авто-поднятие
@@ -354,6 +353,10 @@ function initializeToolsPopup() {
                 curAR.reviewRequestTemplate = rrTemplate;
                 await chrome.storage.local.set({ fpToolsAutoReplies: curAR });
             }
+
+            // Звук пишем только если радио реально есть и отмечено — раньше
+            // автосейв молча откатывал выбор на 'default' из устаревшего DOM.
+            if (selectedSound) settingsToSave.notificationSound = selectedSound.value;
 
             settingsToSave.fpToolsDiscord = {
                 enabled: document.getElementById('discordLogEnabled').checked,

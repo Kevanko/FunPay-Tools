@@ -12,7 +12,7 @@ async function renderTemplateSettings() {
         const item = createElement('div', { class: 'template-item' });
         if (!config.enabled) item.classList.add('disabled-in-settings');
         
-        const colorPickerHtml = `<input type="color" class="template-color-picker" value="${config.color || '#C026D3'}" data-key="${key}" data-custom="${isCustom}">`;
+        const colorPickerHtml = `<input type="color" class="template-color-picker" value="${config.color || '#5b86d8'}" data-key="${key}" data-custom="${isCustom}">`;
         const deleteBtnHtml = isCustom ? `<button class="delete-custom-template-btn" data-id="${config.id}" title="Удалить"><span class="material-symbols-rounded">delete</span></button>` : '';
 
         // === ИЗМЕНЕНИЕ ЗДЕСЬ ===
@@ -316,9 +316,22 @@ async function loadSavedSettings() {
     
     const toolsPopup = document.querySelector('.fp-tools-popup');
     if (settings.fpToolsPopupDragged && settings.fpToolsPopupPosition) {
-        toolsPopup.style.left = settings.fpToolsPopupPosition.left;
-        toolsPopup.style.top = settings.fpToolsPopupPosition.top;
-        toolsPopup.classList.add('no-transform');
+        // Only restore a saved drag position if the window still FULLY fits there in the
+        // current viewport; otherwise fall back to CSS centering. This prevents a stale
+        // position (saved on a wider monitor / older window size) from leaving the popup
+        // shifted or partly off-screen.
+        const left = parseInt(settings.fpToolsPopupPosition.left, 10);
+        const top = parseInt(settings.fpToolsPopupPosition.top, 10);
+        const pw = toolsPopup.offsetWidth || 1040;
+        const ph = toolsPopup.offsetHeight || 720;
+        const fits = !isNaN(left) && !isNaN(top) && left >= 0 && top >= 0 &&
+                     (left + pw) <= window.innerWidth && (top + ph) <= window.innerHeight;
+        if (fits) {
+            toolsPopup.style.left = left + 'px';
+            toolsPopup.style.top = top + 'px';
+            toolsPopup.classList.add('no-transform');
+        }
+        // else: keep CSS centering (top/left 50% + translate)
     }
     if (settings.fpToolsPopupSize) {
         toolsPopup.style.width = settings.fpToolsPopupSize.width;
@@ -380,7 +393,7 @@ async function loadSavedSettings() {
     document.getElementById('enableRedesignedHomepage').checked = settings.enableRedesignedHomepage !== false;
 
     const cursorFxSettings = settings.fpToolsCursorFx || {};
-    const cursorFxDefaults = { enabled: false, type: 'sparkle', color1: '#FF6B6B', color2: '#C026D3', rgb: false, count: 50 };
+    const cursorFxDefaults = { enabled: false, type: 'sparkle', color1: '#5b86d8', color2: '#8fb0e8', rgb: false, count: 50 };
     const finalCursorFxSettings = { ...cursorFxDefaults, ...cursorFxSettings };
 
     document.getElementById('cursorFxEnabled').checked = finalCursorFxSettings.enabled;
@@ -519,5 +532,28 @@ async function loadSavedSettings() {
                 previewNotificationSound(sel ? sel.value : 'default', vol);
             }
         });
+    }
+
+    // Live-синк звука: радио/громкость всегда отражают хранилище. Без этого
+    // вкладка с устаревшим состоянием радио автосейвом откатывала выбор,
+    // сделанный в другой вкладке, тулбарном попапе или редакторе мелодии.
+    if (!window.__fptSoundSyncBound) {
+        window.__fptSoundSyncBound = true;
+        try {
+            chrome.storage.onChanged.addListener((changes, area) => {
+                if (area !== 'local') return;
+                if (changes.notificationSound && changes.notificationSound.newValue) {
+                    const r = document.querySelector(`input[name="notificationSound"][value="${changes.notificationSound.newValue}"]`);
+                    if (r && !r.checked) r.checked = true;
+                }
+                if (changes.notificationVolume) {
+                    const slider = document.getElementById('notificationVolume');
+                    const label = document.getElementById('notificationVolumeValue');
+                    const v = Math.round((typeof changes.notificationVolume.newValue === 'number' ? changes.notificationVolume.newValue : 1) * 100);
+                    if (slider) slider.value = v;
+                    if (label) label.textContent = `${v}%`;
+                }
+            });
+        } catch (_) {}
     }
 }

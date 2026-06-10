@@ -362,7 +362,7 @@ async function checkForCopiedLotData() {
 
     const pasteBar = createElement('div', { id: 'fp-tools-paste-bar' });
     pasteBar.innerHTML = `
-        <span class="paste-bar-icon">📋</span>
+        <span class="paste-bar-icon"><span class="material-symbols-rounded" style="font-size:16px;vertical-align:-3px;">content_paste</span></span>
         <span class="paste-bar-text">Найдены скопированные данные лота. Вставить их в форму?</span>
         <div class="paste-bar-actions">
             <button id="paste-lot-data-btn" class="btn btn-sm btn-primary">Вставить</button>

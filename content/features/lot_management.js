@@ -64,7 +64,7 @@ async function displayPinnedLotsOnLoad() {
         <div class="offer" id="fp-tools-pinned-lots-container">
             <div class="offer-list-title" style="display: flex; align-items: center; gap: 10px;">
                 <h3>Закрепленные лоты</h3>
-                <button id="fp-tools-edit-pinned-lots-btn" class="btn btn-default btn-xs" title="Выбрать закрепленные" style="padding: 2px 8px; font-size: 14px; line-height: 1;">✏️</button>
+                <button id="fp-tools-edit-pinned-lots-btn" class="btn btn-default btn-xs" title="Выбрать закрепленные" style="padding: 2px 8px; font-size: 14px; line-height: 1;"><span class="material-symbols-rounded" style="font-size:16px;vertical-align:-3px;">edit</span></button>
             </div>
             <div class="tc showcase-table tc-b-main">
                 ${pinnedLotsHtml}
@@ -106,20 +106,38 @@ function initializeLotManagement() {
 
         const controlsContainer = $(`
             <div id="fp-tools-selection-controls">
-                <label>
-                    <input type="checkbox" id="fp-tools-select-all-lots"> Выбрать все
+                <span class="fpt-lm-sel-count" id="fpt-lm-sel-count">Выбрано: 0</span>
+                <label class="fpt-lm-checkall">
+                    <input type="checkbox" id="fp-tools-select-all-lots">
+                    <span>Выбрать все</span>
                 </label>
-                <button type="button" class="btn btn-default btn-xs" id="fp-tools-cancel-selection">Отмена</button>
+                <button type="button" class="fpt-lm-btn" id="fp-tools-cancel-selection"><span class="material-symbols-rounded">close</span>Готово</button>
             </div>
         `);
 
         if (isProfileSalesPage) {
             const offersHeader = $(Array.from(document.querySelectorAll('h5.mb10.text-bold')).find(h => h.textContent.trim() === 'Предложения' || h.textContent.trim() === 'Отзывы'));
             if (offersHeader.length) {
-                selectBtn.removeClass('btn-block').addClass('btn-xs');
-                reactivateBtn.removeClass('btn-block').addClass('btn-xs');
+                // Полноценная панель управления вместо двух btn-xs в заголовке:
+                // её видно сразу, вход в массовые действия — одна заметная кнопка.
+                selectBtn.attr('class', 'fpt-lm-btn fpt-lm-btn-primary').html('<span class="material-symbols-rounded">checklist</span>Массовые действия');
+                reactivateBtn.attr('class', 'fpt-lm-btn').html('<span class="material-symbols-rounded">power_settings_new</span>Включить лоты');
+                const lmBar = $(`
+                    <div id="fpt-lm-bar">
+                        <div class="fpt-lm-left">
+                            <span class="material-symbols-rounded fpt-lm-ico">inventory_2</span>
+                            <span class="fpt-lm-title">Управление лотами</span>
+                            <span class="fpt-lm-count" id="fpt-lm-count"></span>
+                        </div>
+                        <div class="fpt-lm-actions"></div>
+                    </div>
+                `);
+                lmBar.find('.fpt-lm-actions').append(reactivateBtn, selectBtn);
                 controlsContainer.addClass('fp-tools-selection-controls-profile');
-                offersHeader.append(selectBtn, reactivateBtn, controlsContainer.hide());
+                lmBar.append(controlsContainer.hide());
+                offersHeader.after(lmBar);
+                const lotCount = $('.tc-item').length;
+                if (lotCount) lmBar.find('#fpt-lm-count').text(lotCount + ' шт.');
             }
         } else if (isCategoryTradePage) {
             $('body').addClass('fp-category-trade-page');
@@ -145,27 +163,32 @@ function initializeLotManagement() {
 
         selectBtn.on('click', function() {
             if(isProfileSalesPage) {
-                $(this).hide();
-                reactivateBtn.hide();
+                $('#fpt-lm-bar').addClass('is-selecting');
             } else {
                  $('.fp-tools-offer-controls, .fp-original-controls').hide();
             }
             controlsContainer.css('display', 'flex');
             toggleSelectionMode(true);
         });
-        
+
         reactivateBtn.on('click', showReactivationPopup);
 
         controlsContainer.find('#fp-tools-cancel-selection').on('click', function() {
             controlsContainer.hide();
             if(isProfileSalesPage) {
-                selectBtn.show();
-                reactivateBtn.show();
+                $('#fpt-lm-bar').removeClass('is-selecting');
             } else {
                 $('.fp-tools-offer-controls, .fp-original-controls').show();
             }
             toggleSelectionMode(false);
             $('.actions').hide();
+        });
+
+        // Esc — быстрый выход из режима выделения
+        $(document).on('keydown.fptLotSelection', function(e) {
+            if (e.key === 'Escape' && $('#fp-tools-selection-controls').is(':visible')) {
+                $('#fp-tools-cancel-selection').trigger('click');
+            }
         });
 
         controlsContainer.find('#fp-tools-select-all-lots').on('change', function() {
@@ -289,12 +312,12 @@ function setupActionProcessing() {
             <div class="actions">
                 <span class="log">Выберите действие</span>
                 <div>
-                    <button class="action-lot price-editor">Редактор цен</button>
-                    <button class="action-lot pin-lot" style="background: #27ae60;">Закрепить</button>
-                    <button class="action-lot unpin-lot" style="background: #c0392b;">Открепить</button>
-                    <button class="action-lot dublicate">Дублировать</button>
-                    <button class="action-lot deactivate-lot">Отключить</button>
-                    <button class="action-lot delete-lot">Удалить</button>
+                    <button class="action-lot price-editor"><span class="material-symbols-rounded">sell</span>Цена</button>
+                    <button class="action-lot pin-lot"><span class="material-symbols-rounded">push_pin</span>Закрепить</button>
+                    <button class="action-lot unpin-lot"><span class="material-symbols-rounded">keep_off</span>Открепить</button>
+                    <button class="action-lot dublicate"><span class="material-symbols-rounded">content_copy</span>Дублировать</button>
+                    <button class="action-lot deactivate-lot"><span class="material-symbols-rounded">power_settings_new</span>Отключить</button>
+                    <button class="action-lot delete-lot is-danger"><span class="material-symbols-rounded">delete</span>Удалить</button>
                 </div>
             </div>
         `).appendTo('body').hide();
@@ -307,7 +330,9 @@ function setupActionProcessing() {
         const selectAllCheckbox = $('#fp-tools-select-all-lots');
 
         $('.actions').css('display', checkedLots > 0 ? 'flex' : 'none');
-        
+        $('.actions .log').text(checkedLots > 0 ? ('Выбрано: ' + checkedLots) : 'Выберите действие');
+        $('#fpt-lm-sel-count').text('Выбрано: ' + checkedLots + ' из ' + totalLots);
+
         // Обновляем главный чекбокс "Выбрать все"
         if (totalLots > 0) {
             selectAllCheckbox.prop('checked', checkedLots === totalLots);
@@ -334,6 +359,7 @@ function setupActionProcessing() {
         }
     });
     
+    let fptLastLotIdx = null; // для Shift+клик — выделения диапазона
     $(document).on('click', 'a.tc-item', function(e) {
         if (!$('#fp-tools-selection-controls').is(':visible')) {
             return;
@@ -343,13 +369,23 @@ function setupActionProcessing() {
                  const checkbox = $(this).find('input[type="checkbox"]');
                  checkbox.prop('checked', !checkbox.prop('checked'));
                  checkbox.trigger('change');
+                 fptLastLotIdx = $('.tc-item').index(this);
             }
             return;
         }
         e.preventDefault();
+        const $items = $('.tc-item');
+        const idx = $items.index(this);
         const checkbox = $(this).find('input[type="checkbox"]');
-        checkbox.prop('checked', !checkbox.prop('checked'));
-        checkbox.trigger('change');
+        const newState = !checkbox.prop('checked');
+        if (e.shiftKey && fptLastLotIdx !== null && fptLastLotIdx !== idx) {
+            // Shift+клик: применяем новое состояние ко всему диапазону от прошлого клика
+            const a = Math.min(fptLastLotIdx, idx), b = Math.max(fptLastLotIdx, idx);
+            $items.slice(a, b + 1).find('.lot-box input').prop('checked', newState).trigger('change');
+        } else {
+            checkbox.prop('checked', newState).trigger('change');
+        }
+        fptLastLotIdx = idx;
     });
 
     const $actionsBar = $('.actions');

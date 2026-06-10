@@ -31,7 +31,7 @@ function fptSlashRenderList() {
             <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
                 <input type="text" class="fpt-slash-trigger template-input" data-i="${i}" value="${fptSlashEsc(c.trigger || '')}" placeholder="/привет" style="flex:0 0 150px;margin:0;">
                 <span style="color:#5a5f7a;font-size:12px;">→</span>
-                <button class="fpt-slash-del btn btn-default" data-i="${i}" title="Удалить" style="margin-left:auto;padding:4px 10px;">🗑️</button>
+                <button class="fpt-slash-del btn btn-default" data-i="${i}" title="Удалить" style="margin-left:auto;padding:4px 10px;"><span class="material-symbols-rounded" style="font-size:16px;">delete</span></button>
             </div>
             <textarea class="fpt-slash-response template-input" data-i="${i}" rows="2" placeholder="Текст-ответ. Напр.: Привет, я тут. Какие вопросы?" style="margin:0;resize:vertical;">${fptSlashEsc(c.response || '')}</textarea>
         </div>
