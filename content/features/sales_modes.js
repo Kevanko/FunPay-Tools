@@ -13,7 +13,7 @@
     const MODE_KEY = 'fpToolsStatsViewMode';
     const PALETTE = ['var(--fpt-uacc, #5b86d8)', '#3f9e7c', '#d9a440', '#8b7fd0', '#0891b2', '#c2703d', '#6b7280', '#db2777', '#65a30d', '#e05252'];
     // Семантические цвета статусов (совпадают с карточками: зелёный/янтарный/красный)
-    const STATUS_COLORS = { 'Закрыто': '#2c9a63', 'В ожидании': '#d9a440', 'Возврат': '#e05252' };
+    const STATUS_COLORS = { 'Закрыто': '#2c9a63', 'Оплачено': '#d9a440', 'Возврат': '#e05252' };
 
     function esc(s) {
         return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({
@@ -254,7 +254,7 @@
 
     function diagramsHTML(agg) {
         const catEntries = Object.entries(agg.byCategory).map(([k, v]) => ({ label: k, value: v })).sort((a, b) => b.value - a.value);
-        const statusLabels = { closed: 'Закрыто', paid: 'В ожидании', refunded: 'Возврат' };
+        const statusLabels = { closed: 'Закрыто', paid: 'Оплачено', refunded: 'Возврат' };
         const statusEntries = Object.entries(agg.byStatus).filter(([, v]) => v > 0).map(([k, v]) => ({ label: statusLabels[k] || k, value: v }));
         const curEntries = Object.entries(agg.byCurrency).map(([k, v]) => ({ label: k, value: v })).sort((a, b) => b.value - a.value);
 

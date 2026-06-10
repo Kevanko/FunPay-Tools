@@ -90,7 +90,7 @@ function getStatsBlockHTML() {
             <div class="fp-stat-card stat-card-pending">
                 <div class="stat-card-icon"><span class="material-symbols-rounded">hourglass_top</span></div>
                 <div class="stat-card-content">
-                    <div class="stat-card-label">В ожидании</div>
+                    <div class="stat-card-label">Оплачено</div>
                     <div class="stat-card-value" id="fpTools-stats-orders-pending">0</div>
                 </div>
             </div>
