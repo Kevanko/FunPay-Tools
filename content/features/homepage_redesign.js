@@ -371,12 +371,75 @@ function gameDomain(name) {
     return `${clean}.com`;
 }
 
+// ── Посещения игр: личная статистика для «Недавно» и «Частые» ────────────────
+// localStorage — синхронная запись на клик переживает переход страницы, данные
+// привязаны к funpay.com, где и нужны. FunPay не отдаёт глобальную популярность,
+// поэтому «популярное» = то, что чаще открывает сам пользователь.
+// Русское склонение: 1 раздел / 2 раздела / 5 разделов.
+function fptPlural(n, forms) {
+    const a = Math.abs(n) % 100, b = n % 10;
+    if (a > 10 && a < 20) return forms[2];
+    if (b > 1 && b < 5) return forms[1];
+    if (b === 1) return forms[0];
+    return forms[2];
+}
+
+const FPT_VISITS_KEY = 'fptGameVisits';
+function fptGetGameVisits() {
+    try { return JSON.parse(localStorage.getItem(FPT_VISITS_KEY)) || {}; } catch (_) { return {}; }
+}
+function fptRecordGameVisit(name, url) {
+    if (!url) return;
+    try {
+        const v = fptGetGameVisits();
+        const e = v[url] || { name, url, count: 0, last: 0 };
+        if (name) e.name = name;
+        e.url = url;
+        e.count = (e.count || 0) + 1;
+        e.last = Date.now();
+        v[url] = e;
+        const keys = Object.keys(v);
+        if (keys.length > 60) {
+            keys.sort((a, b) => (v[b].last || 0) - (v[a].last || 0)).slice(60).forEach(k => delete v[k]);
+        }
+        localStorage.setItem(FPT_VISITS_KEY, JSON.stringify(v));
+    } catch (_) {}
+}
+
 function createRedesignedUI(allGamesData, yourGamesData, realData) {
     const rd = realData || {};
     const tg = rd.toggles || {};
     const displayName = rd.username || getSellerDisplayName();
     const titleText = displayName ? `С возвращением, ${escapeHtml(displayName)}` : 'FunPay';
     const categoryCount = getUniqueCategoryCount(allGamesData);
+
+    // Личная статистика посещений → «Недавно посещённые» + сортировка «Частые».
+    const visits = fptGetGameVisits();
+    const visitList = Object.values(visits);
+    const recentGames = visitList.filter(v => v.last).sort((a, b) => b.last - a.last).slice(0, 6);
+    const topByCount = visitList.filter(v => (v.count || 0) > 0).sort((a, b) => b.count - a.count);
+    const freqSet = new Set(topByCount.slice(0, 8).map(v => v.url));
+    const hasFreq = topByCount.length >= 3;   // достаточно истории, чтобы «Частые» имело смысл
+
+    const recentHTML = recentGames.length ? `
+        <div class="home-recent">
+            <span class="home-recent-label eyebrow">Недавно посещённые</span>
+            <div class="home-recent-row fpx-scroll">
+                ${recentGames.map(g => {
+                    const nm = escapeHtml(g.name || 'Игра');
+                    const lt = escapeHtml((g.name || 'G').charAt(0).toUpperCase());
+                    return `<a href="${escapeHtml(g.url)}" class="home-recent-chip" data-name="${nm}" data-url="${escapeHtml(g.url)}"><span class="home-recent-mark mono">${lt}</span><span class="home-recent-name">${nm}</span></a>`;
+                }).join('')}
+            </div>
+        </div>` : '';
+
+    const sortHTML = `
+        <div class="home-cat-bar">
+            <div class="home-cat-sort" id="fpt-home-sort" role="tablist">
+                <button type="button" data-sort="freq">Частые</button>
+                <button type="button" data-sort="az">А–Я</button>
+            </div>
+        </div>`;
 
     const balanceText = rd.balance || '—';
     const ordersActive = rd.ordersActive != null ? String(rd.ordersActive) : '—';
@@ -512,6 +575,8 @@ function createRedesignedUI(allGamesData, yourGamesData, realData) {
                         <button type="button" class="home-search-x" id="fpt-home-search-x" style="display:none;">${hic('X', 15)}</button>
                     </div>
                 </div>
+                ${recentHTML}
+                ${sortHTML}
                 <div class="gcards" id="fpt-gcards"></div>
                 <div class="home-empty" id="fpt-home-empty" style="display:none;">${hic('Search', 22)}<span></span></div>
             </div>
@@ -522,7 +587,12 @@ function createRedesignedUI(allGamesData, yourGamesData, realData) {
     const grid = uiWrapper.querySelector('#fpt-gcards');
     allGamesData.forEach(game => {
         const card = document.createElement('div');
-        card.className = 'gcard';
+        const visitCount = (visits[game.url] && visits[game.url].count) || 0;
+        const isFreq = freqSet.has(game.url);
+        card.className = 'gcard' + (isFreq ? ' gcard-fav' : '');
+        card.dataset.name = game.name;
+        card.dataset.url = game.url;
+        card.dataset.count = String(visitCount);
         const letter = escapeHtml((game.name.charAt(0) || 'G').toUpperCase());
         const safeName = escapeHtml(game.name);
         const iconUrl = `https://www.google.com/s2/favicons?sz=64&domain=${gameDomain(game.name)}`;
@@ -538,7 +608,7 @@ function createRedesignedUI(allGamesData, yourGamesData, realData) {
                 </div>
                 <div class="gcard-titlewrap">
                     <div class="gcard-title">${safeName}</div>
-                    <div class="gcard-meta faint"><span class="mono">${game.categories.length} разделов</span></div>
+                    <div class="gcard-meta faint"><span class="mono">${game.categories.length} ${fptPlural(game.categories.length, ['раздел', 'раздела', 'разделов'])}</span>${isFreq ? '<span class="gcard-freq">часто</span>' : ''}</div>
                 </div>
                 <span class="gcard-go">${hic('ArrowUpRight', 16)}</span>
             </div>
@@ -546,6 +616,9 @@ function createRedesignedUI(allGamesData, yourGamesData, realData) {
         `;
         grid.appendChild(card);
     });
+
+    // Стартовая сортировка: при наличии истории — «Частые» вперёд, иначе А–Я.
+    fptApplyCatalogSort(grid, hasFreq ? 'freq' : 'az');
 
     // ── events ──
     uiWrapper.querySelectorAll('[data-home-open-tools]').forEach(b =>
@@ -609,6 +682,47 @@ function setupLazyLoadObserver() {
         });
     }, { root: null, rootMargin: '0px 0px 200px 0px' });
     itemsToLoad.forEach(item => observer.observe(item));
+}
+
+// Переупорядочивает карточки каталога: 'freq' — по числу посещений (потом А–Я),
+// 'az' — по алфавиту. Не трогает видимость (ей управляет поиск).
+function fptApplyCatalogSort(grid, mode) {
+    if (!grid) return;
+    const cards = Array.from(grid.children);
+    cards.sort((a, b) => {
+        if (mode === 'freq') {
+            const d = (parseInt(b.dataset.count, 10) || 0) - (parseInt(a.dataset.count, 10) || 0);
+            if (d) return d;
+        }
+        return (a.dataset.name || '').localeCompare(b.dataset.name || '', 'ru');
+    });
+    cards.forEach(c => grid.appendChild(c));
+    const bar = document.getElementById('fpt-home-sort');
+    if (bar) bar.querySelectorAll('[data-sort]').forEach(btn => btn.classList.toggle('is-active', btn.dataset.sort === mode));
+}
+
+function setupCatalogSort(defaultMode) {
+    const bar = document.getElementById('fpt-home-sort');
+    const grid = document.getElementById('fpt-gcards');
+    if (!bar || !grid) return;
+    bar.querySelectorAll('[data-sort]').forEach(btn => btn.classList.toggle('is-active', btn.dataset.sort === defaultMode));
+    bar.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-sort]');
+        if (btn) fptApplyCatalogSort(grid, btn.dataset.sort);
+    });
+}
+
+// Запоминаем открытие игры (клик по карточке, её разделу или чипу «недавних»).
+// mousedown — срабатывает до перехода и для средней кнопки/нового таба.
+function setupVisitTracking() {
+    const root = document.querySelector('.fpt-home');
+    if (!root) return;
+    root.addEventListener('mousedown', (e) => {
+        const chip = e.target.closest('.home-recent-chip');
+        if (chip) { fptRecordGameVisit(chip.dataset.name, chip.dataset.url); return; }
+        const card = e.target.closest('.gcard');
+        if (card) fptRecordGameVisit(card.dataset.name, card.dataset.url);
+    }, true);
 }
 
 function setupSearchFilter() {
@@ -744,6 +858,8 @@ async function initializeRedesign() {
     document.body.classList.add('funpay-redesigned');
     setupSearchFilter();
     setupLazyLoadObserver();
+    setupCatalogSort(document.querySelector('.gcard-fav') ? 'freq' : 'az');
+    setupVisitTracking();
 
     // Re-check balance after DOM is ready (might have been hidden by theme_flash_fix)
     setTimeout(() => {
