@@ -509,6 +509,24 @@ function parseChatList(html) {
     }
 }
 
+// Список ID авторов всех сообщений в истории чата (из .chat-msg-author-link).
+// Нужен автоответчику, чтобы понять, писал ли продавец в чат сам — тогда чат
+// не «новый» и авто-приветствие слать не нужно.
+function parseChatAuthors(html) {
+    try {
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        const ids = new Set();
+        doc.querySelectorAll('.chat-msg-author-link').forEach(a => {
+            const m = (a.getAttribute('href') || '').match(/\/users\/(\d+)\//);
+            if (m) ids.add(m[1]);
+        });
+        return Array.from(ids);
+    } catch (e) {
+        console.error("FP Tools Offscreen: Error parsing chat authors.", e);
+        return null; // null = ошибка разбора (отличаем от пустого массива)
+    }
+}
+
 function parseUserLotsList(html) {
     try {
         const doc = new DOMParser().parseFromString(html, "text/html");
@@ -1057,6 +1075,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             break;
         case 'parseChatList':
             sendResponse(parseChatList(message.html));
+            break;
+        case 'parseChatAuthors':
+            sendResponse(parseChatAuthors(message.html));
             break;
         case 'parseUserLotsList':
             sendResponse(parseUserLotsList(message.html));

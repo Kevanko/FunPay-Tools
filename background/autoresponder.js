@@ -114,9 +114,34 @@ async function parseViaOffscreen(html, action) {
         documentUrls: [chrome.runtime.getURL(OFFSCREEN_PATH)]
     });
     if (!existing.length) {
-        await chrome.offscreen.createDocument({ url: OFFSCREEN_PATH, reasons: ['DOM_PARSER'], justification: 'parse' });
+        // гонку с background.js (оба создают offscreen-документ) не считаем ошибкой
+        try {
+            await chrome.offscreen.createDocument({ url: OFFSCREEN_PATH, reasons: ['DOM_PARSER'], justification: 'parse' });
+        } catch (e) {
+            if (!String(e && e.message || '').includes('single offscreen')) throw e;
+        }
     }
     return chrome.runtime.sendMessage({ target: 'offscreen', action, html });
+}
+
+// Писал ли продавец в этот чат сам. Возвращает 'wrote' | 'clean' | 'error'.
+// История чата отдаётся страницей server-side; автор каждого сообщения —
+// ссылка .chat-msg-author-link на /users/{id}/. Если среди авторов есть наш
+// userId — значит мы (или бот от нашего имени) уже писали, чат не «новый».
+async function sellerWroteInChat(chatId, auth) {
+    try {
+        const res = await fetchWithRetry(`https://funpay.com/chat/?node=${chatId}`, {
+            headers: { cookie: `golden_key=${auth.golden_key}; PHPSESSID=${auth.phpsessid}` }
+        });
+        if (!res.ok) return 'error';
+        const html = await res.text();
+        const authors = await parseViaOffscreen(html, 'parseChatAuthors');
+        if (!Array.isArray(authors)) return 'error';
+        return authors.includes(String(auth.userId)) ? 'wrote' : 'clean';
+    } catch (e) {
+        console.error('FP Tools AR: sellerWroteInChat error', e.message);
+        return 'error';
+    }
 }
 
 async function sendChatMessage(chatId, text, auth) {
@@ -302,6 +327,22 @@ async function handleGreeting(msg, auth, settings) {
     } else {
         const greetedUsers = settings.greetedUsers || [];
         if (greetedUsers.includes(msg.chatId) && cooldownDays === 0) return;
+    }
+
+    // Приветствие — это «написать первым» в нетронутый чат. Если продавец уже
+    // писал в этот чат сам (или бот от его имени — выдача/ответ), чат не новый,
+    // приветствие не шлём. 'error' = временный сбой: пропускаем БЕЗ пометки,
+    // чтобы повторить на следующем сообщении.
+    const sellerStatus = await sellerWroteInChat(msg.chatId, auth);
+    if (sellerStatus === 'error') return;
+    if (sellerStatus === 'wrote') {
+        await atomicUpdate(s => {
+            const arr = s.greetedUsers || [];
+            if (!arr.includes(msg.chatId)) arr.push(msg.chatId);
+            s.greetedUsers = arr;
+        });
+        console.log(`FP Tools AR: приветствие пропущено (продавец уже писал) → ${msg.chatId}`);
+        return;
     }
 
     const text = applyVariables(settings.greetingText, { buyerName: msg.buyerName, chatId: msg.chatId });
