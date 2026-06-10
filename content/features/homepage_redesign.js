@@ -384,6 +384,20 @@ function fptPlural(n, forms) {
     return forms[2];
 }
 
+// Выбранный режим сортировки каталога ('freq' | 'az'). Пусто = авто-выбор.
+const FPT_SORT_KEY = 'fptCatalogSort';
+function fptGetSortMode() {
+    try { const m = localStorage.getItem(FPT_SORT_KEY); return (m === 'freq' || m === 'az') ? m : null; } catch (_) { return null; }
+}
+function fptSetSortMode(mode) {
+    try { localStorage.setItem(FPT_SORT_KEY, mode); } catch (_) {}
+}
+// Единый источник правды: сохранённый выбор пользователя, иначе авто —
+// «Частые», если есть отмеченные частые карточки, иначе «А–Я».
+function fptResolveSortMode(grid) {
+    return fptGetSortMode() || ((grid && grid.querySelector('.gcard-fav')) ? 'freq' : 'az');
+}
+
 const FPT_VISITS_KEY = 'fptGameVisits';
 function fptGetGameVisits() {
     try { return JSON.parse(localStorage.getItem(FPT_VISITS_KEY)) || {}; } catch (_) { return {}; }
@@ -419,7 +433,6 @@ function createRedesignedUI(allGamesData, yourGamesData, realData) {
     const recentGames = visitList.filter(v => v.last).sort((a, b) => b.last - a.last).slice(0, 6);
     const topByCount = visitList.filter(v => (v.count || 0) > 0).sort((a, b) => b.count - a.count);
     const freqSet = new Set(topByCount.slice(0, 8).map(v => v.url));
-    const hasFreq = topByCount.length >= 3;   // достаточно истории, чтобы «Частые» имело смысл
 
     const recentHTML = recentGames.length ? `
         <div class="home-recent">
@@ -617,8 +630,9 @@ function createRedesignedUI(allGamesData, yourGamesData, realData) {
         grid.appendChild(card);
     });
 
-    // Стартовая сортировка: при наличии истории — «Частые» вперёд, иначе А–Я.
-    fptApplyCatalogSort(grid, hasFreq ? 'freq' : 'az');
+    // Стартовая сортировка до отрисовки (grid ещё вне документа) — тем же
+    // режимом, что применит setupCatalogSort после вставки. Без рассинхрона.
+    fptApplyCatalogSort(grid, fptResolveSortMode(grid));
 
     // ── events ──
     uiWrapper.querySelectorAll('[data-home-open-tools]').forEach(b =>
@@ -701,14 +715,17 @@ function fptApplyCatalogSort(grid, mode) {
     if (bar) bar.querySelectorAll('[data-sort]').forEach(btn => btn.classList.toggle('is-active', btn.dataset.sort === mode));
 }
 
-function setupCatalogSort(defaultMode) {
+function setupCatalogSort() {
     const bar = document.getElementById('fpt-home-sort');
     const grid = document.getElementById('fpt-gcards');
     if (!bar || !grid) return;
-    bar.querySelectorAll('[data-sort]').forEach(btn => btn.classList.toggle('is-active', btn.dataset.sort === defaultMode));
+    // порядок и активная кнопка — из одного режима (сохранённый или авто)
+    fptApplyCatalogSort(grid, fptResolveSortMode(grid));
     bar.addEventListener('click', (e) => {
         const btn = e.target.closest('[data-sort]');
-        if (btn) fptApplyCatalogSort(grid, btn.dataset.sort);
+        if (!btn) return;
+        fptSetSortMode(btn.dataset.sort);   // запоминаем выбор пользователя
+        fptApplyCatalogSort(grid, btn.dataset.sort);
     });
 }
 
@@ -858,7 +875,7 @@ async function initializeRedesign() {
     document.body.classList.add('funpay-redesigned');
     setupSearchFilter();
     setupLazyLoadObserver();
-    setupCatalogSort(document.querySelector('.gcard-fav') ? 'freq' : 'az');
+    setupCatalogSort();
     setupVisitTracking();
 
     // Re-check balance after DOM is ready (might have been hidden by theme_flash_fix)
