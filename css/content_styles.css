@@ -10610,6 +10610,45 @@ body.funpay-redesigned {
     border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex: none; }
 .fpt-home .home-search-x:hover { color: var(--text); }
 
+/* Недавно посещённые — горизонтальный ряд чипов над каталогом */
+.fpt-home .home-recent { margin: 0 0 18px; }
+.fpt-home .home-recent-label { display: block; margin-bottom: 10px; }
+.fpt-home .home-recent-row { display: flex; gap: 9px; overflow-x: auto; padding-bottom: 4px; }
+.fpt-home .home-recent-chip {
+    display: inline-flex; align-items: center; gap: 9px; flex: none;
+    padding: 7px 13px 7px 7px; border-radius: 999px; text-decoration: none;
+    background: var(--surface-1); border: 1px solid var(--line); color: var(--text);
+    transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.fpt-home .home-recent-chip:hover { border-color: var(--accent-line); background: var(--surface-2); }
+.fpt-home .home-recent-mark {
+    width: 26px; height: 26px; flex: none; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--surface-3); color: var(--text-dim); border: 1px solid var(--line-strong);
+    font-size: 12px; font-weight: 700; letter-spacing: -0.03em;
+}
+.fpt-home .home-recent-chip:hover .home-recent-mark { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
+.fpt-home .home-recent-name { font-size: 13px; font-weight: 540; letter-spacing: -0.01em; white-space: nowrap; }
+
+/* Панель сортировки каталога */
+.fpt-home .home-cat-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.fpt-home .home-cat-sort { display: inline-flex; padding: 3px; gap: 2px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); }
+.fpt-home .home-cat-sort button {
+    border: 0; background: transparent; cursor: pointer;
+    font-family: var(--font-ui); font-size: 12.5px; font-weight: 560; letter-spacing: -0.01em;
+    color: var(--text-dim); padding: 6px 14px; border-radius: 7px;
+    transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.fpt-home .home-cat-sort button:hover { color: var(--text); }
+.fpt-home .home-cat-sort button.is-active { background: var(--accent); color: var(--accent-fg); }
+
+/* Подсветка часто открываемых карточек — тонкая акцентная грань + метка */
+.fpt-home .gcard-fav { box-shadow: inset 3px 0 0 var(--accent); }
+.fpt-home .gcard-freq {
+    font-size: 10.5px; font-weight: 640; letter-spacing: 0.01em; text-transform: lowercase;
+    padding: 2px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent);
+}
+
 .fpt-home .gcards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 .fpt-home .gcard {
     position: relative; display: flex; flex-direction: column; gap: 14px;
