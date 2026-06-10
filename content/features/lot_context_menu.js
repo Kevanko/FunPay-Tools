@@ -51,12 +51,12 @@
         menu.style.cssText = `position:fixed;left:${x}px;top:${y}px;background:#13141a;border:1px solid #22253a;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.5);z-index:100000;min-width:210px;padding:4px 0;font-family:Inter,'Segoe UI',sans-serif;font-size:13px;color:#d8dae8;`;
 
         const items = [
-            { icon: isPinned ? '📌' : '📍', label: isPinned ? 'Открепить из таблицы' : 'Закрепить в таблице', action: 'pin', enabled: !!lot.offerId },
-            { icon: '✉️', label: lot.sellerName ? `Написать ${lot.sellerName}` : 'Написать', action: 'msg', enabled: !!lot.sellerId },
-            { icon: '🔗', label: 'Скопировать ссылку', action: 'copy', enabled: true },
+            { icon: '<span class="material-symbols-rounded" style="font-size:17px;">' + (isPinned ? 'keep_off' : 'push_pin') + '</span>', label: isPinned ? 'Открепить из таблицы' : 'Закрепить в таблице', action: 'pin', enabled: !!lot.offerId },
+            { icon: '<span class="material-symbols-rounded" style="font-size:17px;">mail</span>', label: lot.sellerName ? `Написать ${lot.sellerName}` : 'Написать', action: 'msg', enabled: !!lot.sellerId },
+            { icon: '<span class="material-symbols-rounded" style="font-size:17px;">link</span>', label: 'Скопировать ссылку', action: 'copy', enabled: true },
             { sep: true },
             {
-                icon: '🔄',
+                icon: '<span class="material-symbols-rounded" style="font-size:17px;">sync</span>',
                 label: 'Переключить',
                 action: 'toggle_ctx',
                 enabled: true,
@@ -99,13 +99,13 @@
         if (action === 'pin') {
             const idx = pinnedLots.findIndex(p => p.offerId === lot.offerId);
             if (idx !== -1) { pinnedLots.splice(idx, 1); showNotification('Лот откреплён'); }
-            else { pinnedLots.unshift({ ...lot, pinnedAt: Date.now() }); if (pinnedLots.length > 50) pinnedLots.length = 50; showNotification('Лот закреплён 📌'); }
+            else { pinnedLots.unshift({ ...lot, pinnedAt: Date.now() }); if (pinnedLots.length > 50) pinnedLots.length = 50; showNotification('Лот закреплён'); }
             savePinned();
             renderPinnedInTable();
         }
         if (action === 'copy') {
-            navigator.clipboard?.writeText(lot.lotUrl).then(() => showNotification('Ссылка скопирована 🔗')).catch(() => {
-                const ta = document.createElement('textarea'); ta.value = lot.lotUrl; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); showNotification('Ссылка скопирована 🔗');
+            navigator.clipboard?.writeText(lot.lotUrl).then(() => showNotification('Ссылка скопирована')).catch(() => {
+                const ta = document.createElement('textarea'); ta.value = lot.lotUrl; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); showNotification('Ссылка скопирована');
             });
         }
         if (action === 'msg') showInlineChat(lot);
@@ -194,7 +194,7 @@
                 if (result?.error) throw new Error(result.error);
 
                 status.style.color = '#4caf82';
-                status.textContent = 'Сообщение отправлено ✓';
+                status.textContent = 'Сообщение отправлено';
                 ta.value = '';
                 setTimeout(removeChatPanel, 2000);
             } catch (e) {
@@ -262,7 +262,7 @@
                 const priceEl = clone.querySelector('.tc-price');
                 if (priceEl) {
                     const unpinBtn = document.createElement('button');
-                    unpinBtn.innerHTML = '📌';
+                    unpinBtn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;">push_pin</span>';
                     unpinBtn.title = 'Открепить';
                     unpinBtn.style.cssText = 'background:none;border:none;cursor:pointer;font-size:12px;padding:0 2px;opacity:0.6;';
                     unpinBtn.addEventListener('click', (e) => {
@@ -281,7 +281,7 @@
 
             // Fallback: minimal row
             row.innerHTML = `
-                <div class="tc-desc" style="flex:1;"><div class="tc-desc-text" style="color:#E9A8FF;">📌 ${lot.title}</div></div>
+                <div class="tc-desc" style="flex:1;"><div class="tc-desc-text" style="color:#aecbf0;"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:-2px;">push_pin</span> ${lot.title}</div></div>
                 <div class="tc-price"><button data-unpin="${lot.offerId}" style="background:none;border:none;color:#3a3d52;cursor:pointer;font-size:14px;padding:0 4px;" title="Открепить">✕</button></div>`;
             row.querySelector('button').addEventListener('click', (e) => {
                 e.preventDefault(); e.stopPropagation();

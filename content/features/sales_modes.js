@@ -11,7 +11,9 @@
     'use strict';
 
     const MODE_KEY = 'fpToolsStatsViewMode';
-    const PALETTE = ['#C026D3', '#7c3aed', '#2563eb', '#059669', '#d97706', '#dc2626', '#0891b2', '#db2777', '#65a30d', '#9333ea'];
+    const PALETTE = ['var(--fpt-uacc, #5b86d8)', '#3f9e7c', '#d9a440', '#8b7fd0', '#0891b2', '#c2703d', '#6b7280', '#db2777', '#65a30d', '#e05252'];
+    // Семантические цвета статусов (совпадают с карточками: зелёный/янтарный/красный)
+    const STATUS_COLORS = { 'Закрыто': '#2c9a63', 'В ожидании': '#d9a440', 'Возврат': '#e05252' };
 
     function esc(s) {
         return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({
@@ -160,7 +162,14 @@
         const W = 560, H = 200, PAD = { t: 16, r: 14, b: 28, l: 52 };
         const cw = W - PAD.l - PAD.r, ch = H - PAD.t - PAD.b;
         const vals = days.map(getVal);
-        const maxV = Math.max(1, ...vals);
+        // «Красивая» шкала: шаг 1/2/2.5/5×10^n, максимум кратен шагу — иначе
+        // подписи получаются вида 0/447/894 и врут при округлении в «к».
+        const rawMax = Math.max(1, ...vals);
+        const rawStep = rawMax / 4;
+        const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+        const norm = rawStep / mag;
+        const step = Math.max(1, mag * (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10));
+        const maxV = Math.ceil(rawMax / step) * step;
         const slot = cw / days.length;
         const barW = Math.max(2, Math.min(26, slot - 4));
 
@@ -177,11 +186,11 @@
                 xL += `<text x="${x}" y="${H - 8}" text-anchor="middle" font-size="9" fill="var(--fpt-text-muted)">${esc(day.slice(5))}</text>`;
             }
         });
-        const steps = 4;
+        const steps = Math.round(maxV / step);
         for (let i = 0; i <= steps; i++) {
             const y = PAD.t + ch - (i / steps) * ch;
-            const rv = (maxV / steps) * i;
-            const lbl = rv >= 1000 ? Math.round(rv / 1000) + 'к' : Math.round(rv);
+            const rv = step * i;
+            const lbl = rv >= 1000 ? (rv % 1000 === 0 ? (rv / 1000) + 'к' : (rv / 1000).toFixed(1) + 'к') : Math.round(rv);
             yL += `<line x1="${PAD.l}" y1="${y}" x2="${W - PAD.r}" y2="${y}" stroke="var(--fpt-border)" stroke-width="1" opacity="0.5"/>`;
             yL += `<text x="${PAD.l - 6}" y="${y + 3}" text-anchor="end" font-size="9" fill="var(--fpt-text-muted)">${lbl}</text>`;
         }
@@ -196,10 +205,17 @@
     }
 
     function chartHTML(agg) {
-        const days = Object.keys(agg.byDay).sort();
-        if (!days.length) return emptyHTML('Нет данных за период');
-        const revChart = singleChart('Выручка по дням, ₽', days, d => agg.byDay[d].revenue, v => money(v, 'RUB'), 'var(--fpt-accent)');
-        const cntChart = singleChart('Заказы по дням, шт.', days, d => agg.byDay[d].count, v => v + ' заказ.', '#2563eb');
+        const keys = Object.keys(agg.byDay).sort();
+        if (!keys.length) return emptyHTML('Нет данных за период');
+        // Непрерывный ряд дат: дни без продаж — нулевые столбцы,
+        // иначе график склеивает разрозненные даты и динамика врёт.
+        const days = [];
+        const d1 = new Date(keys[keys.length - 1] + 'T00:00:00');
+        for (let d = new Date(keys[0] + 'T00:00:00'); d <= d1; d.setDate(d.getDate() + 1)) {
+            days.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+        }
+        const revChart = singleChart('Выручка по дням, ₽', days, d => (agg.byDay[d] ? agg.byDay[d].revenue : 0), v => money(v, 'RUB'), 'var(--fpt-uacc, #5b86d8)');
+        const cntChart = singleChart('Заказы по дням, шт.', days, d => (agg.byDay[d] ? agg.byDay[d].count : 0), v => v + ' заказ.', 'var(--fpt-uacc, #5b86d8)');
         return `<div class="fp-sm-charts-stack">${revChart}${cntChart}</div>`;
     }
 
@@ -220,7 +236,7 @@
             const x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
             const xi1 = cx + rin * Math.cos(a1), yi1 = cy + rin * Math.sin(a1);
             const xi0 = cx + rin * Math.cos(a0), yi0 = cy + rin * Math.sin(a0);
-            const col = PALETTE[i % PALETTE.length];
+            const col = STATUS_COLORS[e.label] || PALETTE[i % PALETTE.length];
             const valStr = fmtVal ? fmtVal(e.value) : String(e.value);
             const ttVal = `${valStr} (${Math.round(frac * 100)}%)`;
             paths += `<path class="fp-sm-seg" d="M${x0},${y0} A${r},${r} 0 ${large} 1 ${x1},${y1} L${xi1},${yi1} A${rin},${rin} 0 ${large} 0 ${xi0},${yi0} Z" fill="${col}" data-label="${esc(e.label)}" data-val="${esc(ttVal)}" tabindex="0"></path>`;
@@ -308,8 +324,8 @@
             border:1px solid var(--fpt-border,#22253a);color:var(--fpt-text-muted,#9099b8);border-radius:8px;
             padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit;}
         .fp-stats-mode-btn .material-symbols-rounded{font-size:16px;}
-        .fp-stats-mode-btn:hover{border-color:var(--fpt-accent,#C026D3);color:var(--fpt-text,#d8dae8);}
-        .fp-stats-mode-btn.active{background:var(--fpt-accent-soft,rgba(192,38,211,0.18));border-color:var(--fpt-accent,#C026D3);color:var(--fpt-accent,#C026D3);}
+        .fp-stats-mode-btn:hover{border-color:var(--fpt-uacc, #5b86d8);color:var(--fpt-text,#d8dae8);}
+        .fp-stats-mode-btn.active{background:var(--fpt-accent-soft,rgba(192,38,211,0.18));border-color:var(--fpt-uacc, #5b86d8);color:var(--fpt-uacc, #5b86d8);}
         #fpTools-stats-modeview{margin-top:12px;}
         .fp-sm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;}
         .fp-sm-card{background:var(--fpt-surface,#1a1c26);border:1px solid var(--fpt-border,#22253a);border-radius:10px;padding:14px;}
@@ -322,14 +338,14 @@
         .fp-sm-leg-val{color:var(--fpt-text,#d8dae8);font-weight:600;flex-shrink:0;}
         .fp-sm-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--fpt-border,#22253a);font-size:12px;}
         .fp-sm-row:last-child{border-bottom:none;}
-        .fp-sm-row-rank{width:18px;text-align:center;color:var(--fpt-accent,#C026D3);font-weight:700;flex-shrink:0;}
+        .fp-sm-row-rank{width:18px;text-align:center;color:var(--fpt-uacc, #5b86d8);font-weight:700;flex-shrink:0;}
         .fp-sm-row-name{flex:1;color:var(--fpt-text,#d8dae8);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
         .fp-sm-row-link{color:var(--fpt-text,#d8dae8);text-decoration:none;}
-        .fp-sm-row-link:hover{color:var(--fpt-accent,#C026D3);text-decoration:underline;}
+        .fp-sm-row-link:hover{color:var(--fpt-uacc, #5b86d8);text-decoration:underline;}
         .fp-sm-row-val{color:var(--fpt-text-muted,#9099b8);flex-shrink:0;}
         button.fp-sm-row-valbtn{background:transparent;border:none;font:inherit;cursor:pointer;
             color:var(--fpt-text-muted,#9099b8);padding:2px 6px;border-radius:6px;transition:color .12s,background .12s;}
-        button.fp-sm-row-valbtn:hover{color:var(--fpt-accent,#C026D3);background:var(--fpt-accent-soft,rgba(192,38,211,0.12));text-decoration:underline;}
+        button.fp-sm-row-valbtn:hover{color:var(--fpt-uacc, #5b86d8);background:var(--fpt-accent-soft,rgba(192,38,211,0.12));text-decoration:underline;}
         .fp-sm-summary{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:12px;font-size:12px;color:var(--fpt-text-muted,#9099b8);}
         .fp-sm-summary strong{color:var(--fpt-text,#d8dae8);}
         .fp-sm-charts-stack{display:flex;flex-direction:column;gap:12px;}
@@ -347,20 +363,20 @@
         .fp-stats-searchbar .fp-stats-search-ico{position:absolute;left:10px;font-size:18px;color:var(--fpt-text-muted,#9099b8);pointer-events:none;}
         #fpTools-stats-search{flex:1;padding:8px 10px 8px 34px;border-radius:8px;font-size:13px;
             background:var(--fpt-surface,#1a1c26);border:1px solid var(--fpt-border,#22253a);color:var(--fpt-text,#d8dae8);outline:none;}
-        #fpTools-stats-search:focus{border-color:var(--fpt-accent,#C026D3);}
-        #fpTools-stats-search-btn{padding:8px 14px;border-radius:8px;border:none;background:var(--fpt-accent,#C026D3);
+        #fpTools-stats-search:focus{border-color:var(--fpt-uacc, #5b86d8);}
+        #fpTools-stats-search-btn{padding:8px 14px;border-radius:8px;border:none;background:var(--fpt-uacc, #5b86d8);
             color:#fff;font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0;}
         #fpTools-stats-search-btn:hover{filter:brightness(1.1);}
         #fpTools-stats-search-clear{width:34px;height:34px;border-radius:8px;border:1px solid var(--fpt-border,#22253a);
             background:var(--fpt-surface,#1a1c26);color:var(--fpt-text-muted,#9099b8);font-size:18px;cursor:pointer;flex-shrink:0;line-height:1;}
-        #fpTools-stats-search-clear:hover{color:var(--fpt-text,#fff);border-color:var(--fpt-accent,#C026D3);}
+        #fpTools-stats-search-clear:hover{color:var(--fpt-text,#fff);border-color:var(--fpt-uacc, #5b86d8);}
         .fp-sm-sr-list{display:flex;flex-direction:column;gap:8px;}
         .fp-sm-sr-row{display:block;text-decoration:none;background:var(--fpt-surface-2,#20222e);
             border:1px solid var(--fpt-border,#22253a);border-radius:9px;padding:9px 11px;transition:border-color .15s;}
-        a.fp-sm-sr-row:hover{border-color:var(--fpt-accent,#C026D3);}
+        a.fp-sm-sr-row:hover{border-color:var(--fpt-uacc, #5b86d8);}
         .fp-sm-sr-top{display:flex;justify-content:space-between;gap:8px;align-items:baseline;}
         .fp-sm-sr-title{font-size:12.5px;color:var(--fpt-text,#d8dae8);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-        .fp-sm-sr-price{font-size:12.5px;font-weight:700;color:var(--fpt-accent,#C026D3);white-space:nowrap;}
+        .fp-sm-sr-price{font-size:12.5px;font-weight:700;color:var(--fpt-uacc, #5b86d8);white-space:nowrap;}
         .fp-sm-sr-meta{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:5px;font-size:11px;color:var(--fpt-text-muted,#9099b8);}
         .fp-sm-sr-status{font-weight:600;}
         .fp-sm-st-closed{color:#4caf82;}
@@ -370,9 +386,9 @@
         .fp-sm-back{display:inline-flex;align-items:center;gap:4px;background:var(--fpt-surface-2,rgba(127,127,127,0.12));
             border:1px solid var(--fpt-border,rgba(127,127,127,0.25));color:var(--fpt-text,#d8dae8);
             border-radius:7px;padding:4px 10px;font-size:12px;cursor:pointer;}
-        .fp-sm-back:hover{border-color:var(--fpt-accent,#C026D3);}
+        .fp-sm-back:hover{border-color:var(--fpt-uacc, #5b86d8);}
         .fp-sm-back .material-symbols-rounded{font-size:15px;}
-        .fp-stats-search-toggle.active{color:var(--fpt-accent,#C026D3);}
+        .fp-stats-search-toggle.active{color:var(--fpt-uacc, #5b86d8);}
         .fp-stats-filterbar{display:flex;flex-direction:column;gap:8px;margin:10px 0 4px;padding:10px 12px;
             background:var(--fpt-surface,#1a1c26);border:1px solid var(--fpt-border,#22253a);border-radius:9px;}
         .fp-stats-filter-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
@@ -392,7 +408,7 @@
         .fp-stats-sort-select option{background:#1a1c26;color:#d8dae8;}
         .fp-stats-filter-reset{margin-left:auto;background:transparent;border:1px solid var(--fpt-border,#22253a);
             color:var(--fpt-text-muted,#9099b8);border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;}
-        .fp-stats-filter-reset:hover{color:var(--fpt-text,#fff);border-color:var(--fpt-accent,#C026D3);}
+        .fp-stats-filter-reset:hover{color:var(--fpt-text,#fff);border-color:var(--fpt-uacc, #5b86d8);}
 
         /* === При включённой кастомной теме делаем все панели полупрозрачными,
               как карточки (glassmorphism), чтобы не было чёрных блоков. === */
@@ -410,7 +426,7 @@
         .fpt-custom-theme-on .fp-stats-sort-select option{background:#15161c !important;color:#e8eaf2 !important;}
         .fpt-custom-theme-on .fp-stats-mode-btn.active{
             background:var(--fpt-accent-soft,rgba(192,38,211,0.25)) !important;
-            border-color:var(--fpt-accent,#C026D3) !important;}
+            border-color:var(--fpt-uacc, #5b86d8) !important;}
         .fpt-custom-theme-on .fp-stats-status-btn.active{
             background:rgba(76,175,130,0.18) !important;border-color:#4caf82 !important;}
         .fpt-custom-theme-on .fp-sm-sr-row{
@@ -446,8 +462,8 @@
         .fpt-custom-theme-off .fp-sm-row-val,
         .fpt-custom-theme-off .fp-sm-leg{color:#666 !important;}
         .fpt-custom-theme-off .fp-stats-mode-btn.active{
-            background:rgba(192,38,211,0.12) !important;
-            border-color:#C026D3 !important;color:#C026D3 !important;}
+            background:rgba(91,134,216,0.12) !important;
+            border-color:#5b86d8 !important;color:#41659f !important;}
         .fpt-custom-theme-off .fp-stats-status-btn.active{
             background:rgba(76,175,130,0.12) !important;border-color:#3a9e6e !important;color:#2e7d54 !important;}
         .fpt-custom-theme-off #fp-sm-tooltip{

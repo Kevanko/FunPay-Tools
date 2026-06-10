@@ -136,7 +136,7 @@ function initReviewRequestButtons() {
                 margin-left:6px;font-family:Inter,sans-serif;transition:background .15s;
                 white-space:nowrap;flex-shrink:0;
             `;
-            btn.textContent = '⭐ Попросить отзыв';
+            btn.textContent = 'Попросить отзыв';
             btn.title = 'Отправить покупателю сообщение с просьбой оставить отзыв';
             btn.addEventListener('mouseenter', () => btn.style.background = '#1e2030');
             btn.addEventListener('mouseleave', () => btn.style.background = '');
@@ -157,7 +157,7 @@ function initReviewRequestButtons() {
 
                 const { fpToolsAutoReplies = {} } = await chrome.storage.local.get('fpToolsAutoReplies');
                 const template = fpToolsAutoReplies.reviewRequestTemplate ||
-                    `Привет! Буду рад, если оставите отзыв на наш заказ #${orderId} 🙏 Это займёт 10 секунд и очень поможет!`;
+                    `Привет! Буду рад, если оставите отзыв на наш заказ #${orderId} Это займёт 10 секунд и очень поможет!`;
 
                 if (!confirm(`Отправить покупателю:\n"${template}"`)) return;
 
@@ -190,12 +190,12 @@ function initReviewRequestButtons() {
                     });
 
                     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    showNotification('✓ Запрос на отзыв отправлен!');
-                    btn.textContent = '✓ Отправлено';
+                    showNotification('Запрос на отзыв отправлен!');
+                    btn.textContent = 'Отправлено';
 
                 } catch (err) {
                     showNotification(`Ошибка: ${err.message}`, true);
-                    btn.textContent = '⭐ Попросить отзыв';
+                    btn.textContent = 'Попросить отзыв';
                     btn.disabled = false;
                 }
             });

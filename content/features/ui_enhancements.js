@@ -60,49 +60,49 @@ function getStatsBlockHTML() {
         <div id="fpTools-stats-cards">
         <div class="fp-stats-grid">
             <div class="fp-stat-card stat-card-large stat-card-revenue">
-                <div class="stat-card-icon">💰</div>
+                <div class="stat-card-icon"><span class="material-symbols-rounded">payments</span></div>
                 <div class="stat-card-content">
                     <div class="stat-card-label">Всего заработано</div>
                     <div class="stat-card-value" id="fpTools-stats-total-revenue">0 ₽</div>
                 </div>
             </div>
             <div class="fp-stat-card">
-                <div class="stat-card-icon">📦</div>
+                <div class="stat-card-icon"><span class="material-symbols-rounded">inventory_2</span></div>
                 <div class="stat-card-content">
                     <div class="stat-card-label">Всего заказов</div>
                     <div class="stat-card-value" id="fpTools-stats-total-orders">0</div>
                 </div>
             </div>
             <div class="fp-stat-card">
-                <div class="stat-card-icon">📈</div>
+                <div class="stat-card-icon"><span class="material-symbols-rounded">trending_up</span></div>
                 <div class="stat-card-content">
                     <div class="stat-card-label">Средний чек</div>
                     <div class="stat-card-value" id="fpTools-stats-average-sale-price">0 ₽</div>
                 </div>
             </div>
             <div class="fp-stat-card stat-card-success">
-                <div class="stat-card-icon">✅</div>
+                <div class="stat-card-icon"><span class="material-symbols-rounded">check_circle</span></div>
                 <div class="stat-card-content">
                     <div class="stat-card-label">Закрыто</div>
                     <div class="stat-card-value" id="fpTools-stats-orders-closed">0</div>
                 </div>
             </div>
             <div class="fp-stat-card stat-card-pending">
-                <div class="stat-card-icon">⏳</div>
+                <div class="stat-card-icon"><span class="material-symbols-rounded">hourglass_top</span></div>
                 <div class="stat-card-content">
                     <div class="stat-card-label">В ожидании</div>
                     <div class="stat-card-value" id="fpTools-stats-orders-pending">0</div>
                 </div>
             </div>
             <div class="fp-stat-card stat-card-refund">
-                <div class="stat-card-icon">↩️</div>
+                <div class="stat-card-icon"><span class="material-symbols-rounded">undo</span></div>
                 <div class="stat-card-content">
                     <div class="stat-card-label">Возвратов</div>
                     <div class="stat-card-value" id="fpTools-stats-orders-refund">0</div>
                 </div>
             </div>
             <div class="fp-stat-card">
-                <div class="stat-card-icon">👥</div>
+                <div class="stat-card-icon"><span class="material-symbols-rounded">group</span></div>
                 <div class="stat-card-content">
                     <div class="stat-card-label">Уникальных покупателей</div>
                     <div class="stat-card-value" id="fpTools-stats-unique-customers">0</div>
@@ -112,19 +112,19 @@ function getStatsBlockHTML() {
 
         <div class="fp-stats-details">
             <div class="fp-stat-detail-item">
-                <span class="detail-label">🏆 Самый активный покупатель:</span>
+                <span class="detail-label"><span class="material-symbols-rounded">trophy</span> Самый активный покупатель:</span>
                 <span class="detail-value" id="fpTools-stats-top-customer">-</span>
             </div>
             <div class="fp-stat-detail-item">
-                <span class="detail-label">💎 Самая дорогая продажа:</span>
+                <span class="detail-label"><span class="material-symbols-rounded">diamond</span> Самая дорогая продажа:</span>
                 <span class="detail-value" id="fpTools-stats-top-sale">-</span>
             </div>
             <div class="fp-stat-detail-item">
-                <span class="detail-label">🔥 Самый популярный товар:</span>
+                <span class="detail-label"><span class="material-symbols-rounded">local_fire_department</span> Самый популярный товар:</span>
                 <span class="detail-value" id="fpTools-stats-popular-product">-</span>
             </div>
             <div class="fp-stat-detail-item">
-                <span class="detail-label">🎮 Самая популярная категория:</span>
+                <span class="detail-label"><span class="material-symbols-rounded">sports_esports</span> Самая популярная категория:</span>
                 <span class="detail-value" id="fpTools-stats-popular-category">-</span>
             </div>
             <div class="fp-stats-unconf-divider"></div>
@@ -134,7 +134,7 @@ function getStatsBlockHTML() {
             </div>
             <div class="fp-stats-extra" id="fpTools-stats-extra" style="display:none;">
                 <div class="fp-stat-detail-item">
-                    <span class="detail-label">🔒 Неподтверждённые заказы:</span>
+                    <span class="detail-label"><span class="material-symbols-rounded" style="font-size:16px;vertical-align:-3px;">lock</span> Неподтверждённые заказы:</span>
                     <span class="detail-value" id="fpTools-stats-unconfirmed">-</span>
                 </div>
             </div>
@@ -264,8 +264,9 @@ async function displaySalesStats() {
     document.getElementById("fpTools-stats-top-customer").onclick = () => { if(stats.mostActiveBuyer.id) window.open(`https://funpay.com/users/${stats.mostActiveBuyer.id}/`); };
     document.getElementById("fpTools-stats-top-sale").textContent = formatCurrency(stats.mostExpensiveSale.price, stats.mostExpensiveSale.currency) || "-";
     document.getElementById("fpTools-stats-top-sale").onclick = () => { if(stats.mostExpensiveSale.orderId) window.open(`https://funpay.com/orders/${stats.mostExpensiveSale.orderId}/`); };
-    document.getElementById("fpTools-stats-popular-product").textContent = stats.mostPopularProduct || "-";
-    document.getElementById("fpTools-stats-popular-category").textContent = stats.mostPopularCategory || "-";
+    const _stripDeco = s => String(s || '').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2190}-\u{21FF}\u{2300}-\u{23FF}\u{2500}-\u{259F}\u{25A0}-\u{25FF}\u{FE00}-\u{FE0F}\u{200D}]/gu, '').replace(/\s{2,}/g, ' ').trim();
+    document.getElementById("fpTools-stats-popular-product").textContent = _stripDeco(stats.mostPopularProduct) || "-";
+    document.getElementById("fpTools-stats-popular-category").textContent = _stripDeco(stats.mostPopularCategory) || "-";
 
     // Fetch unconfirmed (pending) balance from live trade page
     // FIX: Always fetch status=paid specifically (ignores the period filter - unconfirmed is always real-time)
@@ -310,7 +311,9 @@ function initializeSalesStatistics() {
     ordersTable.before(statsContainer);
 
     const periodSelect = document.getElementById("fpTools-stats-period");
-    periodSelect.value = localStorage.getItem("fpToolsStatsPeriod") || "7d";
+    // По умолчанию — всё время: пользователи ждут совпадения с общим числом
+    // заказов в кабинете, а недельная выборка выглядит как «ложные» цифры.
+    periodSelect.value = localStorage.getItem("fpToolsStatsPeriod") || "all";
     periodSelect.addEventListener('change', () => {
         localStorage.setItem("fpToolsStatsPeriod", periodSelect.value);
         displaySalesStats();

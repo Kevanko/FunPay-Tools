@@ -10,49 +10,49 @@ function getAnalyticsBlockHTML() {
         </div>
         <div class="fp-stats-grid">
             <div class="fp-stat-card">
-                <div class="stat-card-icon">👥</div>
+                <div class="stat-card-icon"><span class="material-symbols-rounded" style="font-size:30px;">group</span></div>
                 <div class="stat-card-content">
                     <div class="stat-card-label">Уникальных продавцов</div>
                     <div class="stat-card-value" id="fpTools-analytics-unique-sellers">0</div>
                 </div>
             </div>
             <div class="fp-stat-card">
-                <div class="stat-card-icon">⭐</div>
+                <div class="stat-card-icon"><span class="material-symbols-rounded" style="font-size:30px;">star</span></div>
                 <div class="stat-card-content">
                     <div class="stat-card-label">Продавцов с отзывами</div>
                     <div class="stat-card-value" id="fpTools-analytics-sellers-with-reviews">0</div>
                 </div>
             </div>
             <div class="fp-stat-card">
-                <div class="stat-card-icon">💰</div>
+                <div class="stat-card-icon"><span class="material-symbols-rounded" style="font-size:30px;">payments</span></div>
                 <div class="stat-card-content">
                     <div class="stat-card-label">Средняя цена</div>
                     <div class="stat-card-value" id="fpTools-analytics-average-price">0 ₽</div>
                 </div>
             </div>
             <div class="fp-stat-card stat-card-min-price">
-                <div class="stat-card-icon">📉</div>
+                <div class="stat-card-icon"><span class="material-symbols-rounded" style="font-size:30px;">trending_down</span></div>
                 <div class="stat-card-content">
                     <div class="stat-card-label">Мин. цена</div>
                     <div class="stat-card-value" id="fpTools-analytics-min-price">0 ₽</div>
                 </div>
             </div>
             <div class="fp-stat-card stat-card-max-price">
-                <div class="stat-card-icon">📈</div>
+                <div class="stat-card-icon"><span class="material-symbols-rounded" style="font-size:30px;">trending_up</span></div>
                 <div class="stat-card-content">
                     <div class="stat-card-label">Макс. цена</div>
                     <div class="stat-card-value" id="fpTools-analytics-max-price">0 ₽</div>
                 </div>
             </div>
             <div class="fp-stat-card">
-                <div class="stat-card-icon">💎</div>
+                <div class="stat-card-icon"><span class="material-symbols-rounded" style="font-size:30px;">diamond</span></div>
                 <div class="stat-card-content">
                     <div class="stat-card-label">Общая стоимость</div>
                     <div class="stat-card-value" id="fpTools-analytics-total-value">0 ₽</div>
                 </div>
             </div>
             <div class="fp-stat-card fpt-analytics-online">
-                <div class="stat-card-icon">🟢</div>
+                <div class="stat-card-icon"><span class="material-symbols-rounded" style="font-size:30px;">check_circle</span></div>
                 <div class="stat-card-content">
                     <div class="stat-card-label">Продавцов онлайн</div>
                     <div class="stat-card-value" id="fpTools-analytics-sellers-online">0</div>

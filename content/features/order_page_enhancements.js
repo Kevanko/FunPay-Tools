@@ -70,7 +70,7 @@ function makeOrderNumberCopyable() {
             ta.remove();
         }
         const old = chip.firstChild.nodeValue;
-        chip.firstChild.nodeValue = '✓ скопировано ';
+        chip.firstChild.nodeValue = 'скопировано ';
         chip.style.color = '#4caf82';
         setTimeout(() => { chip.firstChild.nodeValue = old; chip.style.color = ''; }, 1200);
         if (typeof showNotification === 'function') showNotification(`Номер заказа ${orderId} скопирован`);
@@ -91,9 +91,9 @@ function initChatListColorCoding() {
         const style = document.createElement('style');
         style.id = 'fp-chat-colors';
         style.textContent = `
-            .contact-item.fp-sc-paid    .media-user-name::after { content:' 🟠'; font-size:10px; }
-            .contact-item.fp-sc-done    .media-user-name::after { content:' ✅'; font-size:10px; }
-            .contact-item.fp-sc-refund  .media-user-name::after { content:' 🔴'; font-size:10px; }
+            .contact-item.fp-sc-paid    .media-user-name::after { content:' 2'; font-size:13px; color:#e6b46b; }
+            .contact-item.fp-sc-done    .media-user-name::after { content:' 2'; font-size:13px; color:#74d596; }
+            .contact-item.fp-sc-refund  .media-user-name::after { content:' 2'; font-size:13px; color:#e08585; }
         `;
         document.head.appendChild(style);
     }
@@ -131,7 +131,7 @@ function showDearVendorsBanner() {
         font-size:13px;color:var(--fpt-text, #ff8a80);display:flex;align-items:center;gap:10px;
         box-shadow:0 4px 16px var(--fpt-shadow, rgba(0,0,0,0.5));max-width:600px;
     `;
-    banner.innerHTML = `<span style="font-size:18px;">⚠️</span><span><strong style="color:#e05252;">Системное сообщение FunPay</strong> - это предупреждение от администрации, не от покупателя.</span><button onclick="this.parentElement.remove()" style="background:none;border:none;color:#e05252;cursor:pointer;font-size:16px;margin-left:auto;padding:0 0 0 8px;">✕</button>`;
+    banner.innerHTML = `<span class="material-symbols-rounded" style="font-size:18px;color:#e05252;vertical-align:-4px;">warning</span><span><strong style="color:#e05252;">Системное сообщение FunPay</strong> - это предупреждение от администрации, не от покупателя.</span><button onclick="this.parentElement.remove()" style="background:none;border:none;color:#e05252;cursor:pointer;font-size:16px;margin-left:auto;padding:0 0 0 8px;">✕</button>`;
     document.body.appendChild(banner);
     setTimeout(() => banner?.remove(), 8000);
 }
@@ -157,7 +157,7 @@ function initQuickPriceEdit() {
 
         const editBtn = document.createElement('span');
         editBtn.style.cssText = 'display:none;font-size:11px;color:#C026D3;cursor:pointer;margin-left:4px;vertical-align:middle;user-select:none;';
-        editBtn.textContent = '✎';
+        editBtn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;">edit</span>';
         editBtn.title = 'Быстро изменить цену';
         priceEl.appendChild(editBtn);
 
@@ -206,7 +206,7 @@ function openPricePopup(offerId, currentPrice, anchor, nodeId) {
             const res = await chrome.runtime.sendMessage({ action: 'saveSingleLot', nodeId, data: { offer_id: offerId, price: String(price) } });
             if (res?.success) {
                 popup.querySelector('#fp-pe-status').style.color = '#4caf82';
-                popup.querySelector('#fp-pe-status').textContent = '✓ Сохранено';
+                popup.querySelector('#fp-pe-status').textContent = 'Сохранено';
                 const priceNum = anchor.querySelector('.tc-price, .tc-price-inside');
                 if (priceNum) {
                     const unit = priceNum.querySelector('.unit');
@@ -234,7 +234,7 @@ function initOfferListFilter() {
 
     const filters = [
         { label: 'Все',          fn: () => true },
-        { label: '⚡ Автовыдача', fn: b => b.querySelectorAll('a.tc-item .auto-dlv-icon, a.tc-item i.auto-dlv-icon').length > 0 },
+        { label: 'Автовыдача', fn: b => b.querySelectorAll('a.tc-item .auto-dlv-icon, a.tc-item i.auto-dlv-icon').length > 0 },
     ];
 
     let active = 0;

@@ -65,29 +65,32 @@ async function runSalesUpdateCycle() {
         };
 
         if (firstOrderId) {
+            // Статусы недавних заказов МЕНЯЮТСЯ (paid → closed/refunded), поэтому
+            // верхние страницы перечитываем целиком с перезаписью уже сохранённых
+            // заказов — иначе оплаченный навсегда остаётся «в ожидании».
+            const REFRESH_PAGES = 3;
             let continueToken = null;
-            let newOrdersFoundInCycle = true;
-            while (newOrdersFoundInCycle) {
+            let newestId = null;
+            for (let page = 1; page <= 60; page++) {
                 const { nextOrderId, orders } = await fetchAndParseSales(continueToken);
                 if (!orders || orders.length === 0) break;
+                if (newestId === null) newestId = orders[0].orderId;
 
                 const knownOrderIndex = orders.findIndex(o => o.orderId === firstOrderId);
-                const newOrders = (knownOrderIndex !== -1) ? orders.slice(0, knownOrderIndex) : orders;
+                let added = 0;
+                orders.forEach(o => {
+                    if (!savedOrders[o.orderId]) added++;
+                    savedOrders[o.orderId] = o; // и новые, и обновление статусов старых
+                });
+                await saveSalesData(savedOrders, newestId, lastOrderId);
+                if (added > 0) console.log(`FP Tools: Добавлено ${added} новых заказов сверху (стр. ${page}).`);
 
-                if (newOrders.length > 0) {
-                    newOrders.forEach(o => savedOrders[o.orderId] = o);
-                    firstOrderId = newOrders[0].orderId;
-                    await saveSalesData(savedOrders, firstOrderId, lastOrderId);
-                    console.log(`FP Tools: Добавлено ${newOrders.length} новых заказов сверху.`);
-                } else {
-                    newOrdersFoundInCycle = false;
-                }
-
-                if (knownOrderIndex !== -1 || !nextOrderId) break;
-                
+                // стоп: дошли до известного заказа И освежили минимум REFRESH_PAGES страниц
+                if ((knownOrderIndex !== -1 && page >= REFRESH_PAGES) || !nextOrderId) break;
                 continueToken = nextOrderId;
                 await new Promise(resolve => setTimeout(resolve, 1200)); // 3.0: slower to avoid 429
             }
+            if (newestId) firstOrderId = newestId;
         }
 
         let continueToken = lastOrderId;
@@ -446,19 +449,31 @@ async function runTelegramCheckCycle() {
 }
 
 // Функция для парсинга HTML через offscreen документ
-async function parseHtmlViaOffscreen(html, action, extra = {}) {
+// Создание сериализовано: два параллельных вызова (например, сбор статистики
+// и уведомления) оба видели «документа нет» и второй createDocument падал с
+// "Only a single offscreen document may be created".
+let _offscreenCreatePromise = null;
+async function ensureOffscreenDocument() {
     const existingContexts = await chrome.runtime.getContexts({
         contextTypes: ['OFFSCREEN_DOCUMENT'],
         documentUrls: [chrome.runtime.getURL(OFFSCREEN_DOCUMENT_PATH)]
     });
-
-    if (!existingContexts.length) {
-        await chrome.offscreen.createDocument({
+    if (existingContexts.length) return;
+    if (!_offscreenCreatePromise) {
+        _offscreenCreatePromise = chrome.offscreen.createDocument({
             url: OFFSCREEN_DOCUMENT_PATH,
             reasons: ['DOM_PARSER'],
             justification: 'Parsing FunPay page HTML',
-        });
+        }).catch(e => {
+            // гонку с уже созданным документом не считаем ошибкой
+            if (!String(e && e.message || '').includes('single offscreen')) throw e;
+        }).finally(() => { _offscreenCreatePromise = null; });
     }
+    await _offscreenCreatePromise;
+}
+
+async function parseHtmlViaOffscreen(html, action, extra = {}) {
+    await ensureOffscreenDocument();
 
     return await chrome.runtime.sendMessage({
         target: 'offscreen',

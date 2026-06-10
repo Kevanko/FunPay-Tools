@@ -27,7 +27,7 @@ const FPT_FEATURE_REGISTRY = [
         desc: 'Поле в верхней панели сайта (плейсхолдер «Продавец») с кнопкой-иконкой пользователя - ищет профиль продавца по точному нику на RMTHub.',
         group: 'Шапка сайта',
         selector: '#fp-rmthub-form',
-        preview: { kind: 'html', html: '<div class="fpt-pv-rmthub"><span>Продавец</span> <span class="fpt-pv-rmthub-ico">👤</span></div>' }
+        preview: { kind: 'html', html: '<div class="fpt-pv-rmthub"><span>Продавец</span> <span class="fpt-pv-rmthub-ico"><span class="material-symbols-rounded" style="font-size:14px;">person</span></span></div>' }
     },
 
     // ───────────── Чат: поле ввода ─────────────
@@ -53,7 +53,7 @@ const FPT_FEATURE_REGISTRY = [
         desc: 'При наведении на сообщение появляются иконки «перевести» и «ответить». Ответ показывается над полем ввода (как в Telegram), а у пользователей с расширением цитата отображается красивой кликабельной плашкой с переходом к исходному сообщению.',
         group: 'Чат: поле ввода',
         selector: '.fpt-msg-tools, .fpt-reply-bar, .fpt-reply-card',
-        preview: { kind: 'html', html: '<div class="fpt-pv-menu"><a>↩ Ответить · 🌐 Перевести</a></div>' }
+        preview: { kind: 'html', html: '<div class="fpt-pv-menu"><a><span class="material-symbols-rounded" style="font-size:14px;vertical-align:-2px;">reply</span> Ответить · <span class="material-symbols-rounded" style="font-size:14px;vertical-align:-2px;">language</span> Перевести</a></div>' }
     },
     {
         id: 'chat_char_counter',
@@ -97,7 +97,7 @@ const FPT_FEATURE_REGISTRY = [
         desc: 'Пункт в выпадающем меню диалога (⋮) - открывает историю заказов этого покупателя.',
         group: 'Чат: меню диалога',
         selector: '#fp-buyer-hist-menu-btn',
-        preview: { kind: 'html', html: '<div class="fpt-pv-menu"><a>📦 История покупок</a></div>' }
+        preview: { kind: 'html', html: '<div class="fpt-pv-menu"><a><span class="material-symbols-rounded" style="font-size:14px;vertical-align:-2px;">history</span> История покупок</a></div>' }
     },
     {
         id: 'chat_menu_translate',
@@ -105,7 +105,7 @@ const FPT_FEATURE_REGISTRY = [
         desc: 'Пункт в выпадающем меню диалога (⋮) - включает перевод сообщений в реальном времени.',
         group: 'Чат: меню диалога',
         selector: '#fp-translate-menu-btn',
-        preview: { kind: 'html', html: '<div class="fpt-pv-menu"><a>🌐 Включить перевод</a></div>' }
+        preview: { kind: 'html', html: '<div class="fpt-pv-menu"><a><span class="material-symbols-rounded" style="font-size:14px;vertical-align:-2px;">language</span> Включить перевод</a></div>' }
     },
     {
         id: 'chat_menu_export',
@@ -113,7 +113,7 @@ const FPT_FEATURE_REGISTRY = [
         desc: 'Пункт в выпадающем меню диалога (⋮) - выгружает переписку в текстовый файл.',
         group: 'Чат: меню диалога',
         selector: '#fp-export-chat-menu-btn',
-        preview: { kind: 'html', html: '<div class="fpt-pv-menu"><a>💾 Экспортировать чат</a></div>' }
+        preview: { kind: 'html', html: '<div class="fpt-pv-menu"><a><span class="material-symbols-rounded" style="font-size:14px;vertical-align:-2px;">download</span> Экспортировать чат</a></div>' }
     },
     {
         id: 'chat_menu_blacklist',
@@ -121,7 +121,7 @@ const FPT_FEATURE_REGISTRY = [
         desc: 'Красный пункт в выпадающем меню диалога (⋮) - добавляет собеседника в чёрный список.',
         group: 'Чат: меню диалога',
         selector: '#fp-blacklist-menu-btn',
-        preview: { kind: 'html', html: '<div class="fpt-pv-menu"><a class="fpt-pv-menu-danger">🚫 Добавить в ЧС</a></div>' }
+        preview: { kind: 'html', html: '<div class="fpt-pv-menu"><a class="fpt-pv-menu-danger"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:-2px;">block</span> Добавить в ЧС</a></div>' }
     },
 
     // ───────────── Редактор лота ─────────────
@@ -179,7 +179,7 @@ const FPT_FEATURE_REGISTRY = [
         desc: 'Полоса под заголовком редактора лота: «Найдены скопированные данные лота. Вставить их в форму?» с кнопками «Вставить» и «×». Появляется после копирования лота.',
         group: 'Редактор лота',
         selector: '#fp-tools-paste-bar',
-        preview: { kind: 'html', html: '<div class="fpt-pv-pastebar"><span>📋</span><span class="fpt-pv-pastebar-text">Найдены скопированные данные лота. Вставить их в форму?</span><span class="fpt-pv-fpbtn fpt-pv-fpbtn-primary">Вставить</span></div>' }
+        preview: { kind: 'html', html: '<div class="fpt-pv-pastebar"><span><span class="material-symbols-rounded" style="font-size:14px;">content_paste</span></span><span class="fpt-pv-pastebar-text">Найдены скопированные данные лота. Вставить их в форму?</span><span class="fpt-pv-fpbtn fpt-pv-fpbtn-primary">Вставить</span></div>' }
     },
     {
         id: 'lot_clone_btn',
@@ -247,7 +247,7 @@ const FPT_FEATURE_REGISTRY = [
         desc: 'Дополнительный блок «Закрепленные лоты» на странице профиля/продаж (с кнопкой ✏️ для выбора закреплённых).',
         group: 'Список лотов и профиль',
         selector: '#fp-tools-pinned-lots-container',
-        preview: { kind: 'html', html: '<div class="fpt-pv-pinned"><span class="fpt-pv-pinned-title">Закрепленные лоты</span><span class="fpt-pv-fpbtn fpt-pv-fpbtn-xs">✏️</span></div>' }
+        preview: { kind: 'html', html: '<div class="fpt-pv-pinned"><span class="fpt-pv-pinned-title">Закрепленные лоты</span><span class="fpt-pv-fpbtn fpt-pv-fpbtn-xs"><span class="material-symbols-rounded" style="font-size:14px;">edit</span></span></div>' }
     },
     {
         id: 'market_analytics_btn',

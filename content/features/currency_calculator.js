@@ -79,7 +79,8 @@ async function updateCurrencyConversion() {
 
     const result = amount * rate;
     amountToInput.value = result.toFixed(2);
-    rateDisplay.textContent = `1 ${fromCurrency} ≈ ${rate.toFixed(4)} ${toCurrency}`;
+    // мелкие курсы показываем точнее, крупные — без лишних знаков
+    rateDisplay.textContent = `1 ${fromCurrency} ≈ ${rate >= 1 ? rate.toFixed(2) : rate.toFixed(4)} ${toCurrency}`;
 }
 
 // Функция для заполнения выпадающих списков валютами
@@ -99,7 +100,9 @@ async function populateCurrencies() {
     
     const sortedCurrencies = Object.entries(currencyList).sort(([, a], [, b]) => a.localeCompare(b));
 
-    const createOption = (code, name) => `<option value="${code.toUpperCase()}">${code.toUpperCase()} - ${name}</option>`;
+    // В селекте только 3-буквенный код — полное название в title (длинные
+    // строки «USD - US Dollar» рвали узкий селект и выглядели неряшливо).
+    const createOption = (code, name) => `<option value="${code.toUpperCase()}" title="${String(name).replace(/"/g, '&quot;')}">${code.toUpperCase()}</option>`;
 
     let optionsHTML = '';
     

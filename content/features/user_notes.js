@@ -466,7 +466,7 @@ function renderHeaderMenu(chatMenu) {
 
     const pinLi = createElement('li', { class: 'fp-tools-status-item' });
     const pinA = createElement('a', { href: '#' });
-    const syncPinText = () => { pinA.textContent = isPinned(getUserId()) ? '📌 Открепить чат' : '📌 Закрепить чат'; };
+    const syncPinText = () => { pinA.textContent = isPinned(getUserId()) ? 'Открепить чат' : 'Закрепить чат'; };
     syncPinText();
     pinA.addEventListener('click', (e) => {
         e.preventDefault();
@@ -493,7 +493,7 @@ function renderHeaderMenu(chatMenu) {
 
     const manageLi = createElement('li', { class: 'fp-tools-status-item' });
     const manageA = createElement('a', { href: '#' });
-    manageA.textContent = '⚙️ Управление метками';
+    manageA.textContent = 'Управление метками';
     manageA.addEventListener('click', (e) => {
         e.preventDefault();
         openLabelManager();

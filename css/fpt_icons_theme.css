@@ -6,7 +6,9 @@
     font-style: normal;
     font-weight: 400;
     font-display: block; /* avoid flash of letter-text before the glyph loads */
-    src: url('../fonts/material-symbols-rounded.woff2') format('woff2');
+    /* В manifest-CSS относительные url() резолвятся от страницы (давало 404
+       funpay.com/fonts/... на каждой загрузке) — нужен абсолютный путь. */
+    src: url('chrome-extension://__MSG_@@extension_id__/fonts/material-symbols-rounded.woff2') format('woff2');
 }
 
 .material-symbols-rounded,
@@ -28,136 +30,25 @@
     user-select: none;
 }
 
-/* ---------- 2. Nav redesign: icon above label ---------- */
-.fp-tools-nav {
-    width: 220px;
-    padding: 16px 10px;
-    border-right: 1px solid #1a1a1f;
-    background: #050506;
-}
-
-.fp-tools-nav ul {
-    display: grid;
-    grid-template-columns: 1fr 1fr; /* two compact columns of cards */
-    gap: 8px;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-}
-
-/* dividers span the full width of the grid */
-.fp-tools-nav li.fp-nav-divider {
-    grid-column: 1 / -1;
-    font-size: 10px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: #5a5a66;
-    padding: 10px 4px 2px;
-    margin: 0;
-    border: none;
-    background: none;
-}
-
-.fp-tools-nav li[data-page] a {
-    display: flex;
-    flex-direction: column;   /* icon on top, label under */
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    padding: 12px 6px;
-    margin: 0;
-    border-radius: 12px;
-    background: #0c0c10;
-    border: 1px solid #16161c;
-    color: #b8b8c4;
-    text-align: center;
-    height: 72px;             /* fixed height → all cards identical, no vertical gaps */
-    box-sizing: border-box;
-    overflow: hidden;
-    transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.12s ease;
-}
-
-.fp-tools-nav li[data-page] a > span:last-child {
-    font-size: 11.5px;
-    line-height: 1.25;
-    font-weight: 500;
-}
-
+/* ---------- 2. Nav: vertical list (graphite layer in content_styles.css owns layout) ---------- */
+/* The old 2-column card grid was removed to match the funpay-redesign reference:
+   a clean single-column nav with icon-left / label-right rows. content_styles.css
+   defines the full vertical-nav styling; here we only keep Material Symbols icon
+   sizing so the bundled glyph font renders at the right scale. */
 .fp-tools-nav .nav-icon {
-    margin: 0;
-    width: auto;
-    font-size: 26px;          /* Material Symbols sizing is via font-size */
-    opacity: 1;
-    color: #cfcfdb;
-    transition: color 0.18s ease, transform 0.18s ease;
+    font-size: 19px;
 }
 
-.fp-tools-nav li[data-page] a:hover {
-    background: #111118;
-    border-color: #24242e;
-    color: #ececf4;
-    transform: translateY(-1px);
-}
-.fp-tools-nav li[data-page] a:hover .nav-icon {
-    color: #ffffff;
-    transform: scale(1.06);
-}
-
-/* Active item - this is one of the FEW places the pink→purple gradient appears */
-.fp-tools-nav li[data-page].active a {
-    background:
-        linear-gradient(135deg, rgba(236, 72, 153, 0.10), rgba(139, 92, 246, 0.10)),
-        #0e0e14;
-    border-color: rgba(168, 85, 247, 0.35);
-    color: #ffffff;
-    font-weight: 600;
-}
-.fp-tools-nav li[data-page].active a .nav-icon {
-    color: #e9a8ff;
-}
-
-/* ---------- 3. Full-black theme, minimal heavy effects ---------- */
-.fp-tools-popup {
-    background: #050506;                 /* full black */
-    border: 1px solid #15151b;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.75); /* single soft shadow, nothing heavy */
-    color: #d6d6e0;
-}
-
-.fp-tools-header {
-    background: #050506;
-    border-bottom: 1px solid #15151b;
-    position: relative;
-}
-/* a single hairline of pink→purple under the header - the only "always on" accent */
-.fp-tools-header::after {
-    content: '';
-    position: absolute;
-    left: 0; right: 0; bottom: -1px;
-    height: 1px;
-    background: linear-gradient(90deg,
-        transparent 0%,
-        rgba(236, 72, 153, 0.55) 30%,
-        rgba(139, 92, 246, 0.55) 70%,
-        transparent 100%);
-    opacity: 0.5;
-    pointer-events: none;
-}
-
-.fp-tools-content {
-    background: #060608;
-}
-
-/* Header tabs (if used) - match the dark cards, no transforms */
+/* ---------- 3. Header tab icons ---------- */
 .fp-tools-header-tab .nav-icon {
     font-size: 20px;
-    color: #cfcfdb;
+    color: var(--fpt-text-dim, #cfcfdb);
 }
 
 /* Scrollbars - keep them black/subtle */
 .fp-tools-nav::-webkit-scrollbar-thumb,
 .fp-tools-content::-webkit-scrollbar-thumb {
-    background: #1c1c24;
+    background: var(--fpt-line, rgba(255,255,255,.08));
 }
 
 /* Star-rating labels that now use the icon font instead of ⭐ */
@@ -173,33 +64,33 @@ h3 .material-symbols-rounded {
     font-size: 20px;
     vertical-align: -3px;
     margin-right: 6px;
-    color: #cfcfdb;
+    color: var(--fpt-text-dim, #cfcfdb);
 }
 
 /* ---------- 4. Blue accent → 80% transparent fill ---------- */
-/* The primary accent #C026D3 was an opaque solid fill on buttons/elements. Make the FILL
+/* The primary accent var(--fpt-uacc, #5b86d8) was an opaque solid fill on buttons/elements. Make the FILL
    80% transparent (20% opacity) so the black menu shows through, per request. Text/borders
    stay readable. */
 .fp-tools-popup button,
 .fp-tools-popup .btn {
-    background: rgba(192, 38, 211, 0.20);
-    border: 1px solid rgba(192, 38, 211, 0.45);
-    color: #e9e7ff;
+    background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 20%, transparent);
+    border: 1px solid color-mix(in srgb, var(--fpt-uacc, #5b86d8) 45%, transparent);
+    color: #dce7ff;
 }
 .fp-tools-popup button:hover,
 .fp-tools-popup .btn:hover {
-    background: rgba(192, 38, 211, 0.32);
-    border-color: rgba(192, 38, 211, 0.6);
+    background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 32%, transparent);
+    border-color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 60%, transparent);
 }
 /* keep the "default/secondary" buttons dark, not blue */
 .fp-tools-popup .btn.btn-default {
     background: rgba(255, 255, 255, 0.04);
-    border: 1px solid #20202a;
-    color: #cfcfdb;
+    border: 1px solid var(--fpt-line-strong, rgba(255,255,255,.14));
+    color: var(--fpt-text-dim, #cfcfdb);
 }
 .fp-tools-popup .btn.btn-default:hover {
     background: rgba(255, 255, 255, 0.07);
-    border-color: #2c2c38;
+    border-color: var(--fpt-line-strong, #2c2c38);
 }
 
 /* ---------- 5. Kill hover/transition lag ---------- */
@@ -224,23 +115,7 @@ h3 .material-symbols-rounded {
     transition: opacity 0.12s linear !important;
 }
 
-/* ---------- 6. Nav auto-compaction ---------- */
-/* A button flagged by compactNav() spans both grid columns so sections with an odd number
-   of items (or a single item like "Эксклюзив") fill the width instead of leaving a gap. */
-.fp-tools-nav li[data-page].fpt-nav-wide {
-    grid-column: 1 / -1;
-}
-.fp-tools-nav li[data-page].fpt-nav-wide a {
-    flex-direction: row;
-    gap: 10px;
-    height: 72px;
-    padding: 12px 16px;
-    justify-content: center;   /* center icon+text horizontally */
-    align-items: center;
-}
-.fp-tools-nav li[data-page].fpt-nav-wide a .nav-icon {
-    font-size: 22px;
-}
+/* ---------- 6. Nav auto-compaction (obsolete: nav is now a single vertical column) ---------- */
 
 /* ---------- 7. Compact chat header buttons (read-all / tagged-only) ---------- */
 /* These were overflowing the contacts panel. Shrink to small square icon buttons. */
@@ -290,7 +165,7 @@ button.add-image-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: #b8b8c4;
+    color: var(--fpt-text-dim, #b8b8c4);
     box-shadow: none !important;
     cursor: pointer;
     flex: 0 0 auto;
@@ -311,26 +186,26 @@ button.add-image-btn .material-symbols-rounded {
    checkboxes, radios, accent-colors, misc backgrounds. Text/borders stay legible. */
 .fp-tools-popup input[type="checkbox"]:checked,
 .fp-tools-popup .category-select-all:checked {
-    background-color: rgba(192, 38, 211, 0.20) !important;
-    border-color: rgba(192, 38, 211, 0.5) !important;
+    background-color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 20%, transparent) !important;
+    border-color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 50%, transparent) !important;
 }
 .fp-tools-popup input[type="checkbox"],
 .fp-tools-popup input[type="radio"] {
-    accent-color: rgba(192, 38, 211, 0.55);
+    accent-color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, transparent);
 }
 .fp-tools-popup input:focus,
 .fp-tools-popup textarea:focus,
 .fp-tools-popup .fp-ipe-input:focus {
-    border-color: rgba(192, 38, 211, 0.55) !important;
+    border-color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, transparent) !important;
 }
 /* progress / accent bars that were solid blue */
-.fp-tools-popup [style*="#C026D3"] {
+.fp-tools-popup [style*="var(--fpt-uacc, #5b86d8)"] {
     /* note: inline styles can't be overridden by class; handled in JS where needed */
 }
 /* toggle slider checked state, switches, etc. */
 .fp-tools-popup .fp-tools-chat-toggle input:checked + .fp-tools-chat-toggle-slider,
 .fp-tools-popup .switch input:checked + .slider {
-    background: rgba(192, 38, 211, 0.22) !important;
+    background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 22%, transparent) !important;
 }
 
 /* ---------- 10. Remove the save footer (everything autosaves now) ---------- */
@@ -388,9 +263,9 @@ button.add-image-btn .material-symbols-rounded {
     padding: 0 !important;
     margin: 6px 0 0 0;
     background: none !important;
-    border: 1px solid #20202a !important;
+    border: 1px solid var(--fpt-line-strong, rgba(255,255,255,.14)) !important;
     border-radius: 7px;
-    color: #b8b8c4;
+    color: var(--fpt-text-dim, #b8b8c4);
     box-shadow: none !important;
     cursor: pointer;
     transition: color 0.13s linear, border-color 0.13s linear !important;
@@ -398,7 +273,7 @@ button.add-image-btn .material-symbols-rounded {
 .fpt-autoreply-img-btn:hover,
 .fpt-keyword-img-btn:hover {
     color: #fff;
-    border-color: rgba(192,38,211,0.5) !important;
+    border-color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 50%, transparent) !important;
     background: none !important;
 }
 .fpt-autoreply-img-btn .material-symbols-rounded,
@@ -421,7 +296,7 @@ button.add-image-btn .material-symbols-rounded {
     position: static !important;
     background: none !important;
     border: none !important;
-    color: #b8b8c4 !important;
+    color: var(--fpt-text-dim, #b8b8c4) !important;
     padding: 4px !important;
     font-size: inherit !important;
     border-radius: 7px !important;
@@ -456,7 +331,7 @@ button.add-image-btn .material-symbols-rounded {
     height: 4px;
     -webkit-appearance: none;
     appearance: none;
-    background: #20202a;
+    background: var(--fpt-line-strong, rgba(255,255,255,.14));
     border-radius: 3px;
     outline: none;
 }
@@ -466,13 +341,13 @@ button.add-image-btn .material-symbols-rounded {
     width: 14px;
     height: 14px;
     border-radius: 50%;
-    background: #a09af8;
+    background: var(--fpt-uacc, #5b86d8);
     cursor: pointer;
     border: none;
 }
 #notificationVolumeValue {
     font-size: 12px;
-    color: #b8b8c4;
+    color: var(--fpt-text-dim, #b8b8c4);
     min-width: 38px;
     text-align: right;
 }
@@ -481,8 +356,8 @@ button.add-image-btn .material-symbols-rounded {
     height: 30px !important;
     min-width: 0 !important;
     padding: 0 !important;
-    background: rgba(192,38,211,0.15) !important;
-    border: 1px solid rgba(192,38,211,0.4) !important;
+    background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 15%, transparent) !important;
+    border: 1px solid color-mix(in srgb, var(--fpt-uacc, #5b86d8) 40%, transparent) !important;
     border-radius: 7px !important;
     display: inline-flex !important;
     align-items: center !important;
@@ -492,18 +367,18 @@ button.add-image-btn .material-symbols-rounded {
     transition: background-color 0.13s linear !important;
 }
 #previewNotificationBtn:hover {
-    background: rgba(192,38,211,0.28) !important;
+    background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 28%, transparent) !important;
     transform: none !important;
 }
 #previewNotificationBtn .material-symbols-rounded {
     font-size: 18px;
-    color: #e9e7ff;
+    color: #dce7ff;
 }
 
 /* ---------- 15. Clean template editor rows ---------- */
 .fp-tools-popup .template-item {
-    background: #0c0c10;
-    border: 1px solid #16161c;
+    background: var(--fpt-surface, #0c0c11);
+    border: 1px solid var(--fpt-line, rgba(255,255,255,.08));
     border-radius: 10px;
     padding: 12px;
     margin-bottom: 10px;
@@ -520,7 +395,7 @@ button.add-image-btn .material-symbols-rounded {
 .fp-tools-popup .template-item-header .template-label {
     flex: 1;
     font-weight: 600;
-    color: #ececf4;
+    color: var(--fpt-text, #ececf4);
     outline: none;
     padding: 2px 4px;
     border-radius: 4px;
@@ -533,7 +408,7 @@ button.add-image-btn .material-symbols-rounded {
     width: 26px;
     height: 26px;
     padding: 0;
-    border: 1px solid #2a2a36;
+    border: 1px solid var(--fpt-line-strong, #2a2a36);
     border-radius: 6px;
     background: none;
     cursor: pointer;
@@ -542,7 +417,7 @@ button.add-image-btn .material-symbols-rounded {
 .fp-tools-popup .delete-custom-template-btn {
     background: none !important;
     border: none !important;
-    color: #8a8a96 !important;
+    color: var(--fpt-text-faint, #8a8a96) !important;
     padding: 2px !important;
     min-width: 0 !important;
     width: 26px; height: 26px;
@@ -583,12 +458,12 @@ button.add-image-btn .material-symbols-rounded {
     gap: 6px;
     padding: 5px 8px;
     border-radius: 8px;
-    background: rgba(192, 38, 211, 0.10);
-    border: 1px solid rgba(192, 38, 211, 0.35);
-    color: #e9d5ff;
+    background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--fpt-uacc, #5b86d8) 35%, transparent);
+    color: #dce7ff;
     font-size: 12px;
 }
-.fpt-attachment-chip .fpt-att-ic { font-size: 16px; color: #e9a8ff; }
+.fpt-attachment-chip .fpt-att-ic { font-size: 16px; color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, #ffffff); }
 .fpt-attachment-chip .fpt-att-label { white-space: nowrap; }
 .fpt-attachment-chip button {
     background: none !important;
@@ -597,7 +472,7 @@ button.add-image-btn .material-symbols-rounded {
     min-width: 0 !important;
     width: 20px; height: 20px;
     display: inline-flex; align-items: center; justify-content: center;
-    color: #b8b8c4 !important;
+    color: var(--fpt-text-dim, #b8b8c4) !important;
     cursor: pointer;
     box-shadow: none !important;
 }
@@ -617,7 +492,7 @@ button.add-image-btn .material-symbols-rounded {
 .fpt-img-preview-close {
     position: absolute; top: -14px; right: -14px;
     width: 32px; height: 32px; border-radius: 50%;
-    background: #1a1a1f !important; border: 1px solid #333 !important;
+    background: var(--fpt-surface-2, #1a1a1f) !important; border: 1px solid #333 !important;
     color: #fff !important; cursor: pointer;
     display: inline-flex; align-items: center; justify-content: center;
     box-shadow: none !important;
@@ -687,7 +562,7 @@ button.add-image-btn .material-symbols-rounded {
     background-image: none !important;
     border: none !important;
     box-shadow: none !important;
-    color: #b8b8c4 !important;
+    color: var(--fpt-text-dim, #b8b8c4) !important;
     width: 30px !important;
     height: 30px !important;
     min-width: 0 !important;
@@ -705,7 +580,7 @@ button.add-image-btn .material-symbols-rounded {
 }
 .fp-tools-popup .textarea-with-controls .fpt-img-btn:hover,
 .fp-tools-popup .textarea-with-controls .add-image-btn:hover {
-    background: rgba(192,38,211,0.12) !important;
+    background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 12%, transparent) !important;
     color: #fff !important;
 }
 /* keep the image button INSIDE the template content box, on its own row under
@@ -716,8 +591,8 @@ button.add-image-btn .material-symbols-rounded {
     flex-direction: column;
     align-items: stretch;
     gap: 0;
-    background: #08080b;
-    border: 1px solid #1c1c24;
+    background: var(--fpt-bg-deep, #08080b);
+    border: 1px solid var(--fpt-line, rgba(255,255,255,.08));
     border-radius: 9px;
     padding: 8px 8px 6px;
 }
@@ -743,7 +618,7 @@ button.add-image-btn .material-symbols-rounded {
     gap: 6px;
     padding-top: 4px;
     margin-top: 4px;
-    border-top: 1px solid #16161c;
+    border-top: 1px solid var(--fpt-line, rgba(255,255,255,.08));
 }
 
 /* ---------- FIX C: template editor rows - clean, aligned, readable ----------
@@ -751,15 +626,15 @@ button.add-image-btn .material-symbols-rounded {
    crooked. Lock a tidy grid header.                                           */
 .fp-tools-popup .template-settings-list .template-item,
 .fp-tools-popup .template-item {
-    background: #0c0c11 !important;
-    border: 1px solid #1c1c24 !important;
+    background: var(--fpt-surface, #0c0c11) !important;
+    border: 1px solid var(--fpt-line, rgba(255,255,255,.08)) !important;
     border-radius: 12px !important;
     padding: 14px !important;
     margin-bottom: 12px !important;
     transition: border-color 0.15s ease !important;
 }
 .fp-tools-popup .template-item:hover {
-    border-color: #2a2a38 !important;
+    border-color: var(--fpt-line-strong, #2a2a36) !important;
 }
 .fp-tools-popup .template-item-header {
     display: flex !important;
@@ -778,7 +653,7 @@ button.add-image-btn .material-symbols-rounded {
     flex: 0 0 28px !important;
     padding: 0 !important;
     margin: 0 !important;
-    border: 1px solid #33333f !important;
+    border: 1px solid var(--fpt-line-strong, #33333f) !important;
     border-radius: 7px !important;
     background: transparent !important;
     cursor: pointer !important;
@@ -788,8 +663,8 @@ button.add-image-btn .material-symbols-rounded {
     vertical-align: middle;
 }
 .fp-tools-popup .template-color-picker:hover {
-    border-color: rgba(192,38,211,0.6) !important;
-    box-shadow: 0 0 0 2px rgba(192,38,211,0.25) !important;
+    border-color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 60%, transparent) !important;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--fpt-uacc, #5b86d8) 25%, transparent) !important;
 }
 .fp-tools-popup .template-color-picker::-webkit-color-swatch-wrapper { padding: 0 !important; }
 .fp-tools-popup .template-color-picker::-webkit-color-swatch { border: none !important; border-radius: 6px !important; }
@@ -800,7 +675,7 @@ button.add-image-btn .material-symbols-rounded {
     font-size: 14px !important;
     font-weight: 600 !important;
     line-height: 28px !important;
-    color: #ececf4 !important;
+    color: var(--fpt-text, #ececf4) !important;
     padding: 0 6px !important;
     margin: 0 !important;
     border-radius: 6px !important;
@@ -813,7 +688,7 @@ button.add-image-btn .material-symbols-rounded {
 .fp-tools-popup .template-item-header .template-label:focus {
     background: rgba(255,255,255,0.07) !important;
     outline: none !important;
-    box-shadow: 0 0 0 2px rgba(192,38,211,0.4) !important;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--fpt-uacc, #5b86d8) 40%, transparent) !important;
 }
 .fp-tools-popup .template-item-header .template-toggle { margin: 0 !important; flex: 0 0 auto; }
 
@@ -827,17 +702,17 @@ button.add-image-btn .material-symbols-rounded {
     border-radius: 5px !important;
     background: transparent !important;
     background-image: none !important;
-    border: 1.5px solid #4a4a5a !important;
+    border: 1.5px solid var(--fpt-line-strong, #4a4a5a) !important;
     box-shadow: none !important;
     transition: border-color 0.15s ease !important;
 }
 .fp-tools-popup input[type="checkbox"]:hover {
-    border-color: rgba(192,38,211,0.7) !important;
+    border-color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 70%, transparent) !important;
 }
 .fp-tools-popup input[type="checkbox"]:checked {
     background: transparent !important;
     background-image: none !important;
-    border-color: #C026D3 !important;
+    border-color: var(--fpt-uacc, #5b86d8) !important;
 }
 .fp-tools-popup input[type="checkbox"]::after {
     content: '' !important;
@@ -846,7 +721,7 @@ button.add-image-btn .material-symbols-rounded {
     left: 50% !important;
     width: 5px !important;
     height: 9px !important;
-    border: solid #E879F9 !important;
+    border: solid color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, #ffffff) !important;
     border-width: 0 2px 2px 0 !important;
     border-radius: 1px;
     transform: translate(-50%, -55%) rotate(45deg) !important;
@@ -861,23 +736,26 @@ button.add-image-btn .material-symbols-rounded {
 
 /* ---------- FIX E: variable chips - 85% transparent, easy on the eyes -------
    "у переменных белый фон ... сделать его 85% прозрачным"                     */
-.fp-tools-popup .variable-code {
-    background: rgba(255, 255, 255, 0.15) !important;   /* 85% transparent */
-    background-color: rgba(255, 255, 255, 0.15) !important;
-    color: #ffd9a0 !important;
-    border: 1px solid rgba(255,255,255,0.08) !important;
-    border-radius: 5px !important;
-    padding: 1px 6px !important;
-    font-family: 'Fira Code', 'Consolas', monospace !important;
-    font-size: 11.5px !important;
-}
+/* Unified variable / code chip — one calm steel-blue style everywhere in the popup
+   (was inconsistent: gold .variable-code vs coral bare <code> across tabs). */
+.fp-tools-popup .variable-code,
 .fp-tools-popup .variables-list code,
-.fp-tools-popup .template-info code {
-    background: rgba(255,255,255,0.15) !important;
-    border: 1px solid rgba(255,255,255,0.08) !important;
-    color: #ffd9a0 !important;
-    border-radius: 5px !important;
-    padding: 1px 5px !important;
+.fp-tools-popup .template-info code,
+.fp-tools-popup .support-promo code,
+.fp-tools-popup p code,
+.fp-tools-popup span code,
+.fp-tools-popup label code,
+.fp-tools-popup li code,
+.fp-tools-popup code {
+    background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 12%, transparent) !important;
+    background-color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 12%, transparent) !important;
+    color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, #ffffff) !important;
+    border: 1px solid color-mix(in srgb, var(--fpt-uacc, #5b86d8) 28%, transparent) !important;
+    border-radius: 6px !important;
+    padding: 1px 6px !important;
+    font-family: 'Geist Mono', 'SF Mono', ui-monospace, 'Consolas', monospace !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
 }
 
 /* ---------- FIX F: attachment chip - looks clickable, opens order picker ----
@@ -888,15 +766,15 @@ button.add-image-btn .material-symbols-rounded {
     position: relative;
 }
 .fp-tools-popup .fpt-attachment-chip:hover {
-    background: rgba(192, 38, 211, 0.18) !important;
-    border-color: rgba(192, 38, 211, 0.6) !important;
+    background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 18%, transparent) !important;
+    border-color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 60%, transparent) !important;
 }
 .fp-tools-popup .fpt-attachment-chip:hover .fpt-att-hint {
     opacity: 1;
 }
 .fp-tools-popup .fpt-att-hint {
     font-size: 14px;
-    color: #e9a8ff;
+    color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, #ffffff);
     opacity: 0.55;
     transition: opacity 0.15s ease;
     margin-left: 2px;
@@ -907,8 +785,8 @@ button.add-image-btn .material-symbols-rounded {
 .fpt-order-popup {
     position: absolute;
     z-index: 2147483647;
-    background: #111119;
-    border: 1px solid #2a2a38;
+    background: var(--fpt-surface, #111119);
+    border: 1px solid var(--fpt-line-strong, #2a2a36);
     border-radius: 12px;
     padding: 8px;
     display: flex;
@@ -932,27 +810,27 @@ button.add-image-btn .material-symbols-rounded {
     transition: background 0.13s ease, border-color 0.13s ease;
 }
 .fpt-order-opt:hover {
-    background: rgba(192,38,211,0.14);
-    border-color: rgba(192,38,211,0.45);
+    background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 14%, transparent);
+    border-color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 45%, transparent);
 }
 .fpt-order-opt.active {
-    background: rgba(192,38,211,0.20);
-    border-color: rgba(192,38,211,0.65);
+    background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 20%, transparent);
+    border-color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 65%, transparent);
 }
 .fpt-order-opt .material-symbols-rounded {
     font-size: 20px;
-    color: #d8b4fe;
+    color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, #ffffff);
 }
 .fpt-order-opt .fpt-order-arrow {
     font-size: 16px;
-    color: #6a6a7a;
+    color: var(--fpt-text-faint, #6a6a7a);
 }
 .fpt-order-opt .fpt-order-msg { color: #9fe0b0; }
-.fpt-order-opt .fpt-order-img { color: #d8b4fe; }
+.fpt-order-opt .fpt-order-img { color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, #ffffff); }
 .fpt-order-opt .fpt-order-check {
     margin-left: auto;
     font-size: 18px;
-    color: #C026D3;
+    color: var(--fpt-uacc, #5b86d8);
     opacity: 0;
 }
 .fpt-order-opt.active .fpt-order-check { opacity: 1; }
@@ -969,8 +847,8 @@ button.add-image-btn .material-symbols-rounded {
 }
 .fp-tools-popup .fpt-edit-keyword-btn {
     background: none !important;
-    border: 1px solid #2a2a36 !important;
-    color: #b8b8c4 !important;
+    border: 1px solid var(--fpt-line-strong, #2a2a36) !important;
+    color: var(--fpt-text-dim, #b8b8c4) !important;
     width: 30px !important; height: 30px !important;
     min-width: 0 !important; padding: 0 !important;
     border-radius: 7px !important;
@@ -981,20 +859,20 @@ button.add-image-btn .material-symbols-rounded {
 }
 .fp-tools-popup .fpt-edit-keyword-btn:hover {
     color: #fff !important;
-    border-color: rgba(192,38,211,0.55) !important;
-    background: rgba(192,38,211,0.10) !important;
+    border-color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, transparent) !important;
+    background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 10%, transparent) !important;
 }
 .fp-tools-popup .fpt-edit-keyword-btn .material-symbols-rounded { font-size: 17px; }
 .fp-tools-popup .fpt-kw-img-marker {
     font-size: 14px;
-    color: #e9a8ff;
+    color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, #ffffff);
     vertical-align: -2px;
     margin-left: 6px;
     opacity: 0.85;
 }
 .fp-tools-popup .keyword-item.fpt-editing {
-    border-color: rgba(192,38,211,0.5) !important;
-    background: rgba(192,38,211,0.05) !important;
+    border-color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 50%, transparent) !important;
+    background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 5%, transparent) !important;
 }
 
 /* ---------- FIX I: send-order summary line under template content ----------*/
@@ -1004,15 +882,15 @@ button.add-image-btn .material-symbols-rounded {
     gap: 8px;
     margin-top: 8px;
     font-size: 12px;
-    color: #8a8a96;
+    color: var(--fpt-text-faint, #8a8a96);
 }
 .fp-tools-popup .fpt-send-order-btn {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: rgba(192,38,211,0.08) !important;
-    border: 1px solid rgba(192,38,211,0.30) !important;
-    color: #d8b4fe !important;
+    background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 8%, transparent) !important;
+    border: 1px solid color-mix(in srgb, var(--fpt-uacc, #5b86d8) 30%, transparent) !important;
+    color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, #ffffff) !important;
     padding: 4px 10px !important;
     min-width: 0 !important;
     border-radius: 8px !important;
@@ -1024,13 +902,13 @@ button.add-image-btn .material-symbols-rounded {
     transition: background 0.13s ease, border-color 0.13s ease !important;
 }
 .fp-tools-popup .fpt-send-order-btn:hover {
-    background: rgba(192,38,211,0.16) !important;
-    border-color: rgba(192,38,211,0.5) !important;
+    background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 16%, transparent) !important;
+    border-color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 50%, transparent) !important;
 }
 .fp-tools-popup .fpt-send-order-btn .material-symbols-rounded { font-size: 16px; }
-.fp-tools-popup .fpt-send-order-btn .fpt-order-arrow { color:#6a6a7a; font-size:13px; }
+.fp-tools-popup .fpt-send-order-btn .fpt-order-arrow { color:var(--fpt-text-faint, #6a6a7a); font-size:13px; }
 .fp-tools-popup .fpt-send-order-btn .fpt-order-msg { color:#9fe0b0; }
-.fp-tools-popup .fpt-send-order-btn .fpt-order-img { color:#d8b4fe; }
+.fp-tools-popup .fpt-send-order-btn .fpt-order-img { color:color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, #ffffff); }
 
 /* ---------- FIX J: inline order mini-preview shown inside the chip ---------*/
 .fp-tools-popup .fpt-order-mini {
@@ -1044,9 +922,9 @@ button.add-image-btn .material-symbols-rounded {
     border: 1px solid rgba(255,255,255,0.06);
 }
 .fp-tools-popup .fpt-order-mini .material-symbols-rounded { font-size: 14px; }
-.fp-tools-popup .fpt-order-mini .fpt-order-arrow { font-size: 11px; color:#6a6a7a; }
+.fp-tools-popup .fpt-order-mini .fpt-order-arrow { font-size: 11px; color:var(--fpt-text-faint, #6a6a7a); }
 .fp-tools-popup .fpt-order-mini .fpt-order-msg { color:#9fe0b0; }
-.fp-tools-popup .fpt-order-mini .fpt-order-img { color:#d8b4fe; }
+.fp-tools-popup .fpt-order-mini .fpt-order-img { color:color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, #ffffff); }
 .fp-tools-popup .fpt-attachment-chip .fpt-att-label { flex: 0 0 auto; }
 
 /* ============================================================================
@@ -1064,7 +942,7 @@ button.add-image-btn .material-symbols-rounded {
     will-change: auto !important;
 }
 .fp-tools-popup .close-btn:hover {
-    background: #2a2d44 !important;
+    background: #252934 !important;
     color: #fff !important;
     transform: none !important;   /* was scale(1.05) → caused the jitter */
     box-shadow: none !important;
@@ -1098,8 +976,8 @@ button.add-image-btn .material-symbols-rounded {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    background: #0c0c11;
-    border: 1px solid #1c1c24;
+    background: var(--fpt-surface, #0c0c11);
+    border: 1px solid var(--fpt-line, rgba(255,255,255,.08));
     border-radius: 12px;
     padding: 14px;
     margin-bottom: 16px;
@@ -1107,10 +985,10 @@ button.add-image-btn .material-symbols-rounded {
 .fp-tools-popup #fptNeedsInput {
     width: 100%;
     box-sizing: border-box;
-    background: #08080b !important;
-    border: 1px solid #1c1c24 !important;
+    background: var(--fpt-bg-deep, #08080b) !important;
+    border: 1px solid var(--fpt-line, rgba(255,255,255,.08)) !important;
     border-radius: 9px !important;
-    color: #ececf4 !important;
+    color: var(--fpt-text, #ececf4) !important;
     padding: 10px 12px !important;
     font-size: 13px !important;
     resize: vertical;
@@ -1118,16 +996,16 @@ button.add-image-btn .material-symbols-rounded {
 }
 .fp-tools-popup #fptNeedsInput:focus {
     outline: none !important;
-    border-color: rgba(192,38,211,0.5) !important;
-    box-shadow: 0 0 0 2px rgba(192,38,211,0.18) !important;
+    border-color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 50%, transparent) !important;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--fpt-uacc, #5b86d8) 18%, transparent) !important;
 }
 .fp-tools-popup #fptNeedsAskBtn { align-self: flex-start; }
 .fp-tools-popup #fptNeedsAskBtn.fpt-needs-loading { opacity: 0.6; pointer-events: none; }
 
 /* AI result block */
 .fp-tools-popup .fpt-needs-ai-result {
-    background: rgba(192,38,211,0.05);
-    border: 1px solid rgba(192,38,211,0.25);
+    background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 5%, transparent);
+    border: 1px solid color-mix(in srgb, var(--fpt-uacc, #5b86d8) 25%, transparent);
     border-radius: 12px;
     padding: 14px;
     margin-bottom: 18px;
@@ -1137,26 +1015,26 @@ button.add-image-btn .material-symbols-rounded {
 .fp-tools-popup .fpt-needs-ai-empty,
 .fp-tools-popup .fpt-needs-ai-error {
     display: flex; align-items: center; gap: 8px;
-    font-size: 13px; color: #d8b4fe; margin-bottom: 12px; line-height: 1.4;
+    font-size: 13px; color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, #ffffff); margin-bottom: 12px; line-height: 1.4;
 }
 .fp-tools-popup .fpt-needs-ai-error { color: #ff9b9b; }
-.fp-tools-popup .fpt-needs-ai-empty { color: #9aa0b5; }
+.fp-tools-popup .fpt-needs-ai-empty { color: var(--fpt-text-faint, #9aa0b5); }
 .fp-tools-popup .fpt-needs-ai-head .material-symbols-rounded,
-.fp-tools-popup .fpt-needs-ai-loading .material-symbols-rounded { color: #E879F9; }
+.fp-tools-popup .fpt-needs-ai-loading .material-symbols-rounded { color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, #ffffff); }
 .fp-tools-popup .fpt-spin { animation: fptSpin 0.9s linear infinite; }
 @keyframes fptSpin { to { transform: rotate(360deg); } }
 
 .fp-tools-popup .fpt-needs-ai-cards { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
 .fp-tools-popup .fpt-needs-ai-card {
     display: flex; align-items: center; gap: 10px;
-    background: #0c0c11; border: 1px solid #1c1c24; border-radius: 10px; padding: 10px 12px;
+    background: var(--fpt-surface, #0c0c11); border: 1px solid var(--fpt-line, rgba(255,255,255,.08)); border-radius: 10px; padding: 10px 12px;
 }
 .fp-tools-popup .fpt-needs-ai-card-main { display: flex; align-items: flex-start; gap: 10px; flex: 1 1 auto; cursor: pointer; margin: 0; }
-.fp-tools-popup .fpt-needs-ai-card-label { display: block; font-size: 13px; font-weight: 600; color: #ececf4; }
-.fp-tools-popup .fpt-needs-ai-card-reason { display: block; font-size: 11.5px; color: #8a8a96; margin-top: 2px; line-height: 1.35; }
+.fp-tools-popup .fpt-needs-ai-card-label { display: block; font-size: 13px; font-weight: 600; color: var(--fpt-text, #ececf4); }
+.fp-tools-popup .fpt-needs-ai-card-reason { display: block; font-size: 11.5px; color: var(--fpt-text-faint, #8a8a96); margin-top: 2px; line-height: 1.35; }
 .fp-tools-popup .fpt-needs-ai-conf {
-    flex: 0 0 auto; font-size: 11px; font-weight: 700; color: #d8b4fe;
-    background: rgba(192,38,211,0.12); border: 1px solid rgba(192,38,211,0.3);
+    flex: 0 0 auto; font-size: 11px; font-weight: 700; color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, #ffffff);
+    background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 12%, transparent); border: 1px solid color-mix(in srgb, var(--fpt-uacc, #5b86d8) 30%, transparent);
     padding: 2px 7px; border-radius: 20px;
 }
 
@@ -1166,47 +1044,47 @@ button.add-image-btn .material-symbols-rounded {
 }
 .fp-tools-popup .fpt-needs-filter {
     flex: 0 0 220px; max-width: 50%;
-    background: #08080b !important; border: 1px solid #1c1c24 !important;
-    border-radius: 8px !important; color: #ececf4 !important; padding: 6px 10px !important; font-size: 12px !important;
+    background: var(--fpt-bg-deep, #08080b) !important; border: 1px solid var(--fpt-line, rgba(255,255,255,.08)) !important;
+    border-radius: 8px !important; color: var(--fpt-text, #ececf4) !important; padding: 6px 10px !important; font-size: 12px !important;
 }
-.fp-tools-popup .fpt-needs-filter:focus { outline: none !important; border-color: rgba(192,38,211,0.5) !important; }
+.fp-tools-popup .fpt-needs-filter:focus { outline: none !important; border-color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 50%, transparent) !important; }
 
 .fp-tools-popup .fpt-needs-list { margin-top: 10px; }
 .fp-tools-popup .fpt-needs-group { margin-bottom: 16px; }
 .fp-tools-popup .fpt-needs-group-title {
     font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
-    color: #6a6a7a; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #16161c;
+    color: var(--fpt-text-faint, #6a6a7a); margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid var(--fpt-line, rgba(255,255,255,.08));
 }
 .fp-tools-popup .fpt-needs-item {
     display: flex; align-items: center; gap: 10px;
-    background: #0c0c11; border: 1px solid #16161c; border-radius: 10px;
+    background: var(--fpt-surface, #0c0c11); border: 1px solid var(--fpt-line, rgba(255,255,255,.08)); border-radius: 10px;
     padding: 10px 12px; margin-bottom: 6px; transition: border-color 0.13s ease;
 }
-.fp-tools-popup .fpt-needs-item:hover { border-color: #2a2a38; }
+.fp-tools-popup .fpt-needs-item:hover { border-color: var(--fpt-line-strong, #2a2a36); }
 .fp-tools-popup .fpt-needs-check { display: flex; align-items: flex-start; gap: 10px; flex: 1 1 auto; cursor: pointer; margin: 0; }
 .fp-tools-popup .fpt-needs-item-text { display: flex; flex-direction: column; }
-.fp-tools-popup .fpt-needs-item-label { font-size: 13px; font-weight: 600; color: #ececf4; }
-.fp-tools-popup .fpt-needs-item-desc { font-size: 11.5px; color: #8a8a96; margin-top: 2px; line-height: 1.35; }
+.fp-tools-popup .fpt-needs-item-label { font-size: 13px; font-weight: 600; color: var(--fpt-text, #ececf4); }
+.fp-tools-popup .fpt-needs-item-desc { font-size: 11.5px; color: var(--fpt-text-faint, #8a8a96); margin-top: 2px; line-height: 1.35; }
 .fp-tools-popup .fpt-needs-preview-btn {
-    flex: 0 0 auto; background: none !important; border: 1px solid #2a2a36 !important;
-    color: #b8b8c4 !important; width: 32px !important; height: 32px !important; min-width: 0 !important;
+    flex: 0 0 auto; background: none !important; border: 1px solid var(--fpt-line-strong, #2a2a36) !important;
+    color: var(--fpt-text-dim, #b8b8c4) !important; width: 32px !important; height: 32px !important; min-width: 0 !important;
     padding: 0 !important; border-radius: 8px !important; cursor: pointer;
     display: inline-flex !important; align-items: center !important; justify-content: center !important;
     box-shadow: none !important; text-transform: none !important; letter-spacing: normal !important;
     transition: border-color 0.13s ease, color 0.13s ease !important;
 }
-.fp-tools-popup .fpt-needs-preview-btn:hover { color: #E879F9 !important; border-color: rgba(192,38,211,0.55) !important; }
+.fp-tools-popup .fpt-needs-preview-btn:hover { color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, #ffffff) !important; border-color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, transparent) !important; }
 .fp-tools-popup .fpt-needs-preview-btn .material-symbols-rounded { font-size: 18px; }
 
 .fp-tools-popup .fpt-needs-footer { display: flex; align-items: center; gap: 14px; margin-top: 8px; }
-.fp-tools-popup .fpt-needs-status { font-size: 12px; color: #8a8a96; transition: color 0.2s ease; }
+.fp-tools-popup .fpt-needs-status { font-size: 12px; color: var(--fpt-text-faint, #8a8a96); transition: color 0.2s ease; }
 .fp-tools-popup .fpt-needs-status-ok { color: #9fe0b0; }
 .fp-tools-popup .fpt-needs-status-err { color: #ff8a8a; }
 .fp-tools-popup .fpt-needs-autosave-note {
     display: inline-flex; align-items: center; gap: 5px;
-    font-size: 11.5px; color: #6a6a7a;
+    font-size: 11.5px; color: var(--fpt-text-faint, #6a6a7a);
 }
-.fp-tools-popup .fpt-needs-autosave-note .material-symbols-rounded { font-size: 14px; color: #E9A8FF; }
+.fp-tools-popup .fpt-needs-autosave-note .material-symbols-rounded { font-size: 14px; color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, #ffffff); }
 
 /* inline preview row (expands under the item, never covers anything) */
 .fp-tools-popup .fpt-needs-preview-row {
@@ -1215,16 +1093,16 @@ button.add-image-btn .material-symbols-rounded {
     gap: 14px;
     margin: -2px 0 8px;
     padding: 12px 14px;
-    background: #070709;
-    border: 1px dashed #26263200;
-    border-color: rgba(192,38,211,0.30);
+    background: var(--fpt-bg-deep, #070709);
+    border: 1px dashed var(--fpt-line-strong, #262632);
+    border-color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 30%, transparent);
     border-radius: 10px;
     animation: fptPvIn 0.14s ease-out;
 }
 @keyframes fptPvIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
-.fp-tools-popup .fpt-needs-preview-caption { font-size: 11px; color: #6a6a7a; flex: 0 0 auto; }
+.fp-tools-popup .fpt-needs-preview-caption { font-size: 11px; color: var(--fpt-text-faint, #6a6a7a); flex: 0 0 auto; }
 .fp-tools-popup .fpt-needs-preview-btn.fpt-needs-preview-open {
-    color: #E879F9 !important; border-color: rgba(192,38,211,0.55) !important; background: rgba(192,38,211,0.10) !important;
+    color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, #ffffff) !important; border-color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, transparent) !important; background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 10%, transparent) !important;
 }
 
 /* the "stage" holds a small visual replica of the real element */
@@ -1232,10 +1110,10 @@ button.add-image-btn .material-symbols-rounded {
     flex: 1 1 auto;
     display: flex; align-items: center; justify-content: center;
     min-height: 52px; padding: 10px;
-    background: #15151c; border-radius: 8px;
-    box-shadow: inset 0 0 0 1px #1f1f29;
+    background: var(--fpt-surface-2, #15151c); border-radius: 8px;
+    box-shadow: inset 0 0 0 1px var(--fpt-line, rgba(255,255,255,.08));
 }
-.fp-tools-popup .fpt-pv-none { color: #6a6a7a; font-size: 12px; }
+.fp-tools-popup .fpt-pv-none { color: var(--fpt-text-faint, #6a6a7a); font-size: 12px; }
 
 /* ── element replicas - faithful mini-copies of the REAL injected elements ── */
 
@@ -1253,7 +1131,7 @@ button.add-image-btn .material-symbols-rounded {
 .fp-tools-popup .fpt-pv-aibtn {
     width: 36px; height: 36px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    background: rgba(192,38,211,0.06);
+    background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 6%, transparent);
 }
 .fp-tools-popup .fpt-pv-aibtn img {
     width: 20px; height: 20px; display: block;
@@ -1331,14 +1209,14 @@ button.add-image-btn .material-symbols-rounded {
 /* AI-generation button (dark pill with sparkle svg + label) */
 .fp-tools-popup .fpt-pv-aigen {
     display: inline-flex; align-items: center; gap: 7px;
-    background: #15151c; color: #e3e3e3; border: 1px solid #2a2a3a;
+    background: var(--fpt-surface-2, #15151c); color: var(--fpt-text, #e3e3e3); border: 1px solid #2a2a3a;
     border-radius: 8px; padding: 7px 13px; font-size: 13px;
 }
 .fp-tools-popup .fpt-pv-aigen svg { display: block; }
 
 /* font block (label Шрифт + select + Клавиатура button) */
 .fp-tools-popup .fpt-pv-fontblock { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.fp-tools-popup .fpt-pv-fontblock label { color: #cfd0da; font-size: 12px; margin: 0; }
+.fp-tools-popup .fpt-pv-fontblock label { color: var(--fpt-text-dim, #cfd0da); font-size: 12px; margin: 0; }
 .fp-tools-popup .fpt-pv-fpselect {
     background: #fff; color: #333; border: 1px solid #ccc; border-radius: 4px;
     padding: 5px 8px; font-size: 12px;
@@ -1346,7 +1224,7 @@ button.add-image-btn .material-symbols-rounded {
 
 /* translate button in lot (real style: subtle dark pill) */
 .fp-tools-popup .fpt-pv-translatebtn {
-    background: #2A1830; color: #E9A8FF; border: 1px solid rgba(192,38,211,0.4);
+    background: #152033; color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, #ffffff); border: 1px solid color-mix(in srgb, var(--fpt-uacc, #5b86d8) 40%, transparent);
     border-radius: 6px; padding: 6px 14px; font-size: 13px;
 }
 
@@ -1359,8 +1237,8 @@ button.add-image-btn .material-symbols-rounded {
 /* paste bar */
 .fp-tools-popup .fpt-pv-pastebar {
     display: flex; align-items: center; gap: 8px;
-    background: #1b1b22; border: 1px solid #2a2a3a; border-radius: 8px;
-    padding: 8px 12px; font-size: 12px; color: #d8d8e0;
+    background: var(--fpt-surface-2, #1b1b22); border: 1px solid #2a2a3a; border-radius: 8px;
+    padding: 8px 12px; font-size: 12px; color: var(--fpt-text-dim, #d8d8e0);
 }
 .fp-tools-popup .fpt-pv-pastebar-text { flex: 1 1 auto; }
 
@@ -1374,11 +1252,11 @@ button.add-image-btn .material-symbols-rounded {
 
 /* pinned lots block header */
 .fp-tools-popup .fpt-pv-pinned { display: flex; align-items: center; gap: 10px; }
-.fp-tools-popup .fpt-pv-pinned-title { color: #ececf4; font-size: 14px; font-weight: 700; }
+.fp-tools-popup .fpt-pv-pinned-title { color: var(--fpt-text, #ececf4); font-size: 14px; font-weight: 700; }
 
 /* "show more" expand row */
 .fp-tools-popup .fpt-pv-expandrow {
-    display: flex; align-items: center; gap: 8px; color: #9099b8;
+    display: flex; align-items: center; gap: 8px; color: var(--fpt-text-faint, #9099b8);
     font-size: 13px; padding: 6px 0;
 }
 
@@ -1387,7 +1265,61 @@ button.add-image-btn .material-symbols-rounded {
 .fp-tools-popup .fpt-needs-lock {
     width: 19px; height: 19px; flex: 0 0 19px;
     display: inline-flex; align-items: center; justify-content: center;
-    border: 1.5px solid #33333f; border-radius: 5px; color: #6a6a7a;
+    border: 1.5px solid var(--fpt-line-strong, #33333f); border-radius: 5px; color: var(--fpt-text-faint, #6a6a7a);
     margin-top: 1px;
 }
 .fp-tools-popup .fpt-needs-lock .material-symbols-rounded { font-size: 13px; }
+
+/* ---------- Light preset: кнопки/иконки читаемы на светлых поверхностях ----------
+   Primary-кнопки: сплошной акцент + белый текст (полупрозрачная заливка с
+   акцентным текстом была нечитаема). Кружки выбора акцента исключены —
+   они показывают СВОЙ цвет (var(--sw) / конусный градиент). */
+[data-fpt-preset="light"] .fp-tools-popup button:not(.accentpick-sw):not(.accentpick-wheel):not(.accentpick-rainbow):not(.fpt-theme-sw):not(.fpt-wall):not(.btn-default):not(.close-btn),
+[data-fpt-preset="light"] .fp-tools-popup .btn:not(.btn-default) {
+    background: var(--fpt-uacc, #5b86d8);
+    border-color: transparent;
+    color: #ffffff;
+}
+[data-fpt-preset="light"] .fp-tools-popup button:not(.accentpick-sw):not(.accentpick-wheel):not(.accentpick-rainbow):not(.fpt-theme-sw):not(.fpt-wall):not(.btn-default):not(.close-btn):hover,
+[data-fpt-preset="light"] .fp-tools-popup .btn:not(.btn-default):hover {
+    background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 86%, #1c2230);
+}
+[data-fpt-preset="light"] .fp-tools-popup .btn.btn-default,
+[data-fpt-preset="light"] .fp-tools-popup button.btn-default {
+    background: #ffffff;
+    border: 1px solid var(--fpt-line-strong, rgba(20,25,35,.18));
+    color: var(--fpt-text-dim, #4d5460);
+}
+[data-fpt-preset="light"] .fp-tools-popup .btn.btn-default:hover,
+[data-fpt-preset="light"] .fp-tools-popup button.btn-default:hover {
+    background: #f2f3f6;
+}
+[data-fpt-preset="light"] .fp-tools-popup .close-btn {
+    background: #ffffff;
+    border: 1px solid var(--fpt-line-strong, rgba(20,25,35,.18));
+    color: var(--fpt-text-dim, #4d5460);
+}
+[data-fpt-preset="light"] .fpt-img-btn:hover,
+[data-fpt-preset="light"] button.add-image-btn:hover,
+[data-fpt-preset="light"] .fp-tools-popup .close-btn:hover {
+    color: var(--fpt-text, #23272f) !important;
+    background: rgba(20, 25, 35, 0.08) !important;
+}
+
+/* Чип-тумблер не сжимается флексом (обрезался текст) */
+.fpt-chip-toggle { flex: 0 0 auto; }
+[data-fpt-preset="light"] .fpt-chip-toggle:hover { color: var(--fpt-text, #23272f); }
+
+/* Danger-кнопка сброса темы — светлый вариант на светлой теме */
+[data-fpt-preset="light"] .fp-tools-popup #resetThemeBtn {
+    background: #fbeaea;
+    border-color: #e3b4b4;
+    color: #a11d1d;
+}
+[data-fpt-preset="light"] .fp-tools-popup #resetThemeBtn:hover {
+    background: #f6dcdc;
+    box-shadow: none;
+}
+
+/* Текст радио-опций следует теме (был жёсткий #eee — белый на светлой) */
+.fp-tools-popup .fp-tools-radio-option span { color: var(--fpt-text, #eee); }

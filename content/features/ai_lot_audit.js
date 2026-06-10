@@ -301,7 +301,7 @@ function auditRenderQuestion(index) {
                 wrap.querySelectorAll('.fp-audit-opt').forEach(b => {
                     b.style.borderColor = '#22253a'; b.style.background = '#1a1c2e'; b.style.color = '#d8dae8';
                 });
-                btn.style.borderColor = '#C026D3'; btn.style.background = '#2A1830'; btn.style.color = '#E9A8FF';
+                btn.style.borderColor = '#5b86d8'; btn.style.background = '#2A1830'; btn.style.color = '#E9A8FF';
                 btn.dataset.selected = '1';
             });
             wrap.appendChild(btn);
@@ -326,7 +326,7 @@ function auditRenderQuestion(index) {
                 wrap.querySelectorAll('.fp-audit-opt').forEach(b => {
                     b.style.borderColor = '#22253a'; b.style.background = '#1a1c2e'; b.style.color = '#d8dae8';
                 });
-                btn.style.borderColor = '#C026D3'; btn.style.background = '#2A1830'; btn.style.color = '#E9A8FF';
+                btn.style.borderColor = '#5b86d8'; btn.style.background = '#2A1830'; btn.style.color = '#E9A8FF';
                 btn.dataset.selected = '1';
             });
             wrap.appendChild(btn);
@@ -378,7 +378,7 @@ function auditRenderQuestion(index) {
         const ta = document.createElement('textarea');
         ta.placeholder = 'Ваш ответ...';
         ta.style.cssText = `width:100%;height:80px;background:#0e0f16;border:1px solid #22253a;border-radius:8px;padding:10px;color:#d8dae8;font-size:13px;resize:vertical;outline:none;font-family:inherit;box-sizing:border-box;`;
-        ta.addEventListener('focus', () => ta.style.borderColor = '#C026D3');
+        ta.addEventListener('focus', () => ta.style.borderColor = '#5b86d8');
         ta.addEventListener('blur',  () => ta.style.borderColor = '#22253a');
         getValue = () => ta.value.trim();
         container.appendChild(ta);
@@ -423,11 +423,11 @@ function auditShowResults(recs) {
         <div style="background:#1a1c2e;border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px;color:#c0c4d8;line-height:1.5;">
             <strong style="color:#eceef6;">Резюме:</strong><br>${recs.summary || ''}
         </div>
-        ${section('🔴 Критично - исправить первым делом', recs.critical, '#e05252')}
-        ${section('📝 Названия и описания', recs.titles, '#FF6B6B')}
-        ${section('💰 Цены', recs.pricing, '#ff9800')}
-        ${section('🔍 Видимость в поиске', recs.visibility, '#C026D3')}
-        ${section('💬 Клиентский сервис', recs.service, '#4caf82')}
+        ${section('<span class="material-symbols-rounded" style="font-size:13px;vertical-align:-2px;">warning</span> Критично - исправить первым делом', recs.critical, '#e05252')}
+        ${section('<span class="material-symbols-rounded" style="font-size:13px;vertical-align:-2px;">edit_note</span> Названия и описания', recs.titles, '#FF6B6B')}
+        ${section('<span class="material-symbols-rounded" style="font-size:13px;vertical-align:-2px;">payments</span> Цены', recs.pricing, '#ff9800')}
+        ${section('<span class="material-symbols-rounded" style="font-size:13px;vertical-align:-2px;">search</span> Видимость в поиске', recs.visibility, '#5b86d8')}
+        ${section('<span class="material-symbols-rounded" style="font-size:13px;vertical-align:-2px;">chat</span> Клиентский сервис', recs.service, '#4caf82')}
         <button onclick="document.getElementById('fp-audit-start-btn').click()" style="margin-top:10px;background:#1e2030;border:1px solid #22253a;border-radius:6px;padding:8px 16px;color:#9099b8;cursor:pointer;font-size:13px;font-family:inherit;">Начать заново</button>
     `;
 }
@@ -524,12 +524,12 @@ function initializeAILotAudit() {
             } else {
                 auditRenderQuestion(_currentQ + 1);
                 // Update button label
-                nextBtn.textContent = _currentQ >= _questions.length - 1 ? '✅ Завершить' : 'Далее →';
+                nextBtn.textContent = _currentQ >= _questions.length - 1 ? 'Завершить' : 'Далее →';
             }
 
             // Update next button
             if (_currentQ < _questions.length - 1) {
-                nextBtn.textContent = _currentQ + 1 >= _questions.length - 1 ? '✅ Завершить' : 'Далее →';
+                nextBtn.textContent = _currentQ + 1 >= _questions.length - 1 ? 'Завершить' : 'Далее →';
             }
         });
     }

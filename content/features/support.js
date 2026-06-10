@@ -193,7 +193,7 @@ function _renderCategorySelect(fieldsDiv, submitBtn) {
             _renderFields(fields, fieldsDiv);
             if (submitBtn) submitBtn.style.display = 'block';
         } catch (e) {
-            spinner.textContent = '❌ ' + e.message;
+            spinner.textContent = e.message;
         }
     });
 }
@@ -347,11 +347,11 @@ async function _sendPendingTicket() {
         const res = await _msg('supportCreateTicket', { categoryId, fieldValues, message });
         document.getElementById('fp-ticket-confirm-overlay').style.display = 'none';
         _ticketPendingPayload = null;
-        if (typeof showNotification === 'function') showNotification('Заявка отправлена' + (res.ticketId ? ' #' + res.ticketId : '') + ' ✓');
+        if (typeof showNotification === 'function') showNotification('Заявка отправлена' + (res.ticketId ? ' #' + res.ticketId : ''));
         _loadTickets();
     } catch (e) {
         btn.disabled = false; btn.textContent = 'Отправить';
-        if (typeof showNotification === 'function') showNotification('❌ ' + e.message, true);
+        if (typeof showNotification === 'function') showNotification(e.message, true);
     }
 }
 
@@ -411,7 +411,7 @@ async function _buildAndConfirmAutoTicket() {
         const preview = `Категория: Подтверждение заказа\n  Ник: ${username}\n  Заказы: ${idsStr}\n\nСообщение:\n${message}`;
         _showConfirm(preview, { categoryId: '1', fieldValues: fv, message });
     } catch (e) {
-        statusEl.textContent = '❌ ' + e.message;
+        statusEl.textContent = e.message;
     } finally {
         btn.disabled = false; btn.textContent = 'Отправить заявку в ТП';
     }
@@ -544,7 +544,7 @@ async function _sendTicketReply() {
         input.value = '';
         btn.disabled = false; btn.textContent = 'Отправить';
     } catch (e) {
-        if (typeof showNotification === 'function') showNotification('❌ ' + e.message, true);
+        if (typeof showNotification === 'function') showNotification(e.message, true);
         btn.disabled = false; btn.textContent = 'Отправить';
     }
 }

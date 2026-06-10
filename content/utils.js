@@ -513,8 +513,9 @@ function fptComputePalette() {
     const hover    = fptMix(bg, dark ? 'white' : 'black', dark ? 0.14 : 0.08);
     const text     = textRaw;
     const textMuted = dark ? fptMix(textRaw, 'black', 0.35) : fptMix(textRaw, 'white', 0.35);
-    // акцент берём фирменный фанпеевский, но это можно переопределить
-    const accent = [193, 38, 211, 1]; // #C026D3 — но используем умеренно
+    // акцент берём из новой дизайн-системы funpay-redesign — сдержанный стальной синий,
+    // постоянный во всех темах (см. tokens.css: --accent)
+    const accent = [91, 134, 216, 1]; // #5b86d8 — steel blue, используем умеренно
 
     return {
         dark,
@@ -534,6 +535,21 @@ function fptComputePalette() {
 // Выставляет CSS-переменные --fpt-* на :root.
 function fptApplyThemeVars() {
     try {
+        // При активном пресете кастомной темы переменные уже заданы мгновенно
+        // в раннем CSS (theme_core/flash_fix) — отложенный пересчёт от фактического
+        // фона страницы здесь только давал «докрашивание» виджетов через 120–400мс.
+        const preset = document.documentElement.getAttribute('data-fpt-preset');
+        if (preset && preset !== 'native') {
+            const isLight = preset === 'light';
+            document.documentElement.classList.toggle('fpt-theme-dark', !isLight);
+            document.documentElement.classList.toggle('fpt-theme-light', isLight);
+            // снять возможные инлайны от прошлых пересчётов — пусть рулит ранний CSS
+            const r = document.documentElement.style;
+            ['--fpt-bg','--fpt-surface','--fpt-surface-2','--fpt-border','--fpt-hover',
+             '--fpt-text','--fpt-text-muted','--fpt-accent','--fpt-accent-soft','--fpt-shadow']
+                .forEach(v => r.removeProperty(v));
+            return;
+        }
         const p = fptComputePalette();
         const r = document.documentElement.style;
         r.setProperty('--fpt-bg',         p.bg);
