@@ -11634,10 +11634,15 @@ body.funpay-redesigned .fpt-home .tgl[data-on="true"]::after {
 .fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .fpt-metric-card strong { color: #ffffff !important; }
 .fp-tools-popup .fpt-metric-card small,
 .fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .fpt-metric-card small { color: rgba(255,255,255,.88) !important; }
-.fp-tools-popup .fpt-metric-card .material-symbols-rounded { color: #ffffff !important; }
-.fp-tools-popup .theme-actions-grid .btn,
-.fp-tools-popup .theme-actions-grid .btn .material-icons,
-.fp-tools-popup .theme-actions-grid .btn span { color: #ffffff !important; }
+/* иконка в карточке лежит в СВЕТЛОМ квадрате (--fpt-surface-2) → акцентный цвет, НЕ белый
+   (белый засвечивался на светлом квадрате) */
+.fp-tools-popup .fpt-metric-card .fpt-metric-ic.material-symbols-rounded,
+.fp-tools-popup .fpt-metric-card .material-symbols-rounded { color: var(--fpt-accent, var(--fpt-uacc, #5b86d8)) !important; }
+/* кнопки темы с тёмным/цветным фоном — светлый текст; КРОМЕ «Сбросить тему»
+   (у неё светло-розовый фон и свой тёмно-красный текст). */
+.fp-tools-popup .theme-actions-grid .btn:not(#resetThemeBtn),
+.fp-tools-popup .theme-actions-grid .btn:not(#resetThemeBtn) .material-icons,
+.fp-tools-popup .theme-actions-grid .btn:not(#resetThemeBtn) span { color: #ffffff !important; }
 /* кнопка "цвета фона" иногда на светлом градиенте — добавим тень тексту для читаемости */
 .fp-tools-popup #generatePaletteBtn, .fp-tools-popup #generatePaletteBtn span { text-shadow: 0 1px 2px rgba(0,0,0,.4) !important; }
 
