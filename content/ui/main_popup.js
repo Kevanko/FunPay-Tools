@@ -337,9 +337,12 @@ function createMainPopup() {
                     <p class="template-info">Добавьте текущий аккаунт в список, чтобы быстро переключаться между профилями без ввода пароля.</p>
                     <div class="support-promo fpt-callout-info" style="margin-bottom: 20px;">
                         <span class="nav-icon material-symbols-rounded fpt-callout-icon">info</span>
-                        <span>Нажмите «+ Добавить текущий аккаунт» для каждого профиля. Переключение происходит мгновенно без ввода паролей.</span>
+                        <span>«Добавить текущий» — сохранить аккаунт, в котором вы сейчас. «Войти в другой» — выйти и войти в новый профиль (он добавится сам). Переключение между сохранёнными — мгновенно, без паролей.</span>
                     </div>
-                    <button id="addCurrentAccountBtn" class="btn">+ Добавить текущий аккаунт</button>
+                    <div class="fpt-acc-addrow">
+                        <button id="addCurrentAccountBtn" class="btn">+ Добавить текущий</button>
+                        <button id="addNewAccountBtn" class="btn btn-default"><span class="material-symbols-rounded" style="font-size:17px;vertical-align:-3px;margin-right:5px;">login</span>Войти в другой аккаунт</button>
+                    </div>
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-top:22px;margin-bottom:10px;">
                         <h4 style="margin:0;">Сохраненные аккаунты:</h4>
                         <button id="fptRefreshAccountsBtn" class="btn btn-default" style="padding:4px 10px;font-size:12px;" title="Обновить баланс, аватары и непрочитанные">

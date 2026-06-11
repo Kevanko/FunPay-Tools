@@ -1605,6 +1605,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         })();
         return true;
     }
+
+    // Выйти и сразу открыть страницу входа FunPay (для «Добавить новый аккаунт»).
+    if (request.action === 'deleteCookiesAndLogin') {
+        (async () => {
+            const allCookies = await chrome.cookies.getAll({ url: "https://funpay.com" });
+            for (const cookie of allCookies) {
+                await chrome.cookies.remove({ url: "https://funpay.com", name: cookie.name, storeId: cookie.storeId });
+            }
+            chrome.tabs.update(sender.tab.id, { url: 'https://funpay.com/account/login' });
+        })();
+        return true;
+    }
     
     // SALES STATS HANDLERS
     if (request.action === 'updateSales') {
