@@ -5,9 +5,79 @@ function _fptCleanBal(b) {
     return m ? m[0].replace(/\s+/g, ' ').trim() : '—';
 }
 
+function _fptAlive() { try { return !!(chrome && chrome.runtime && chrome.runtime.id); } catch (_) { return false; } }
+
 async function saveAccountsList() {
-    await chrome.storage.local.set({ fpToolsAccounts: fpToolsAccounts });
+    if (!_fptAlive()) return;            // расширение перезагружено — не дёргаем chrome.*
+    try { await chrome.storage.local.set({ fpToolsAccounts: fpToolsAccounts }); } catch (_) {}
     renderAccountsList();
+}
+
+// Добавление нового аккаунта / перевход: чистим куки и перезагружаем, чтобы
+// войти заново. После входа fptCheckPendingAdd подхватит аккаунт и добавит/обновит.
+async function fptStartAddNewAccount() {
+    if (!_fptAlive()) return;
+    try { await chrome.storage.local.set({ fptPendingAddAccount: { ts: Date.now() } }); } catch (_) {}
+    try { chrome.runtime.sendMessage({ action: 'deleteCookiesAndReload' }); } catch (_) {}
+}
+
+// На загрузке: если ждём добавления и пользователь УЖЕ вошёл — берём текущий
+// ключ и добавляем аккаунт в конец (или обновляем существующий по имени). Без дублей.
+async function fptCheckPendingAdd() {
+    if (!_fptAlive()) return;
+    let pending;
+    try { ({ fptPendingAddAccount: pending } = await chrome.storage.local.get('fptPendingAddAccount')); } catch (_) { return; }
+    if (!pending) return;
+    const nameEl = document.querySelector('.user-link-name');
+    const name = nameEl ? nameEl.textContent.trim() : null;
+    if (!name) return; // ещё не вошли — ждём загрузки после входа
+    let key = null;
+    try { const r = await chrome.runtime.sendMessage({ action: 'getGoldenKey' }); if (r && r.success) key = r.key; } catch (_) {}
+    if (!key) return;
+    let accts = [];
+    try { ({ fpToolsAccounts: accts = [] } = await chrome.storage.local.get('fpToolsAccounts')); } catch (_) { return; }
+    const existing = accts.find(a => a.name === name);
+    let msg = null;
+    if (existing) {
+        existing.key = key; existing.loginError = false; existing.online = existing.online !== false;
+        msg = `Аккаунт «${name}» обновлён.`;
+    } else if (!accts.some(a => a.key === key)) {
+        accts.push({ name, key, online: true });
+        msg = `Аккаунт «${name}» добавлен.`;
+    }
+    try { await chrome.storage.local.set({ fpToolsAccounts: accts, fptPendingAddAccount: null }); } catch (_) {}
+    if (typeof fpToolsAccounts !== 'undefined') { try { fpToolsAccounts.length = 0; accts.forEach(a => fpToolsAccounts.push(a)); renderAccountsList(); } catch (_) {} }
+    if (msg && typeof showNotification === 'function') showNotification(msg);
+}
+
+// После переключения проверяем, удался ли вход. Если активный аккаунт после
+// перезагрузки не залогинен под нужным именем — помечаем loginError (кнопка → «Перевойти»).
+async function fptCheckSwitchResult() {
+    if (!_fptAlive()) return;
+    let mark;
+    try { ({ fptSwitchCheck: mark } = await chrome.storage.local.get('fptSwitchCheck')); } catch (_) { return; }
+    if (!mark || !mark.name) return;
+    const nameEl = document.querySelector('.user-link-name');
+    const name = nameEl ? nameEl.textContent.trim() : null;
+    let accts = [];
+    try { ({ fpToolsAccounts: accts = [] } = await chrome.storage.local.get('fpToolsAccounts')); } catch (_) { return; }
+    const acc = accts.find(a => a.name === mark.name);
+    if (name === mark.name) {
+        if (acc && acc.loginError) { acc.loginError = false; }     // вход удался
+    } else {
+        if (acc) acc.loginError = true;                            // вход не удался — ключ устарел
+        if (typeof showNotification === 'function') showNotification(`Не удалось войти в «${mark.name}» — ключ устарел. Нажмите «Перевойти».`, true);
+    }
+    try { await chrome.storage.local.set({ fpToolsAccounts: accts, fptSwitchCheck: null }); } catch (_) {}
+}
+
+// Переключение на сохранённый аккаунт с пометкой проверки результата.
+async function fptSwitchToAccount(acc) {
+    if (!acc || !acc.key) return;
+    try { await chrome.storage.local.set({ fptSwitchCheck: { name: acc.name, ts: Date.now() } }); } catch (_) {}
+    try { await chrome.runtime.sendMessage({ action: 'setGoldenKey', key: acc.key }); } catch (e) {
+        if (typeof showNotification === 'function') showNotification(`Ошибка переключения: ${e.message}`, true);
+    }
 }
 
 const _fptAccSnapCache = {}; // key -> { ts, snapshot }
@@ -67,10 +137,13 @@ async function renderAccountsList() {
         balSpan.textContent = _fptCleanBal(account.balance);
         // полезная мелочь: новые сообщения, заказы, статус сети
         const metaSpan = createElement('div', { class: 'fpt-acc-meta' });
+        const statusHTML = (!isActive && account.loginError)
+            ? `<span class="fpt-acc-meta-i fpt-acc-status err">ошибка входа</span>`
+            : `<span class="fpt-acc-meta-i fpt-acc-status ${isOnline ? 'on' : ''}">${isOnline ? 'в сети' : 'не в сети'}</span>`;
         metaSpan.innerHTML =
             `<span class="fpt-acc-meta-i" title="Новые сообщения"><span class="material-symbols-rounded">mail</span>${account.unread || 0}</span>` +
             `<span class="fpt-acc-meta-i" title="Новые заказы"><span class="material-symbols-rounded">shopping_bag</span>${account.orders || 0}</span>` +
-            `<span class="fpt-acc-meta-i fpt-acc-status ${isOnline ? 'on' : ''}">${isOnline ? 'в сети' : 'не в сети'}</span>`;
+            statusHTML;
         info.append(nameSpan, balSpan, metaSpan);
 
         // действия
@@ -88,24 +161,21 @@ async function renderAccountsList() {
             saveAccountsList();
         });
 
-        // кнопка "Войти" (текстовая) — как просили вернуть
-        const switchBtn = createElement('button', { class: `fpt-acc-login-btn ${isActive ? 'active' : ''}` });
-        switchBtn.textContent = isActive ? 'Активен' : 'Войти';
+        // кнопка входа: «Войти» / «Активен» / «Перевойти» (если ключ устарел)
+        const hasError = !isActive && account.loginError;
+        const switchBtn = createElement('button', { class: `fpt-acc-login-btn ${isActive ? 'active' : ''} ${hasError ? 'relogin' : ''}` });
+        switchBtn.textContent = isActive ? 'Активен' : (hasError ? 'Перевойти' : 'Войти');
         switchBtn.disabled = isActive;
         switchBtn.addEventListener('click', async () => {
             if (isActive) return;
             switchBtn.disabled = true;
-            showNotification(`Переключаюсь на аккаунт ${account.name}...`, false);
-            try {
-                const res = await chrome.runtime.sendMessage({ action: 'setGoldenKey', key: account.key });
-                if (!res || !res.success) {
-                    switchBtn.disabled = false;
-                    showNotification(`Не удалось войти: ${res && res.error ? res.error : 'неизвестная ошибка'}`, true);
-                }
-            } catch (e) {
-                switchBtn.disabled = false;
-                showNotification(`Ошибка переключения: ${e.message}`, true);
+            if (hasError) {
+                showNotification('Откройте вход в этот аккаунт — после входа ключ обновится.', false);
+                await fptStartAddNewAccount();   // чистим куки + открываем вход; после входа обновим по имени
+                return;
             }
+            showNotification(`Переключаюсь на аккаунт ${account.name}...`, false);
+            await fptSwitchToAccount(account);
         });
 
         const renameBtn = createElement('button', { class: 'fpt-acc-btn fpt-acc-btn-edit', title: 'Переименовать' });
@@ -160,8 +230,7 @@ async function maybeAutoRefreshAccounts() {
                 changed = true;
             }
         }
-        if (changed) await chrome.storage.local.set({ fpToolsAccounts });
-        if (changed) renderAccountsList();
+        if (changed && _fptAlive()) { try { await chrome.storage.local.set({ fpToolsAccounts }); } catch (_) {} renderAccountsList(); }
     } finally {
         _fptAccAutoRefreshing = false;
     }
@@ -243,14 +312,23 @@ function fptInjectAccountMenuItems() {
     const logoutLi = logoutA && logoutA.closest('li');
     if (!menu || !logoutLi) return false;
 
-    if (!menu.querySelector('.fpt-menu-add-account')) {
+    if (!menu.querySelector('.fpt-menu-accounts')) {
         const li = document.createElement('li');
-        li.innerHTML = '<a href="#" class="fpt-menu-add-account">Добавить аккаунт</a>';
+        li.innerHTML = '<a href="#" class="fpt-menu-accounts">Аккаунты</a>';
         logoutLi.parentElement.insertBefore(li, logoutLi);
         li.querySelector('a').addEventListener('click', (e) => {
             e.preventDefault();
             document.getElementById('fpToolsButton')?.click();
             setTimeout(() => document.querySelector('.fp-tools-popup li[data-page="accounts"] a')?.click(), 320);
+        });
+    }
+    if (!menu.querySelector('.fpt-menu-add-new')) {
+        const li = document.createElement('li');
+        li.innerHTML = '<a href="#" class="fpt-menu-add-new">Добавить новый аккаунт</a>';
+        logoutLi.parentElement.insertBefore(li, logoutLi);
+        li.querySelector('a').addEventListener('click', (e) => {
+            e.preventDefault();
+            fptStartAddNewAccount();   // чистим куки + перезагрузка для входа; после входа добавится сам
         });
     }
     if (!menu.querySelector('.fp-tools-logout-clean')) {
@@ -298,13 +376,16 @@ async function fptRenderAccountSwitcher(menu) {
             const acc = accts[parseInt(btn.dataset.accIdx, 10)];
             if (!acc || acc.name === curName) return;
             li.querySelectorAll('.fpt-accsw-row').forEach(b => b.disabled = true);
-            try { await chrome.runtime.sendMessage({ action: 'setGoldenKey', key: acc.key }); } catch (_) {}
+            await fptSwitchToAccount(acc);
         });
     });
 }
 
 (function fptBootAccountMenu() {
     if (window !== window.top) return;
+    // после входа/перезагрузки: подхватить добавление аккаунта и проверить вход
+    fptCheckPendingAdd();
+    fptCheckSwitchResult();
     if (fptInjectAccountMenuItems()) return;
     const mo = new MutationObserver(() => { if (fptInjectAccountMenuItems()) mo.disconnect(); });
     mo.observe(document.documentElement, { childList: true, subtree: true });

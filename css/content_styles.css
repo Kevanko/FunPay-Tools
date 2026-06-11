@@ -8561,7 +8561,10 @@ textarea.fp-cw-input { line-height:1.4; }
 }
 .fpt-acc-login-btn:hover{filter:brightness(1.1);}
 .fpt-acc-login-btn.active{background:#20222e;color:#4caf50;cursor:default;filter:none;}
+.fpt-acc-login-btn.relogin{background:#d9a440;color:#1a1c26;}
 .fpt-acc-login-btn:disabled{cursor:default;}
+.fpt-acc-status.err{color:#e07070;}
+.fpt-acc-status.err::before{background:#e07070;}
 .fpt-acc-btn{
     width:34px;height:34px;display:flex;align-items:center;justify-content:center;
     border:1px solid #2a2d3f;background:#20222e;

@@ -156,7 +156,7 @@
         if (!rightNav) return false;
         const li = document.createElement('li');
         li.className = 'dropdown fp-tools-header-item';
-        li.innerHTML = '<a href="javascript:void(0)" style="font-weight: 650; cursor: pointer; user-select: none;" id="fpToolsButton" data-fpt-location="header">FP Tools<span></span></a>';
+        li.innerHTML = '<a role="button" tabindex="0" style="font-weight: 650; cursor: pointer; user-select: none;" id="fpToolsButton" data-fpt-location="header">FP Tools<span></span></a>';
         const userMenuItem = rightNav.querySelector('li.dropdown.hidden-sm.hidden-xs');
         if (userMenuItem) rightNav.insertBefore(li, userMenuItem);
         else rightNav.appendChild(li);
