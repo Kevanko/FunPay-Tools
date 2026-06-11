@@ -6,6 +6,79 @@
     'use strict';
 
     let _gamesCache = null;
+    const DRAFT_KEY = 'fptPendingLotDraft';
+
+    // расширение могло обновиться — chrome.* кидает «context invalidated»
+    function _alive() { try { return !!(chrome.runtime && chrome.runtime.id); } catch (_) { return false; } }
+    async function sendMsg(msg) {
+        if (!_alive()) throw new Error('Расширение обновилось — обновите страницу (F5).');
+        try { return await chrome.runtime.sendMessage(msg); }
+        catch (e) { throw new Error(/context invalidated/i.test(e.message || '') ? 'Расширение обновилось — обновите страницу (F5).' : (e.message || 'Ошибка связи с расширением.')); }
+    }
+
+    // node подкатегории из ссылки раздела (.../lots/123/ или .../chips/123/)
+    function nodeIdFromUrl(url) {
+        const m = String(url || '').match(/\/(?:lots|chips)\/(\d+)/) || String(url || '').match(/(\d+)/);
+        return m ? m[1] : '';
+    }
+
+    function stashDraft(draft) {
+        try { if (_alive() && (draft.title || draft.desc || draft.buyerMsg)) chrome.storage.local.set({ [DRAFT_KEY]: { ...draft, ts: Date.now() } }); } catch (_) {}
+    }
+
+    // Открываем РОДНУЮ форму добавления лота FunPay для выбранного раздела
+    // (синхронно, без блокировки попапов) и сохраняем черновик — поля подставит
+    // applyPendingLotDraft() на той странице. Пользователь сам жмёт «Сохранить».
+    function openCreateForm(draft) {
+        const node = draft.node;
+        if (!node) { if (typeof showNotification === 'function') showNotification('Не удалось определить раздел игры.', true); return null; }
+        const win = window.open(`https://funpay.com/lots/offerEdit?node=${node}`, '_blank');
+        stashDraft(draft);
+        if (typeof showNotification === 'function') {
+            const what = draft.mode === 'empty' ? 'Открываю форму создания лота' : 'Поля подставлены — проверьте и нажмите «Сохранить»';
+            showNotification(what + ' в новой вкладке.', false);
+        }
+        return win;
+    }
+
+    // На странице offerEdit: подставляем сохранённый черновик в русские поля.
+    // Черновик при копировании пишется через 1–2 с после открытия вкладки —
+    // поэтому опрашиваем storage несколько раз.
+    function applyPendingLotDraft() {
+        if (!/\/lots\/offerEdit/.test(location.pathname)) return;
+        if (!_alive()) return;
+        const node = new URLSearchParams(location.search).get('node');
+        let polls = 0;
+        const poll = () => {
+            if (!_alive()) return;
+            chrome.storage.local.get(DRAFT_KEY, (st) => {
+                const d = st && st[DRAFT_KEY];
+                if (!d) { if (++polls < 24) setTimeout(poll, 300); return; }   // ждём ~7 c
+                if (Date.now() - (d.ts || 0) > 120000) { chrome.storage.local.remove(DRAFT_KEY); return; }
+                if (d.node && node && String(d.node) !== String(node)) { if (++polls < 24) setTimeout(poll, 300); return; }
+                applyDraftFields(d);
+            });
+        };
+        poll();
+    }
+
+    function applyDraftFields(d) {
+        let tries = 0;
+        const fill = () => {
+            const sum = document.querySelector('input[name="fields[summary][ru]"]');
+            const desc = document.querySelector('textarea[name="fields[desc][ru]"]');
+            if (!sum && !desc) { if (++tries < 30) return setTimeout(fill, 150); return; }
+            if (sum && d.title) { sum.value = d.title; sum.dispatchEvent(new Event('input', { bubbles: true })); }
+            if (desc && d.desc) { desc.value = d.desc; desc.dispatchEvent(new Event('input', { bubbles: true })); }
+            const pm = document.querySelector('textarea[name="fields[payment_msg][ru]"]');
+            if (pm && d.buyerMsg) { pm.value = d.buyerMsg; pm.dispatchEvent(new Event('input', { bubbles: true })); }
+            if (_alive()) chrome.storage.local.remove(DRAFT_KEY);
+            if ((d.title || d.desc) && typeof showNotification === 'function') {
+                showNotification('Черновик подставлен. Проверьте поля, цену и нажмите «Сохранить».', false);
+            }
+        };
+        fill();
+    }
 
     function isOwnProfile() {
         if (!/\/users\/\d+\//.test(location.pathname)) return false;
@@ -110,7 +183,7 @@
                     <div class="fpt-addgame-view fpt-addgame-view-ai" style="display:none;"></div>
                 </div>
                 <div class="fpt-addgame-foot">
-                    <span class="fpt-addgame-note">Каркас. Реальная публикация лота включится после вашего подтверждения.</span>
+                    <span class="fpt-addgame-note">Откроется форма создания лота в выбранном разделе — проверьте поля и цену, затем «Сохранить».</span>
                     <div class="fpt-addgame-actions">
                         <button type="button" class="fpt-addgame-cancel">Отмена</button>
                         <button type="button" class="fpt-addgame-create" disabled>Создать лот</button>
@@ -211,23 +284,44 @@
             updateCreate();
         });
 
-        createBtn.addEventListener('click', () => {
+        const currentNode = () => nodeIdFromUrl(catSel && catSel.value);
+
+        createBtn.addEventListener('click', async () => {
             const mode = currentMode();
             if (mode === 'ai') {
-                openAiCompose({ overlay, viewMain, viewAi, backBtn, titleH, foot, lots, chosenGame, catSel });
+                openAiCompose({ overlay, viewMain, viewAi, backBtn, titleH, foot, lots, chosenGame, catSel, currentNode });
                 return;
             }
-            // empty / copy — публикация пока ЗАГЕЙЧЕНА (каркас)
-            const map = { empty: 'создаст пустой лот', copy: 'создаст лоты копированием выбранных' };
-            if (typeof showNotification === 'function') {
-                showNotification(`Каркас. Скажите «включить» — кнопка ${map[mode]} в выбранном разделе игры.`, false);
+            const node = currentNode();
+            if (mode === 'empty') {
+                openCreateForm({ node, mode: 'empty' });
+                close();
+                return;
+            }
+            // copy: открываем форму раздела СРАЗУ (без блокировки попапа), затем
+            // читаем полный текст выбранного лота и дописываем черновик — страница
+            // подхватит его опросом storage.
+            if (!node) { if (typeof showNotification === 'function') showNotification('Не удалось определить раздел игры.', true); return; }
+            const checked = overlay.querySelector('.fpt-addgame-lot input:checked');
+            const lot = checked ? lots[+checked.dataset.lot] : null;
+            if (!lot || !lot.id) { if (typeof showNotification === 'function') showNotification('Выберите лот с доступным ID для копирования.', true); return; }
+            window.open(`https://funpay.com/lots/offerEdit?node=${node}`, '_blank');
+            if (typeof showNotification === 'function') showNotification('Открываю форму и читаю лот…', false);
+            close();
+            try {
+                const resp = await sendMsg({ action: 'cloneGetSource', offerId: lot.id });
+                if (!resp || !resp.success) throw new Error(resp && resp.error ? resp.error : 'Не удалось прочитать лот.');
+                const s = resp.source || {};
+                stashDraft({ node, mode: 'copy', title: s.summary_ru || '', desc: s.desc_ru || '' });
+            } catch (err) {
+                if (typeof showNotification === 'function') showNotification('Ошибка копирования: ' + err.message + ' Поля придётся заполнить вручную.', true);
             }
         });
     }
 
     // ── Окно ИИ-генератора: описать задачу или собрать на основе своих лотов ──
     function openAiCompose(ctx) {
-        const { viewMain, viewAi, backBtn, titleH, foot, lots, chosenGame, catSel } = ctx;
+        const { viewMain, viewAi, backBtn, titleH, foot, lots, chosenGame, catSel, currentNode } = ctx;
         const gameName = chosenGame ? chosenGame.name : '';
         const catName = catSel && catSel.selectedOptions[0] ? catSel.selectedOptions[0].textContent.trim() : '';
 
@@ -263,8 +357,9 @@
                         <textarea class="fpt-aigen-rmsg" rows="3"></textarea>
                     </div>
                     <div class="fpt-aigen-resact">
-                        <button type="button" class="fpt-aigen-copy"><span class="material-symbols-rounded">content_copy</span>Скопировать текст</button>
-                        <button type="button" class="fpt-aigen-regen"><span class="material-symbols-rounded">refresh</span>Сгенерировать заново</button>
+                        <button type="button" class="fpt-aigen-make"><span class="material-symbols-rounded">add</span>Создать лот</button>
+                        <button type="button" class="fpt-aigen-copy"><span class="material-symbols-rounded">content_copy</span>Скопировать</button>
+                        <button type="button" class="fpt-aigen-regen"><span class="material-symbols-rounded">refresh</span>Заново</button>
                     </div>
                 </div>
             </div>`;
@@ -297,6 +392,7 @@
         const rMsg = viewAi.querySelector('.fpt-aigen-rmsg');
         const copyBtn = viewAi.querySelector('.fpt-aigen-copy');
         const regenBtn = viewAi.querySelector('.fpt-aigen-regen');
+        const makeBtn = viewAi.querySelector('.fpt-aigen-make');
 
         const run = async () => {
             const idea = promptEl.value.trim();
@@ -313,7 +409,7 @@
             runT.textContent = 'Генерирую…';
             runBtn.classList.add('is-loading');
             try {
-                const resp = await chrome.runtime.sendMessage({
+                const resp = await sendMsg({
                     action: 'generateAILot',
                     data: {
                         promptTitle: idea || (picked[0] ? picked[0].desc : gameName),
@@ -345,6 +441,17 @@
 
         runBtn.addEventListener('click', run);
         regenBtn.addEventListener('click', run);
+        makeBtn.addEventListener('click', () => {
+            const node = typeof currentNode === 'function' ? currentNode() : '';
+            openCreateForm({
+                node, mode: 'ai',
+                title: rTitle.value.trim(),
+                desc: rDesc.value.trim(),
+                buyerMsg: (rMsgWrap.style.display !== 'none' ? rMsg.value.trim() : '')
+            });
+            const ov = viewAi.closest('.fpt-addgame-overlay');
+            if (ov) ov.remove();
+        });
         copyBtn.addEventListener('click', () => {
             const parts = [rTitle.value.trim(), '', rDesc.value.trim()];
             if (rMsgWrap.style.display !== 'none' && rMsg.value.trim()) parts.push('', '— Сообщение покупателю —', rMsg.value.trim());
@@ -362,7 +469,9 @@
     }
 
     function init() {
-        if (window !== window.top || !isOwnProfile()) return;
+        if (window !== window.top) return;
+        applyPendingLotDraft();              // на странице offerEdit — подставить черновик
+        if (!isOwnProfile()) return;
         const tryBuild = () => buildCard();
         tryBuild();
         // профиль может дорисовываться — наблюдаем недолго

@@ -6120,11 +6120,11 @@ a.contact-item:hover {
 .fpt-aigen-result{display:flex;flex-direction:column;gap:9px;padding-top:14px;margin-top:4px;border-top:1px solid var(--fpt-pLine, rgba(255,255,255,.08));}
 .fpt-aigen-reshead{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--fpt-uacc, #5b86d8);}
 .fpt-aigen-resact{display:flex;gap:8px;margin-top:4px;}
-.fpt-aigen-copy,.fpt-aigen-regen{display:flex;align-items:center;gap:6px;height:36px;padding:0 14px;border-radius:9px;cursor:pointer;
+.fpt-aigen-make,.fpt-aigen-copy,.fpt-aigen-regen{display:flex;align-items:center;gap:6px;height:36px;padding:0 14px;border-radius:9px;cursor:pointer;
     font-size:12.5px;font-weight:560;border:1px solid var(--fpt-pLine, rgba(255,255,255,.14));background:var(--fpt-p2, #262a34);color:var(--fpt-pTx);}
-.fpt-aigen-copy .material-symbols-rounded,.fpt-aigen-regen .material-symbols-rounded{font-size:17px;}
-.fpt-aigen-copy{background:var(--fpt-uacc, #5b86d8);color:#fff;border-color:transparent;}
-.fpt-aigen-copy:hover,.fpt-aigen-regen:hover{filter:brightness(1.06);}
+.fpt-aigen-make .material-symbols-rounded,.fpt-aigen-copy .material-symbols-rounded,.fpt-aigen-regen .material-symbols-rounded{font-size:17px;}
+.fpt-aigen-make{background:var(--fpt-uacc, #5b86d8);color:#fff;border-color:transparent;}
+.fpt-aigen-make:hover,.fpt-aigen-copy:hover,.fpt-aigen-regen:hover{filter:brightness(1.06);}
 
 /* Поддержка: крипто-кошельки */
 .fp-tools-popup .fpt-wallets { display: flex; flex-direction: column; gap: 12px; margin: 6px 0 4px; }
