@@ -201,7 +201,7 @@ function getCustomThemeCss(settings) {
                 --fpt-pA: ${pal.pA}; --fpt-p1: ${pal.p1}; --fpt-p2: ${pal.p2}; --fpt-p3: ${pal.p3};
                 --fpt-pTx: ${pal.pTx}; --fpt-pTxDim: ${pal.pTxDim}; --fpt-pTxFaint: ${pal.pTxFaint};
                 --fpt-pLine: ${pal.pLine}; --fpt-pInput: ${pal.pInput}; --fpt-pHeader: ${pal.pHeader};
-                --fpt-pVeil: ${pal.pVeil}; --fpt-pBadge: ${pal.pBadge}; --fpt-pShadow: ${pal.pShadow};
+                --fpt-pVeil: ${(settings.bgImage || settings.bgVideo) ? (preset.scheme === 'light' ? 'rgba(255,255,255,.14)' : 'rgba(10,12,16,.32)') : pal.pVeil}; --fpt-pBadge: ${pal.pBadge}; --fpt-pShadow: ${pal.pShadow};
                 --fpt-pLogoFilter: ${pal.pLogoFilter};
                 --fpt-wallBase: ${preset.base[1]};
                 /* legacy-набор для сайтовых виджетов: задан мгновенно, чтобы
