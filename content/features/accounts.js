@@ -7,6 +7,40 @@ function _fptCleanBal(b) {
 
 function _fptAlive() { try { return !!(chrome && chrome.runtime && chrome.runtime.id); } catch (_) { return false; } }
 
+// userId + имя активного аккаунта из app-data (для пер-аккаунтных ключей продаж).
+function _fptActiveUser() {
+    try { const d = JSON.parse(document.body.dataset.appData); const u = Array.isArray(d) ? d[0] : d; return { id: u && u.userId ? String(u.userId) : '', name: (u && u.userName) || '' }; } catch (_) { return { id: '', name: '' }; }
+}
+
+// Продажи хранятся ПО АККАУНТУ: fpToolsSalesData__<userId>. Графики/главная читают
+// общий fpToolsSalesData — поэтому на КАЖДОЙ загрузке приводим общий ключ к данным
+// ТЕКУЩЕГО аккаунта, чтобы не показывать чужую статистику.
+async function fptSyncActiveSales() {
+    if (!_fptAlive()) return;
+    const { id: uid } = _fptActiveUser();
+    if (!uid) return;
+    try {
+        const K = `fpToolsSalesData__${uid}`, KF = `fpToolsFirstOrderId__${uid}`, KL = `fpToolsLastOrderId__${uid}`;
+        const g = await chrome.storage.local.get([K, KF, KL, 'fpToolsSalesData']);
+        const mine = g[K];
+        const hasData = mine && typeof mine === 'object' && Object.keys(mine).length > 0;
+        if (hasData) {
+            // у аккаунта есть свои продажи — показываем ИХ (общий ключ читают графики/главная)
+            const same = JSON.stringify(mine) === JSON.stringify(g.fpToolsSalesData);
+            if (!same) await chrome.storage.local.set({ fpToolsSalesData: mine, fpToolsFirstOrderId: g[KF], fpToolsLastOrderId: g[KL] });
+        } else {
+            // нет своих данных: общий ключ чистим (чтобы не показать чужую статистику) и
+            // просим фон собрать ИМЕННО заказы этого аккаунта (funpay отдаёт только их —
+            // данные будут чистые, без смешивания).
+            await chrome.storage.local.set({ fpToolsSalesData: {} });
+            try { await chrome.storage.local.remove(['fpToolsFirstOrderId', 'fpToolsLastOrderId']); } catch (_) {}
+            try { chrome.runtime.sendMessage({ action: 'updateSales' }); } catch (_) {}
+        }
+    } catch (_) {}
+}
+// запускаем как можно раньше
+try { if (window === window.top) fptSyncActiveSales(); } catch (_) {}
+
 async function saveAccountsList() {
     if (!_fptAlive()) return;            // расширение перезагружено — не дёргаем chrome.*
     try { await chrome.storage.local.set({ fpToolsAccounts: fpToolsAccounts }); } catch (_) {}
@@ -440,8 +474,10 @@ const FPT_SETTINGS_KEYS = [
 // чёрный список, метки и заметки о покупателях, копилки, закреплённое, авто-выдача
 // по лотам, отключённые лоты, ник, выбранные категории авто-поднятия). Копировать
 // их между аккаунтами НЕ нужно — но при смене аккаунта они свапаются (у каждого свои).
+// ПРИМЕЧАНИЕ: продажи (fpToolsSalesData) НЕ свапаются, а хранятся по ключу с userId
+// (fpToolsSalesData__<id>) — см. fptSyncActiveSales. Свап тут только мелкие данные.
 const FPT_DATA_KEYS = [
-    'fpToolsSalesData', 'fpToolsSalesChartPeriod', 'fpToolsAutoDeliveryLots',
+    'fpToolsSalesChartPeriod', 'fpToolsAutoDeliveryLots',
     'fpToolsBlacklist', 'fpToolsCustomLabels', 'fpToolsUserStatuses', 'fpToolsUserNotes',
     'fpToolsDeactivatedLots', 'fpToolsPiggyBanks', 'fpToolsPinnedChats', 'fpToolsPinnedLots',
     'fpToolsMyEpicNick', 'fpToolsSelectedBumpCategories'

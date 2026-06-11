@@ -99,13 +99,25 @@
                     }, 800);
                 });
 
-                // Clear the draft for the chat that is active at submit time.
+                // Очистка черновика при ОТПРАВКЕ. FunPay шлёт сообщение через JS
+                // (кнопка + runner) и чистит поле программно — событие 'submit' часто
+                // не срабатывает, а программная очистка поля НЕ генерит 'input'. Поэтому
+                // ловим саму отправку: клик по кнопке отправки и Enter (без Shift).
                 const form = input.closest('form');
-                form?.addEventListener('submit', () => {
+                const clearDraftNow = () => {
                     const chatId = getChatIdFromUrl();
                     if (!chatId) return;
-                    delete _drafts[chatId];
-                    chrome.storage.local.set({ [DRAFT_KEY]: _drafts });
+                    clearTimeout(_draftTimer);          // отменяем отложенное пересохранение
+                    if (_drafts[chatId] !== undefined) {
+                        delete _drafts[chatId];
+                        try { chrome.storage.local.set({ [DRAFT_KEY]: _drafts }); } catch (_) {}
+                    }
+                };
+                form?.addEventListener('submit', clearDraftNow);
+                const sendBtn = form?.querySelector('button[type="submit"], button.btn-round, .chat-form-btn button');
+                sendBtn?.addEventListener('click', () => setTimeout(clearDraftNow, 30));
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) setTimeout(clearDraftNow, 30);
                 });
             }
         });

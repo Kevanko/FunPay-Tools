@@ -25,11 +25,30 @@ async function runSalesUpdateCycle() {
         const auth = await getAuthDetailsForBackground();
         if (!auth.golden_key) throw new Error("Не удалось получить golden_key для сбора статистики.");
 
-        let {
-            fpToolsSalesData: savedOrders = {},
-            fpToolsFirstOrderId: firstOrderId,
-            fpToolsLastOrderId: lastOrderId
-        } = await chrome.storage.local.get(['fpToolsSalesData', 'fpToolsFirstOrderId', 'fpToolsLastOrderId']);
+        // Продажи храним ОТДЕЛЬНО ПО АККАУНТУ (ключ с userId) — иначе заказы разных
+        // аккаунтов сваливаются в один общий объект и графики смешиваются. Глобальный
+        // fpToolsSalesData — «зеркало» активного аккаунта для отрисовки.
+        //
+        // ВАЖНО: заказы /orders/trade грузятся по АКТИВНОЙ сессии (ambient-cookie), а
+        // userId из getAuthDetailsForBackground берётся из вкладок и может ОТСТАВАТЬ
+        // (старая вкладка другого аккаунта) → заказы лягут под чужой ключ = смешивание.
+        // Поэтому userId берём из ТОЙ ЖЕ активной сессии (прямой запрос с credentials).
+        let uid = '';
+        try {
+            const me = await fetch('https://funpay.com/', { credentials: 'include', cache: 'no-store' });
+            const mh = await me.text();
+            const mm = mh.match(/data-app-data="([^"]+)"/);
+            if (mm) { const d = JSON.parse(mm[1].replace(/&quot;/g, '"')); const u = Array.isArray(d) ? d[0] : d; if (u && u.userId) uid = String(u.userId); }
+        } catch (_) {}
+        if (!uid && auth.userId) uid = String(auth.userId);   // запасной вариант
+        const K_DATA = uid ? `fpToolsSalesData__${uid}` : 'fpToolsSalesData';
+        const K_FIRST = uid ? `fpToolsFirstOrderId__${uid}` : 'fpToolsFirstOrderId';
+        const K_LAST = uid ? `fpToolsLastOrderId__${uid}` : 'fpToolsLastOrderId';
+
+        let store = await chrome.storage.local.get([K_DATA, K_FIRST, K_LAST]);
+        let savedOrders = store[K_DATA] || {};
+        let firstOrderId = store[K_FIRST];
+        let lastOrderId = store[K_LAST];
 
         const fetchAndParseSales = async (continueToken = null) => {
             const url = 'https://funpay.com/orders/trade';
@@ -57,9 +76,10 @@ async function runSalesUpdateCycle() {
 
         const saveSalesData = async (orders, firstId, lastId) => {
             await chrome.storage.local.set({
-                fpToolsSalesData: orders,
-                fpToolsFirstOrderId: firstId,
-                fpToolsLastOrderId: lastId,
+                // по аккаунту
+                [K_DATA]: orders, [K_FIRST]: firstId, [K_LAST]: lastId,
+                // зеркало для отрисовки активного аккаунта (его читают графики/главная)
+                fpToolsSalesData: orders, fpToolsFirstOrderId: firstId, fpToolsLastOrderId: lastId,
                 fpToolsSalesLastUpdate: Date.now()
             });
         };
@@ -1664,9 +1684,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     }
     if (request.action === 'resetSalesStorage') {
-        chrome.storage.local.remove([
-            'fpToolsSalesData', 'fpToolsFirstOrderId', 'fpToolsLastOrderId', 'fpToolsSalesLastUpdate'
-        ]).then(() => sendResponse({success: true}));
+        (async () => {
+            try {
+                // чистим И общий ключ, И пер-аккаунтный ключ активного аккаунта
+                const auth = await getAuthDetailsForBackground();
+                const uid = auth && auth.userId ? String(auth.userId) : '';
+                const keys = ['fpToolsSalesData', 'fpToolsFirstOrderId', 'fpToolsLastOrderId', 'fpToolsSalesLastUpdate'];
+                if (uid) keys.push(`fpToolsSalesData__${uid}`, `fpToolsFirstOrderId__${uid}`, `fpToolsLastOrderId__${uid}`);
+                await chrome.storage.local.remove(keys);
+                sendResponse({ success: true });
+            } catch (e) { sendResponse({ success: false, error: e.message }); }
+        })();
         return true;
     }
 
