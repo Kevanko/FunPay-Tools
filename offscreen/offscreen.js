@@ -976,7 +976,7 @@ function parseProfileInfo(html) {
 // Снимок аккаунта для вкладки мультиаккаунтов: имя, аватар, баланс, непрочитанные.
 function parseAccountSnapshot(html) {
     const doc = new DOMParser().parseFromString(html, 'text/html');
-    const out = { username: '', avatar: '', balance: '', unread: 0, loggedIn: false };
+    const out = { username: '', avatar: '', balance: '', unread: 0, orders: 0, loggedIn: false };
 
     // имя + userId из app-data
     let userId = null;
@@ -1005,9 +1005,13 @@ function parseAccountSnapshot(html) {
         }
     }
 
-    // баланс
-    const balEl = doc.querySelector('.badge-balance, .menu-item-balance, .user-link-balance');
-    if (balEl) out.balance = balEl.textContent.replace(/\s+/g, ' ').trim();
+    // баланс: оставляем только сумму с валютой (без слова-метки «Финансы»)
+    const balEl = doc.querySelector('.badge-balance, .user-link-balance, .menu-item-balance');
+    if (balEl) {
+        const raw = balEl.textContent.replace(/\s+/g, ' ').trim();
+        const m = raw.match(/[\d][\d\s.,]*\s*[₽$€]/);
+        out.balance = m ? m[0].replace(/\s+/g, ' ').trim() : '';
+    }
 
     // непрочитанные сообщения: бейдж на иконке чата
     const unreadEl = doc.querySelector('.menu-icon-chat .badge, .badge-chat, .menu-item-chat .badge, .chat-counter');
@@ -1022,6 +1026,22 @@ function parseAccountSnapshot(html) {
             const u = Array.isArray(d) ? d[0] : d;
             const c = (u.counters && (u.counters.chat || u.counters.messages)) || (u.badges && u.badges.chat);
             if (c) { const n = parseInt(c, 10); if (!isNaN(n)) out.unread = n; }
+        } catch (_) {}
+    }
+
+    // новые заказы (продажи): бейдж рядом с пунктом «Продажи» в навбаре
+    const salesLink = [...doc.querySelectorAll('.navbar-nav a, .navbar-right a')].find(a => /Продажи/i.test(a.textContent || ''));
+    const salesBadge = salesLink && salesLink.querySelector('.badge');
+    if (salesBadge) {
+        const n = parseInt((salesBadge.textContent || '').replace(/\D/g, ''), 10);
+        if (!isNaN(n)) out.orders = n;
+    }
+    if (!out.orders && appDataRaw) {
+        try {
+            const d = JSON.parse(appDataRaw.replace(/&quot;/g, '"'));
+            const u = Array.isArray(d) ? d[0] : d;
+            const c = (u.counters && (u.counters.sells || u.counters.sales || u.counters.orders));
+            if (c) { const n = parseInt(c, 10); if (!isNaN(n)) out.orders = n; }
         } catch (_) {}
     }
 

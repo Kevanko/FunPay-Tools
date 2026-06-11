@@ -1,3 +1,10 @@
+// Из «Финансы 4328 ₽» → «4328 ₽» (старые кэши хранят метку «Финансы»).
+function _fptCleanBal(b) {
+    if (!b) return '—';
+    const m = String(b).match(/[\d][\d\s.,]*\s*[₽$€]/);
+    return m ? m[0].replace(/\s+/g, ' ').trim() : '—';
+}
+
 async function saveAccountsList() {
     await chrome.storage.local.set({ fpToolsAccounts: fpToolsAccounts });
     renderAccountsList();
@@ -31,10 +38,11 @@ async function renderAccountsList() {
 
     fpToolsAccounts.forEach((account, index) => {
         const isActive = account.name === currentUsername;
+        const isOnline = isActive || account.online !== false;   // новые/без флага — в сети
         const item = createElement('div', { class: `fpt-acc-item ${isActive ? 'active' : ''}` });
 
-        // аватар
-        const avatar = createElement('div', { class: 'fpt-acc-avatar' });
+        // аватар (зелёный кружок = в сети)
+        const avatar = createElement('div', { class: `fpt-acc-avatar ${isOnline ? 'is-online' : ''}` });
         if (account.avatar) avatar.style.backgroundImage = `url('${account.avatar}')`;
         else avatar.innerHTML = '<span class="material-symbols-rounded">person</span>';
 
@@ -56,11 +64,29 @@ async function renderAccountsList() {
             nameSpan.appendChild(dot);
         }
         const balSpan = createElement('div', { class: 'fpt-acc-balance' });
-        balSpan.textContent = account.balance || '—';
-        info.append(nameSpan, balSpan);
+        balSpan.textContent = _fptCleanBal(account.balance);
+        // полезная мелочь: новые сообщения, заказы, статус сети
+        const metaSpan = createElement('div', { class: 'fpt-acc-meta' });
+        metaSpan.innerHTML =
+            `<span class="fpt-acc-meta-i" title="Новые сообщения"><span class="material-symbols-rounded">mail</span>${account.unread || 0}</span>` +
+            `<span class="fpt-acc-meta-i" title="Новые заказы"><span class="material-symbols-rounded">shopping_bag</span>${account.orders || 0}</span>` +
+            `<span class="fpt-acc-meta-i fpt-acc-status ${isOnline ? 'on' : ''}">${isOnline ? 'в сети' : 'не в сети'}</span>`;
+        info.append(nameSpan, balSpan, metaSpan);
 
         // действия
         const actionsDiv = createElement('div', { class: 'fpt-acc-actions' });
+
+        // тумблер «в сети» (текущий аккаунт всегда онлайн)
+        const onlineBtn = createElement('button', {
+            class: `fpt-acc-online-btn ${isOnline ? 'on' : ''}`,
+            title: isActive ? 'Текущий аккаунт всегда в сети' : (isOnline ? 'В сети — выключить' : 'Не в сети — включить')
+        });
+        onlineBtn.innerHTML = `<span class="material-symbols-rounded">${isOnline ? 'wifi' : 'wifi_off'}</span>`;
+        if (isActive) onlineBtn.disabled = true;
+        onlineBtn.addEventListener('click', () => {
+            fpToolsAccounts[index].online = !(account.online !== false);
+            saveAccountsList();
+        });
 
         // кнопка "Войти" (текстовая) — как просили вернуть
         const switchBtn = createElement('button', { class: `fpt-acc-login-btn ${isActive ? 'active' : ''}` });
@@ -101,7 +127,7 @@ async function renderAccountsList() {
             }
         });
 
-        actionsDiv.append(switchBtn, renameBtn, deleteBtn);
+        actionsDiv.append(onlineBtn, switchBtn, renameBtn, deleteBtn);
         item.append(avatar, info, actionsDiv);
         listContainer.appendChild(item);
     });
@@ -129,6 +155,7 @@ async function maybeAutoRefreshAccounts() {
                 account.avatar = snap.avatar || account.avatar || '';
                 account.balance = snap.balance || account.balance || '';
                 account.unread = typeof snap.unread === 'number' ? snap.unread : (account.unread || 0);
+                account.orders = typeof snap.orders === 'number' ? snap.orders : (account.orders || 0);
                 account._snapTs = Date.now();
                 changed = true;
             }
@@ -150,6 +177,7 @@ async function fptRefreshAllAccounts() {
             account.avatar = snap.avatar || account.avatar || '';
             account.balance = snap.balance || account.balance || '';
             account.unread = typeof snap.unread === 'number' ? snap.unread : (account.unread || 0);
+                account.orders = typeof snap.orders === 'number' ? snap.orders : (account.orders || 0);
             account._snapTs = Date.now();
         }
     }
@@ -180,7 +208,7 @@ function setupAccountManagementHandlers() {
         try {
             const response = await chrome.runtime.sendMessage({ action: 'getGoldenKey' });
             if (response && response.success) {
-                fpToolsAccounts.push({ name: currentUsername, key: response.key });
+                fpToolsAccounts.push({ name: currentUsername, key: response.key, online: true });
                 await saveAccountsList();
                 showNotification(`Аккаунт "${currentUsername}" успешно добавлен!`);
             } else {
@@ -234,7 +262,45 @@ function fptInjectAccountMenuItems() {
             try { chrome.runtime.sendMessage({ action: 'deleteCookiesAndReload' }); } catch (_) {}
         });
     }
+    fptRenderAccountSwitcher(menu);
     return true;
+}
+
+function _fptEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+// Компактный переключатель аккаунтов прямо в дропдауне профиля FunPay:
+// клик по аватарке → внизу список аккаунтов, переключение в один клик.
+async function fptRenderAccountSwitcher(menu) {
+    if (!menu) return;
+    let accts = [];
+    try { ({ fpToolsAccounts: accts = [] } = await chrome.storage.local.get('fpToolsAccounts')); } catch (_) {}
+    menu.querySelector('.fpt-accsw-block')?.remove();
+    if (!accts.length) return;
+    const curName = document.querySelector('.user-link-name')?.textContent.trim();
+
+    const li = document.createElement('li');
+    li.className = 'fpt-accsw-block';
+    li.innerHTML = '<div class="fpt-accsw-head">Аккаунты</div>' + accts.map((a, i) => {
+        const active = a.name === curName;
+        const online = active || a.online !== false;
+        const av = a.avatar ? ` style="background-image:url('${_fptEsc(a.avatar)}')"` : '';
+        return `<button type="button" class="fpt-accsw-row${active ? ' active' : ''}" data-acc-idx="${i}">
+            <span class="fpt-accsw-av${online ? ' on' : ''}"${av}>${a.avatar ? '' : '<span class="material-symbols-rounded">person</span>'}</span>
+            <span class="fpt-accsw-info"><span class="fpt-accsw-name">${_fptEsc(a.name)}</span><span class="fpt-accsw-bal">${_fptEsc(_fptCleanBal(a.balance))}</span></span>
+            ${active ? '<span class="fpt-accsw-cur">текущий</span>' : '<span class="material-symbols-rounded fpt-accsw-go">login</span>'}
+        </button>`;
+    }).join('');
+    menu.insertBefore(li, menu.firstChild);
+
+    li.querySelectorAll('.fpt-accsw-row').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.preventDefault(); e.stopPropagation();
+            const acc = accts[parseInt(btn.dataset.accIdx, 10)];
+            if (!acc || acc.name === curName) return;
+            li.querySelectorAll('.fpt-accsw-row').forEach(b => b.disabled = true);
+            try { await chrome.runtime.sendMessage({ action: 'setGoldenKey', key: acc.key }); } catch (_) {}
+        });
+    });
 }
 
 (function fptBootAccountMenu() {
@@ -244,4 +310,13 @@ function fptInjectAccountMenuItems() {
     mo.observe(document.documentElement, { childList: true, subtree: true });
     document.addEventListener('DOMContentLoaded', () => fptInjectAccountMenuItems(), { once: true });
     setTimeout(() => mo.disconnect(), 15000);
+    // обновлять список в дропдауне при изменении аккаунтов
+    try {
+        chrome.storage.onChanged.addListener((ch, area) => {
+            if (area === 'local' && ch.fpToolsAccounts) {
+                const m = document.querySelector('.navbar-right.logged li.dropdown.hidden-sm.hidden-xs .dropdown-menu');
+                if (m) fptRenderAccountSwitcher(m);
+            }
+        });
+    } catch (_) {}
 })();

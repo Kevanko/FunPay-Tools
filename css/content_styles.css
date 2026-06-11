@@ -8506,8 +8506,51 @@ textarea.fp-cw-input { line-height:1.4; }
     font-size:14px;font-weight:600;color:#e8eaf0;
     display:flex;align-items:center;gap:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
-.fpt-acc-active-dot{width:7px;height:7px;border-radius:50%;background:#4caf50;flex-shrink:0;}
+/* Переключатель аккаунтов в дропдауне профиля (шапка сайта) */
+.navbar-right.logged .dropdown-menu .fpt-accsw-block{padding:8px 8px 6px;border-bottom:1px solid var(--fpt-pLine, rgba(255,255,255,.08));list-style:none;}
+.fpt-accsw-head{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--fpt-pTxFaint, #8a90a6);padding:2px 8px 6px;}
+.fpt-accsw-row{
+    display:flex;align-items:center;gap:10px;width:100%;text-align:left;cursor:pointer;
+    padding:7px 8px;border:0;background:transparent;border-radius:9px;color:var(--fpt-pTx, #e8eaf0);
+    transition:background .14s ease;
+}
+.fpt-accsw-row:hover:not(:disabled){background:var(--fpt-uacc-soft, color-mix(in srgb, var(--fpt-uacc, #5b86d8) 14%, transparent));}
+.fpt-accsw-row.active{background:var(--fpt-uacc-soft, color-mix(in srgb, var(--fpt-uacc, #5b86d8) 12%, transparent));cursor:default;}
+.fpt-accsw-row:disabled{opacity:.6;}
+.fpt-accsw-av{
+    position:relative;width:30px;height:30px;border-radius:50%;flex-shrink:0;
+    background-size:cover;background-position:center;background-color:rgba(128,128,140,.2);
+    display:flex;align-items:center;justify-content:center;
+}
+.fpt-accsw-av .material-symbols-rounded{font-size:17px;color:var(--fpt-pTxDim, #9099b8);}
+.fpt-accsw-av.on{box-shadow:0 0 0 2px var(--fpt-pHeader, #16181f), 0 0 0 3.5px #3fbf6f;}
+.fpt-accsw-info{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25;}
+.fpt-accsw-name{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fpt-accsw-bal{font-size:11px;color:var(--fpt-pTxDim, #9099b8);}
+.fpt-accsw-cur{font-size:10px;font-weight:600;color:var(--fpt-uacc, #5b86d8);flex-shrink:0;}
+.fpt-accsw-go{font-size:17px;color:var(--fpt-pTxFaint, #8a90a6);flex-shrink:0;}
+.fpt-accsw-row:hover .fpt-accsw-go{color:var(--fpt-uacc, #5b86d8);}
+
+.fpt-acc-active-dot{width:7px;height:7px;border-radius:50%;background:#3fbf6f;flex-shrink:0;}
 .fpt-acc-balance{font-size:12px;color:var(--fpt-text-dim, #9099b8);margin-top:2px;}
+/* зелёный кружок вокруг аватарки = аккаунт в сети */
+.fpt-acc-avatar.is-online{box-shadow:inset 0 0 0 1px #2a2d3f, 0 0 0 2px #16181f, 0 0 0 4px #3fbf6f;}
+/* полезная мелочь: сообщения · заказы · статус */
+.fpt-acc-meta{display:flex;align-items:center;gap:10px;margin-top:4px;font-size:11.5px;color:var(--fpt-text-faint, #6a7090);}
+.fpt-acc-meta-i{display:inline-flex;align-items:center;gap:3px;}
+.fpt-acc-meta-i .material-symbols-rounded{font-size:14px;}
+.fpt-acc-status{color:var(--fpt-text-faint,#6a7090);}
+.fpt-acc-status.on{color:#3fbf6f;}
+.fpt-acc-status::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block;margin-right:5px;vertical-align:middle;}
+.fpt-acc-online-btn{
+    width:34px;height:34px;display:flex;align-items:center;justify-content:center;
+    border:1px solid #2a2d3f;background:#20222e;color:var(--fpt-text-faint,#6a7090);
+    border-radius:9px;cursor:pointer;transition:all .15s;padding:0;
+}
+.fpt-acc-online-btn .material-symbols-rounded{font-size:18px;}
+.fpt-acc-online-btn.on{color:#3fbf6f;border-color:color-mix(in srgb,#3fbf6f 45%,transparent);background:color-mix(in srgb,#3fbf6f 12%,#20222e);}
+.fpt-acc-online-btn:hover:not(:disabled){border-color:#3fbf6f;color:#3fbf6f;}
+.fpt-acc-online-btn:disabled{opacity:.85;cursor:default;}
 .fpt-acc-actions{display:flex;align-items:center;gap:6px;flex-shrink:0;}
 .fpt-acc-login-btn{
     display:inline-flex;align-items:center;justify-content:center;

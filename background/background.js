@@ -850,6 +850,36 @@ function fptSnapshotForKey(key) {
     return next;
 }
 
+// ── «Всегда в сети» для сохранённых аккаунтов ───────────────────────────────
+// Периодически дёргаем funpay.com с golden_key каждого онлайн-аккаунта через
+// заголовок Cookie (НЕ трогая активную куку браузера) — это регистрирует
+// активность, и аккаунт виден онлайн всем на FunPay. Текущий аккаунт онлайн и
+// так от вашей работы; остальные — только если включён их тумблер. Новые
+// аккаунты по умолчанию онлайн (account.online !== false).
+const ONLINE_ALARM = 'fptOnlineHeartbeat';
+let _fptOnlineRunning = false;
+async function runOnlineHeartbeat() {
+    if (_fptOnlineRunning) return;
+    _fptOnlineRunning = true;
+    try {
+        const { fpToolsAccounts = [] } = await chrome.storage.local.get('fpToolsAccounts');
+        const online = fpToolsAccounts.filter(a => a && a.key && a.online !== false);
+        for (const a of online) {
+            try {
+                await fetch('https://funpay.com/', {
+                    method: 'GET',
+                    headers: { 'Cookie': `golden_key=${a.key}` },
+                    credentials: 'omit',
+                    cache: 'no-store'
+                });
+            } catch (_) {}
+            await new Promise(r => setTimeout(r, 700)); // не частим запросами
+        }
+    } catch (_) {} finally {
+        _fptOnlineRunning = false;
+    }
+}
+
 
 // --- Главный обработчик сообщений ---
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -1833,6 +1863,9 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
             chrome.tabs.sendMessage(tab.id, { action: 'fpToolsCheckRestoreLots' }).catch(() => {});
         });
     }
+    if (alarm.name === ONLINE_ALARM) {
+        await runOnlineHeartbeat();
+    }
 });
 
 function setupInitialAlarms() {
@@ -1864,6 +1897,10 @@ function setupInitialAlarms() {
             });
             runDiscordCheckCycle();
         }
+        // «Всегда в сети»: лёгкий пинг онлайн-аккаунтов каждые 3 минуты.
+        chrome.alarms.create(ONLINE_ALARM, { delayInMinutes: 0.5, periodInMinutes: 3 });
+        runOnlineHeartbeat();
+
         // Telegram: запускаем опрос, если включён и есть токен.
         telegramSyncAlarm();
         // <-- НОВЫЙ БЛОК ДЛЯ АВТООТВЕТЧИКА -->
