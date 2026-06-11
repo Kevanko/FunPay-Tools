@@ -291,63 +291,172 @@
     }
 
 
-    // --- 5. ФУНКЦИЯ ДЛЯ UI ПОПАПА (ПРЕДПРОСМОТР) ---
-    window.renderEpicPreviews = function() {
-        const container = document.getElementById('fpt-epic-previews-container');
-        if (!container) return;
+    // --- 5. СВОЙ НИК: ЛОКАЛЬНОЕ ОФОРМЛЕНИЕ (бесплатно, без TG/оплаты) ---
+    const MY_NICK_KEY = 'fpToolsMyEpicNick'; // { nick, cfg }
+    const PREVIEW_KEY = '__fpt_epic_preview__';
 
-        let myNick = "ТвойНик";
-        const myNickEl = document.querySelector('.user-link-name');
-        if (myNickEl && myNickEl.textContent) myNick = myNickEl.textContent.trim();
+    function getMyNick() {
+        const el = document.querySelector('.user-link-name');
+        return el && el.textContent ? el.textContent.trim() : '';
+    }
 
-        const presets = [
-            "FPT-STYLE-eyJjMSI6IiNmZjg4MDAiLCJjMiI6IiNmZjAwMDAiLCJjMyI6IiNmZmZmMDAiLCJhbmciOiI5OSIsInNjbCI6IjU2Iiwic3BkIjoiNyIsImFuIjpbImdsb3ciLCJ3YXZlIl0sIm92IjoibGlnaHRuaW5nIiwicGMiOiIjZmZmNzAwIn0=",
-            "FPT-STYLE-eyJjMSI6IiNmNzA5ZmIiLCJjMiI6IiNmZjAwNTUiLCJjMyI6IiNmZmZmZmYiLCJhbmciOiIxMzEiLCJzY2wiOiIxNjkiLCJzcGQiOiI3IiwiYW4iOlsiZ2xvdyIsIndhdmUiXSwib3YiOiJzcGFya3MiLCJwYyI6IiNmZjAwNDAifQ==",
-            "FPT-STYLE-eyJjMSI6IiNmZjE5MDAiLCJjMiI6IiNmZjU5MDAiLCJjMyI6bnVsbCwiYW5nIjoiMzI4Iiwic2NsIjoiODgiLCJzcGQiOiIxIiwiYW4iOlsiZ2xvdyIsIndhdmUiLCJwdWxzZSIsImdsaXRjaCJdLCJvdiI6ImZpcmUiLCJwYyI6IiNmZjI2MDAifQ=="
-        ];
+    // Регистрирует ник со стилем в движке (donatersMap + parsedConfigs через CSS).
+    function registerNickStyle(key, cfg) {
+        donatersMap[key] = 'FPT-STYLE-' + btoa(JSON.stringify(cfg));
+        injectGlobalCSS(); // пересобирает parsedConfigs и CSS
+    }
 
-        const previewMap = {};
-        presets.forEach((preset, i) => {
-            previewMap[`${myNick} ${i+1}`] = preset;
+    // Загружает сохранённое оформление своего ника и применяет на сайте.
+    async function loadMyNick() {
+        try {
+            const { [MY_NICK_KEY]: saved } = await chrome.storage.local.get(MY_NICK_KEY);
+            if (saved && saved.nick && saved.cfg) {
+                registerNickStyle(saved.nick, saved.cfg);
+                scanDOM(document.body);
+                return true;
+            }
+        } catch (_) {}
+        return false;
+    }
+
+    // Готовые пресеты (cfg-объекты) для быстрого старта.
+    const EPIC_PRESETS = [
+        { name: 'Сталь',   cfg: { c1:'#5b86d8', c2:'#8fb0e8', c3:null, ang:'90', scl:'200', spd:'6', an:['wave','glow'], ov:'none', pc:'' } },
+        { name: 'Закат',   cfg: { c1:'#ff8800', c2:'#ff0066', c3:'#ffd000', ang:'99', scl:'200', spd:'7', an:['wave','glow'], ov:'sparks', pc:'#ffcc33' } },
+        { name: 'Неон',    cfg: { c1:'#f709fb', c2:'#00e5ff', c3:'#ffffff', ang:'131', scl:'200', spd:'5', an:['wave','glow'], ov:'stars', pc:'#ff66ff' } },
+        { name: 'Пламя',   cfg: { c1:'#ff1900', c2:'#ff5900', c3:null, ang:'328', scl:'120', spd:'2', an:['glow','pulse'], ov:'fire', pc:'#ff2600' } },
+        { name: 'Лёд',     cfg: { c1:'#7fe9ff', c2:'#3f7bd0', c3:'#ffffff', ang:'120', scl:'200', spd:'8', an:['wave'], ov:'snow', pc:'' } },
+        { name: 'Матрица', cfg: { c1:'#00ff66', c2:'#0a3d1f', c3:null, ang:'90', scl:'150', spd:'4', an:['glow'], ov:'matrix', pc:'#00ff66' } },
+    ];
+
+    function cfgFromUI() {
+        const v = id => document.getElementById(id);
+        const an = [...document.querySelectorAll('#fpt-epic-anims input:checked')].map(i => i.value);
+        const cfg = {
+            c1: v('fpt-epic-c1').value,
+            c2: v('fpt-epic-c2').value,
+            c3: v('fpt-epic-c3on').checked ? v('fpt-epic-c3').value : null,
+            ang: String(v('fpt-epic-ang').value),
+            scl: String(v('fpt-epic-scl').value),
+            spd: String(v('fpt-epic-spd').value),
+            an,
+            ov: v('fpt-epic-ov').value,
+            pc: v('fpt-epic-pcon').checked ? v('fpt-epic-pc').value : ''
+        };
+        return cfg;
+    }
+
+    function cfgToUI(cfg) {
+        const v = id => document.getElementById(id);
+        if (!cfg) return;
+        v('fpt-epic-c1').value = cfg.c1 || '#5b86d8';
+        v('fpt-epic-c2').value = cfg.c2 || '#8fb0e8';
+        v('fpt-epic-c3on').checked = !!cfg.c3;
+        if (cfg.c3) v('fpt-epic-c3').value = cfg.c3;
+        v('fpt-epic-ang').value = parseInt(cfg.ang) || 90;
+        v('fpt-epic-scl').value = parseInt(cfg.scl) || 100;
+        v('fpt-epic-spd').value = parseInt(cfg.spd) || 5;
+        const anims = Array.isArray(cfg.an) ? cfg.an : [];
+        document.querySelectorAll('#fpt-epic-anims input').forEach(i => { i.checked = anims.includes(i.value); });
+        v('fpt-epic-ov').value = cfg.ov || 'none';
+        v('fpt-epic-pcon').checked = !!cfg.pc;
+        if (cfg.pc) v('fpt-epic-pc').value = cfg.pc;
+        v('fpt-epic-pc-wrap').style.display = cfg.pc ? '' : 'none';
+        syncRangeLabels();
+    }
+
+    function syncRangeLabels() {
+        const set = (id, suf) => { const el = document.getElementById(id); const out = document.getElementById(id + '-v'); if (el && out) out.textContent = el.value + suf; };
+        set('fpt-epic-ang', '°'); set('fpt-epic-scl', '%'); set('fpt-epic-spd', 'с');
+    }
+
+    // Отрисовка живого предпросмотра в #fpt-epic-live (отдельный ключ — сайт не трогаем до «Применить»).
+    function renderLivePreview() {
+        const live = document.getElementById('fpt-epic-live');
+        if (!live) return;
+        const nick = (document.getElementById('fpt-epic-nick').value || getMyNick() || 'ВашНик').trim();
+        const cfg = cfgFromUI();
+        registerNickStyle(PREVIEW_KEY, cfg);
+        live.innerHTML = '';
+        const tn = document.createTextNode(nick);
+        live.appendChild(tn);
+        applyStylesToNode(tn, PREVIEW_KEY, nick);
+    }
+
+    window.setupEpicEditor = function() {
+        const root = document.querySelector('.fp-tools-page-content[data-page="epic_nicks"]');
+        if (!root || root.dataset.epicInit) { renderLivePreview(); return; }
+        root.dataset.epicInit = '1';
+
+        // ник по умолчанию = свой
+        const nickInput = document.getElementById('fpt-epic-nick');
+        if (nickInput && !nickInput.value) nickInput.value = getMyNick();
+
+        // пресеты
+        const presetsBox = document.getElementById('fpt-epic-presets');
+        if (presetsBox) {
+            presetsBox.innerHTML = '';
+            EPIC_PRESETS.forEach(p => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'fpt-epic-preset-btn';
+                b.textContent = p.name;
+                b.addEventListener('click', () => { cfgToUI(p.cfg); renderLivePreview(); });
+                presetsBox.appendChild(b);
+            });
+        }
+
+        // загрузить сохранённый конфиг в UI (или дефолт)
+        chrome.storage.local.get(MY_NICK_KEY).then(({ [MY_NICK_KEY]: saved }) => {
+            if (saved && saved.cfg) { if (saved.nick) nickInput.value = saved.nick; cfgToUI(saved.cfg); }
+            renderLivePreview();
         });
 
-        // Добавляем тестовые ники и ПРИНУДИТЕЛЬНО обновляем стили и парсер
-        Object.assign(donatersMap, previewMap);
-        injectGlobalCSS();
-
-        container.innerHTML = ''; // Очищаем контейнер
-
-        presets.forEach((preset, i) => {
-            const nick = `${myNick} ${i+1}`;
-            
-            const row = document.createElement('div');
-            row.style.cssText = "display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #1e2030; padding-bottom: 15px;";
-            
-            const nameCol = document.createElement('div');
-            nameCol.style.cssText = "font-size: 16px;";
-            
-            const textNode = document.createTextNode(nick);
-            nameCol.appendChild(textNode);
-            
-            const infoCol = document.createElement('div');
-            infoCol.style.cssText = "font-size: 12px; color: #5a5f7a;";
-            infoCol.textContent = `Пример ${i+1}`;
-
-            row.appendChild(nameCol);
-            row.appendChild(infoCol);
-            container.appendChild(row);
-
-            // Рендерим стили и канвас в этот конкретный узел
-            applyStylesToNode(textNode, nick, nick);
+        // живой предпросмотр на любое изменение
+        root.addEventListener('input', renderLivePreview);
+        root.addEventListener('change', (e) => {
+            if (e.target.id === 'fpt-epic-pcon') document.getElementById('fpt-epic-pc-wrap').style.display = e.target.checked ? '' : 'none';
+            syncRangeLabels();
+            renderLivePreview();
         });
+
+        // применить → сохранить + применить к своему нику на сайте
+        document.getElementById('fpt-epic-apply').addEventListener('click', async () => {
+            const nick = (nickInput.value || getMyNick()).trim();
+            if (!nick) { if (typeof showNotification === 'function') showNotification('Не удалось определить ник.', true); return; }
+            const cfg = cfgFromUI();
+            await chrome.storage.local.set({ [MY_NICK_KEY]: { nick, cfg } });
+            registerNickStyle(nick, cfg);
+            scanDOM(document.body);
+            if (typeof showNotification === 'function') showNotification('Оформление ника применено!');
+        });
+
+        // убрать
+        document.getElementById('fpt-epic-reset').addEventListener('click', async () => {
+            const { [MY_NICK_KEY]: saved } = await chrome.storage.local.get(MY_NICK_KEY);
+            await chrome.storage.local.remove(MY_NICK_KEY);
+            if (saved && saved.nick) { delete donatersMap[saved.nick]; delete parsedConfigs[saved.nick]; injectGlobalCSS(); }
+            // снять обёртки на странице
+            document.querySelectorAll('.fpt-epic-wrap').forEach(w => {
+                if ((w.querySelector('.fpt-epic-text')?.textContent || '') === (saved && saved.nick)) {
+                    const t = document.createTextNode(w.querySelector('.fpt-epic-text').textContent);
+                    w.parentNode && w.parentNode.replaceChild(t, w);
+                }
+            });
+            if (typeof showNotification === 'function') showNotification('Оформление убрано.');
+            renderLivePreview();
+        });
+
+        renderLivePreview();
     };
 
 
     // --- ИНИЦИАЛИЗАЦИЯ ---
     async function init() {
         await fetchDonaters();
-        if (Object.keys(donatersMap).length > 0) {
-            injectGlobalCSS();
+        await loadMyNick(); // своё локальное оформление (даже если сервер пуст)
+
+        if (Object.keys(parsedConfigs).length > 0) {
             scanDOM(document.body);
 
             const observer = new MutationObserver(mutations => {
@@ -359,6 +468,13 @@
             });
             observer.observe(document.body, { childList: true, subtree: true });
         }
+
+        // живой кросс-вкладочный синк своего оформления
+        try {
+            chrome.storage.onChanged.addListener((changes, area) => {
+                if (area === 'local' && changes[MY_NICK_KEY]) loadMyNick();
+            });
+        } catch (_) {}
     }
 
     if (document.readyState === 'loading') {

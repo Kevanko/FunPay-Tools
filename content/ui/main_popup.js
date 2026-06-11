@@ -267,27 +267,65 @@ function createMainPopup() {
 
                 <!-- НАЧАЛО ВКЛАДКИ "ЭПИЧЕСКИЕ НИКИ" -->
                 <div class="fp-tools-page-content" data-page="epic_nicks">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <h3>Эпический никнейм <span class="material-symbols-rounded" style="vertical-align:-3px;color:var(--fpt-accent);">diamond</span></h3>
-                    </div>
-                    <p class="template-info" style="font-size: 14px; line-height: 1.5;">
-                        Выделитесь среди конкурентов! Ваш никнейм будет светиться, переливаться и излучать частицы <b>у всех пользователей расширения FP Tools</b> (более 15 000 человек).
-                    </p>
+                    <h3>Эпический никнейм</h3>
+                    <p class="template-info">Оформите свой ник: градиент, анимация и частицы. Применяется к вашему нику на сайте бесплатно — без Telegram и оплаты. Меняйте настройки и сразу смотрите предпросмотр.</p>
 
-                    <div class="support-promo fpt-callout-premium" style="margin-bottom: 25px; padding: 18px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
-                        <div style="font-size: 15px; margin-bottom: 12px; color: var(--fpt-text);">Приобрести уникальный стиль можно навсегда по очень низкой цене.</div>
-                        <div style="font-size: 13px; color: var(--fpt-text-dim); margin-bottom: 15px;">Больше 6 способов оплаты на выбор. Нажав на кнопку ниже, вы перейдёте в Telegram-бота, где сможете нажать на "Украсить ник на сайте FunPay"</div>
-                        <a href="https://t.me/FPToolsBot" target="_blank" class="btn" style="text-decoration:none; display:flex; align-items:center; justify-content:center; gap:8px; font-size: 14px; padding: 10px;">
-                            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-1.37.2-1.64l16.44-5.99c.73-.27 1.36.17 1.15.99l-2.28 10.82c-.15.71-.56 1.01-1.2 1.01l-4.82-.01-1.15 4.35c-.32.74-1.23.46-1.42-.47z"/></svg>
-                            Получить уникальный ник
-                        </a>
+                    <div class="fpt-epic-preview-card">
+                        <span class="fpt-epic-preview-label eyebrow">Предпросмотр</span>
+                        <div id="fpt-epic-live" class="fpt-epic-live">ВашНик</div>
                     </div>
 
-                    <h4 style="margin-bottom: 15px;">Вот несколько примеров для того, чтобы вы посмотрели, как это будет выглядеть у всех пользователей расширения:</h4>
-                    <div id="fpt-epic-previews-container" style="display: flex; flex-direction: column; gap: 30px; margin-top: 10px; background: var(--fpt-bg-deep); border: 1px solid var(--fpt-line); border-radius: 12px; padding: 20px;">
-                        <div style="text-align: center; color: var(--fpt-text-faint); font-size: 12px;">Загрузка движка частиц...</div>
+                    <div class="fpt-eyebrow fpt-blocklabel">Пресеты</div>
+                    <div class="fpt-epic-presets" id="fpt-epic-presets"></div>
+
+                    <div class="template-container">
+                        <label for="fpt-epic-nick">Ник для оформления</label>
+                        <input type="text" id="fpt-epic-nick" class="template-input" placeholder="Ваш ник на FunPay">
                     </div>
-                </div> <!-- КОНЕЦ ВКЛАДКИ "ЭПИЧЕСКИЕ НИКИ" -->
+
+                    <div class="fpt-eyebrow fpt-blocklabel">Цвета градиента</div>
+                    <div class="template-container color-input-grid">
+                        <div><label for="fpt-epic-c1">Цвет 1</label><input type="color" id="fpt-epic-c1" class="theme-color-input" value="#5b86d8"></div>
+                        <div><label for="fpt-epic-c2">Цвет 2</label><input type="color" id="fpt-epic-c2" class="theme-color-input" value="#8fb0e8"></div>
+                        <div><label for="fpt-epic-c3">Цвет 3</label><input type="color" id="fpt-epic-c3" class="theme-color-input" value="#3f9e7c"></div>
+                    </div>
+                    <div class="checkbox-label-inline"><input type="checkbox" id="fpt-epic-c3on"><label for="fpt-epic-c3on" style="margin-bottom:0;"><span>Использовать третий цвет</span></label></div>
+
+                    <div class="fpt-eyebrow fpt-blocklabel">Градиент и скорость</div>
+                    <div class="fpt-theme-extra">
+                        <div class="template-container"><div class="range-label"><label for="fpt-epic-ang">Угол</label><span id="fpt-epic-ang-v">90°</span></div><input type="range" id="fpt-epic-ang" min="0" max="360" step="1" value="90"></div>
+                        <div class="template-container"><div class="range-label"><label for="fpt-epic-scl">Растяжение</label><span id="fpt-epic-scl-v">100%</span></div><input type="range" id="fpt-epic-scl" min="50" max="300" step="1" value="100"></div>
+                        <div class="template-container"><div class="range-label"><label for="fpt-epic-spd">Скорость</label><span id="fpt-epic-spd-v">5с</span></div><input type="range" id="fpt-epic-spd" min="1" max="15" step="1" value="5"></div>
+                    </div>
+
+                    <div class="fpt-eyebrow fpt-blocklabel">Анимация текста</div>
+                    <div class="fpt-epic-anims" id="fpt-epic-anims">
+                        <label class="fpt-epic-chip"><input type="checkbox" value="glow"><span>Свечение</span></label>
+                        <label class="fpt-epic-chip"><input type="checkbox" value="wave"><span>Перелив</span></label>
+                        <label class="fpt-epic-chip"><input type="checkbox" value="pulse"><span>Пульс</span></label>
+                        <label class="fpt-epic-chip"><input type="checkbox" value="glitch"><span>Глитч</span></label>
+                    </div>
+
+                    <div class="fpt-eyebrow fpt-blocklabel">Частицы</div>
+                    <div class="template-container"><select id="fpt-epic-ov">
+                        <option value="none">Без частиц</option>
+                        <option value="fire">Огонь</option>
+                        <option value="snow">Снег</option>
+                        <option value="sparks">Искры</option>
+                        <option value="matrix">Матрица</option>
+                        <option value="smoke">Дым</option>
+                        <option value="lightning">Молнии</option>
+                        <option value="stars">Звёзды</option>
+                        <option value="orbs">Сферы</option>
+                    </select></div>
+                    <div class="checkbox-label-inline"><input type="checkbox" id="fpt-epic-pcon"><label for="fpt-epic-pcon" style="margin-bottom:0;"><span>Свой цвет частиц</span></label></div>
+                    <div class="template-container color-input-grid" id="fpt-epic-pc-wrap" style="display:none;"><div><label for="fpt-epic-pc">Цвет частиц</label><input type="color" id="fpt-epic-pc" class="theme-color-input" value="#ffd700"></div></div>
+
+                    <div class="theme-actions-grid" style="margin-top:16px;">
+                        <button id="fpt-epic-apply" class="btn" style="grid-column:1/-1;">Применить к моему нику</button>
+                        <button id="fpt-epic-reset" class="btn btn-default">Убрать оформление</button>
+                    </div>
+                </div> <!-- КОНЕЦ ВКЛАДКИ "ЭПИЧЕСКИЙ НИК" -->
 
                 <!-- НАЧАЛО ВКЛАДКИ "АККАУНТЫ" -->
                 <div class="fp-tools-page-content" data-page="accounts">
@@ -750,6 +788,8 @@ function createMainPopup() {
                         <div><label for="themeTextColor">Цвет текста:</label><input type="color" id="themeTextColor" class="theme-color-input"></div>
                         <div><label for="themeLinkColor">Цвет ссылок:</label><input type="color" id="themeLinkColor" class="theme-color-input"></div>
                     </div>
+                    <div class="fpt-eyebrow fpt-blocklabel" style="margin-top:18px;">Дополнительно</div>
+                    <div class="fpt-theme-extra">
                     <div class="template-container"><div class="range-label"><label for="themeFontSelect">Шрифт:</label></div><select id="themeFontSelect"></select></div>
                     <div class="template-container"><div class="range-label"><label for="themeBgBlur">Размытие фона:</label><span id="themeBgBlurValue">0px</span></div><input type="range" id="themeBgBlur" min="0" max="20" step="1"></div>
                     <div class="template-container"><div class="range-label"><label for="themeBgBrightness">Яркость фона:</label><span id="themeBgBrightnessValue">100%</span></div><input type="range" id="themeBgBrightness" min="20" max="150" step="1"></div>
@@ -762,6 +802,7 @@ function createMainPopup() {
                     <div class="setting-group"><h4 style="margin-top: 0;">Расположение</h4><div class="template-container"><div class="range-label"><label for="headerPositionSelect">Верхняя панель:</label></div><select id="headerPositionSelect"><option value="top">Вверх (по умолчанию)</option><option value="bottom">Вниз</option></select></div></div>
                     <div class="setting-group"><h4 style="margin-top: 0;">Прозрачное меню FunPay Tools</h4><div class="checkbox-label-inline"><input type="checkbox" id="fptMenuTransparentEnabled"><label for="fptMenuTransparentEnabled" style="margin-bottom:0;"><span>Сделать меню прозрачным</span></label></div><small style="font-size:12px;opacity:0.7;display:block;margin-top:-10px;margin-bottom:8px;">Делает окно FunPay Tools прозрачным со стеклянным размытием.</small><div id="fptMenuTransparentControls" style="display:none;"><div class="template-container color-input-grid"><div><label for="fptMenuTintColor">Цвет фона:</label><input type="color" id="fptMenuTintColor" class="theme-color-input"></div></div></div></div>
                     <div class="setting-group" id="fptTextOutlineGroup"><h4 style="margin-top: 0;">Контур тексту</h4><div class="checkbox-label-inline"><input type="checkbox" id="fptTextOutlineEnabled"><label for="fptTextOutlineEnabled" style="margin-bottom:0;"><span>Включить контур буквам</span></label></div><small style="font-size:12px;opacity:0.7;display:block;margin-top:-10px;margin-bottom:8px;">Обводит все буквы в меню контуром для возможного повышения читаемости.</small><div id="fptTextOutlineControls" style="display:none;"><div class="template-container color-input-grid"><div><label for="fptTextOutlineColor">Цвет контура:</label><input type="color" id="fptTextOutlineColor" class="theme-color-input"></div></div><div class="template-container"><div class="range-label"><label for="fptTextOutlineWidth">Толщина:</label><span id="fptTextOutlineWidthValue">1px</span></div><input type="range" id="fptTextOutlineWidth" min="0" max="5" step="0.5"></div></div></div>
+                    </div>
                     <div class="theme-actions-grid"><button id="enableMagicStickBtn" class="btn" style="grid-column: 1 / -1;"><span class="material-icons">auto_fix_normal</span><span>Включить режим редактора</span></button><button id="generatePaletteBtn" class="btn btn-default" style="display: flex; align-items: center; justify-content: center; gap: 8px;"><span class="material-icons" style="font-size: 18px;">auto_fix_high</span>цвета фона</button><button id="randomizeThemeBtn" class="btn btn-default" style="display: flex; align-items: center; justify-content: center; gap: 8px;"><span class="material-icons" style="font-size: 18px;">casino</span>рандом</button><button id="shareThemeBtn" class="btn btn-default" style="display: flex; align-items: center; justify-content: center; gap: 8px;"><span class="material-icons" style="font-size: 18px;">share</span>Поделиться темой</button><button id="exportThemeBtn" class="btn btn-default" title="Сохранить текущие настройки темы в файл (.fptheme)">Экспорт</button><button id="importThemeBtn" class="btn btn-default" title="Загрузить настройки темы из файла (.fptheme)">Импорт</button><input type="file" id="importThemeInput" accept=".fptheme" style="display: none;"><button id="resetThemeBtn" class="btn btn-default">СБРОСИТЬ ТЕМУ</button></div>
                 </div>
                 <div class="fp-tools-page-content" data-page="autobump">
@@ -854,16 +895,21 @@ function createMainPopup() {
                     <div id="currency-error-display" class="currency-error"></div>
                 </div>
                 <div class="fp-tools-page-content" data-page="effects">
-                    <h3>Эффекты частиц</h3>
-                    <div class="checkbox-label-inline"><input type="checkbox" id="cursorFxEnabled"><label for="cursorFxEnabled" style="margin-bottom:0;"><span>Включить эффекты частиц</span></label></div>
-                    <div class="template-container"><label for="cursorFxType">Тип эффекта:</label><select id="cursorFxType"><option value="sparkle">Искры</option><option value="trail">След</option><option value="snow">Снег</option><option value="blood">Кровь</option></select></div>
+                    <h3>Эффекты курсора</h3>
+                    <p class="template-info">Частицы за курсором и собственное изображение курсора. Включите и настройте под себя.</p>
+
+                    <div class="fpt-eyebrow fpt-blocklabel">Частицы за курсором</div>
+                    <div class="checkbox-label-inline"><input type="checkbox" id="cursorFxEnabled"><label for="cursorFxEnabled" style="margin-bottom:0;"><span>Включить частицы</span></label></div>
+                    <div class="fpt-fx-row">
+                        <div class="template-container"><label for="cursorFxType">Тип эффекта:</label><select id="cursorFxType"><option value="sparkle">Искры</option><option value="trail">След</option><option value="snow">Снег</option><option value="blood">Капли</option></select></div>
+                        <div class="template-container"><div class="range-label"><label for="cursorFxCount">Интенсивность:</label><span id="cursorFxCountValue">50%</span></div><input type="range" id="cursorFxCount" min="0" max="100" step="1"></div>
+                    </div>
                     <div class="template-container color-input-grid"><div><label for="cursorFxColor1">Цвет 1:</label><input type="color" id="cursorFxColor1" class="theme-color-input"></div><div><label for="cursorFxColor2">Цвет 2 (градиент):</label><input type="color" id="cursorFxColor2" class="theme-color-input"></div></div>
-                    <div class="checkbox-label-inline"><input type="checkbox" id="cursorFxRgb"><label for="cursorFxRgb" style="margin-bottom:0;"><span>Радужный (RGB)</span></label></div>
-                    <div class="template-container"><div class="range-label"><label for="cursorFxCount">Интенсивность:</label><span id="cursorFxCountValue">50%</span></div><input type="range" id="cursorFxCount" min="0" max="100" step="1"></div>
-                    <div style="margin-top: 20px;"><button id="resetCursorFxBtn" class="btn btn-default">Сбросить эффекты</button></div>
-                    <div style="border-top: 1px solid rgba(255,255,255,0.1); margin: 25px 0;"></div>
-                    <h3>Пользовательский курсор</h3>
-                    <div class="checkbox-label-inline"><input type="checkbox" id="customCursorEnabled"><label for="customCursorEnabled" style="margin-bottom:0;"><span>Включить свой курсор</span></label></div>
+                    <div class="checkbox-label-inline"><input type="checkbox" id="cursorFxRgb"><label for="cursorFxRgb" style="margin-bottom:0;"><span>Радужный перелив (RGB)</span></label></div>
+                    <div style="margin-top: 14px;"><button id="resetCursorFxBtn" class="btn btn-default">Сбросить настройки частиц</button></div>
+
+                    <div class="fpt-eyebrow fpt-blocklabel" style="margin-top:22px;">Свой курсор</div>
+                    <div class="checkbox-label-inline"><input type="checkbox" id="customCursorEnabled"><label for="customCursorEnabled" style="margin-bottom:0;"><span>Включить своё изображение курсора</span></label></div>
                     <div id="customCursorControls" style="display: none;"><div class="template-container"><label>Изображение курсора:</label><div id="cursor-image-preview" style="width:64px; height:64px; background-color: var(--fpt-surface-2, rgba(0,0,0,0.2)); border:1px solid rgba(255,255,255,0.1); border-radius:8px; margin-bottom:10px; background-size:contain; background-position:center; background-repeat: no-repeat; display:flex; align-items:center; justify-content:center; color: #888; font-size:12px;">Нет</div><button id="uploadCursorImageBtn" class="btn">Загрузить</button><button id="removeCursorImageBtn" class="btn btn-default" style="margin-left: 10px;">Удалить</button><input type="file" id="cursorImageInput" accept="image/*" style="display: none;"></div><div class="checkbox-label-inline"><input type="checkbox" id="hideSystemCursor" checked><label for="hideSystemCursor" style="margin-bottom:0;"><span>Скрыть системный курсор</span></label></div><div class="template-container"><div class="range-label"><label for="customCursorSize">Размер:</label><span id="customCursorSizeValue">32px</span></div><input type="range" id="customCursorSize" min="16" max="128" step="1" value="32"></div><div class="template-container"><div class="range-label"><label for="customCursorOpacity">Прозрачность:</label><span id="customCursorOpacityValue">100%</span></div><input type="range" id="customCursorOpacity" min="0" max="100" step="1" value="100"></div></div>
                 </div>
                 <div class="fp-tools-page-content" data-page="overview">
@@ -997,9 +1043,9 @@ function createMainPopup() {
                     </div>
 
                     <!-- Auto ticket block -->
-                    <div class="support-promo fpt-callout-info" style="padding:11px 12px;margin-bottom:12px;">
-                        <div style="font-weight:600;font-size:13px;margin-bottom:4px;color:#f0c4ff;"><span class="material-symbols-rounded" style="font-size:15px;vertical-align:-3px;margin-right:5px;">mail</span>Подтверждение заказов</div>
-                        <p style="font-size:12px;color:#6a7090;margin:0 0 10px;line-height:1.5;">FunPay не всегда подтверждает заказы автоматически. Кнопка ниже соберёт все ваши неподтверждённые заказы и отправит заявку в ТП с просьбой их подтвердить - вручную делать не надо.</p>
+                    <div class="support-promo fpt-callout-info fpt-ticket-autocard" style="padding:13px 14px;margin-bottom:12px;">
+                        <div style="font-weight:600;font-size:13px;margin-bottom:5px;color:var(--fpt-text);"><span class="material-symbols-rounded" style="font-size:15px;vertical-align:-3px;margin-right:5px;color:var(--fpt-uacc,#5b86d8);">mail</span>Подтверждение заказов</div>
+                        <p style="font-size:12px;color:var(--fpt-text-muted,#6a7090);margin:0 0 10px;line-height:1.5;">FunPay не всегда подтверждает заказы автоматически. Кнопка ниже соберёт все ваши неподтверждённые заказы и отправит заявку в ТП с просьбой их подтвердить — вручную делать не надо.</p>
                         <div style="display:flex;gap:10px;margin-bottom:10px;">
                             <label style="font-size:11px;color:#6a7090;display:flex;flex-direction:column;gap:3px;flex:1;">
                                 Возраст заказа (ч)
@@ -1135,7 +1181,7 @@ function setupPopupNavigation() {
             contentPages.forEach(page => {
                 page.classList.toggle('active', page.dataset.page === pageId);
             });
-            if (pageId === 'epic_nicks') { if (typeof renderEpicPreviews === 'function') renderEpicPreviews(); }
+            if (pageId === 'epic_nicks') { if (typeof setupEpicEditor === 'function') setupEpicEditor(); }
             if (pageId === 'currency_calc') initializeCurrencyCalculator();
             if (pageId === 'notes') { if (typeof initializeNotes === 'function') initializeNotes(); }
             if (pageId === 'global_chat') { if (typeof initializeGlobalChat === 'function') initializeGlobalChat(); }
