@@ -192,6 +192,27 @@ async function sendChatImageInBackground(chatId, dataUrl, chatName) {
     return { fileId };
 }
 
+// Текст в чат (вынесено, чтобы переиспользовать в батче картинок).
+async function sendChatTextInBackground(chatId, text) {
+    const auth = await getAuthDetailsForBackground();
+    if (!auth.golden_key || !auth.csrf_token) throw new Error('Нет авторизации.');
+    const cookieStr = auth.phpsessid ? `golden_key=${auth.golden_key}; PHPSESSID=${auth.phpsessid}` : `golden_key=${auth.golden_key}`;
+    const payload = {
+        objects: JSON.stringify([{ type: 'chat_node', id: chatId, tag: '00000000', data: { node: chatId, last_message: -1, content: '' } }]),
+        request: JSON.stringify({ action: 'chat_message', data: { node: chatId, last_message: -1, content: text } }),
+        csrf_token: auth.csrf_token
+    };
+    const res = await fetch('https://funpay.com/runner/', {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8', 'x-requested-with': 'XMLHttpRequest', 'cookie': cookieStr },
+        body: new URLSearchParams(payload)
+    });
+    const json = await res.json().catch(() => null);
+    if (json?.error) throw new Error(json.error);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return { ok: true };
+}
+
 async function getAuthDetailsForBackground() {
     const goldenKeyCookie = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
     if (!goldenKeyCookie || !goldenKeyCookie.value) {
@@ -864,16 +885,35 @@ async function runOnlineHeartbeat() {
     try {
         const { fpToolsAccounts = [] } = await chrome.storage.local.get('fpToolsAccounts');
         const online = fpToolsAccounts.filter(a => a && a.key && a.online !== false);
+        const updates = {};   // key -> snapshot
         for (const a of online) {
             try {
-                await fetch('https://funpay.com/', {
-                    method: 'GET',
-                    headers: { 'Cookie': `golden_key=${a.key}` },
-                    credentials: 'omit',
-                    cache: 'no-store'
-                });
+                // fptSnapshotForKey КОРРЕКТНО авторизуется (подменяет golden_key и
+                // возвращает обратно). Ручной заголовок Cookie браузер игнорирует —
+                // поэтому он не годится ни для онлайна, ни для подсчёта. Этот запрос
+                // и регистрирует аккаунт онлайн, и даёт счётчики.
+                const snap = await fptSnapshotForKey(a.key);
+                if (snap && snap.loggedIn) updates[a.key] = snap;
             } catch (_) {}
-            await new Promise(r => setTimeout(r, 700)); // не частим запросами
+            await new Promise(r => setTimeout(r, 500));
+        }
+        const keys = Object.keys(updates);
+        if (keys.length) {
+            const { fpToolsAccounts: latest = [] } = await chrome.storage.local.get('fpToolsAccounts');
+            const merged = latest.map(acc => {
+                const s = acc && updates[acc.key];
+                if (!s) return acc;
+                return {
+                    ...acc,
+                    avatar: s.avatar || acc.avatar,
+                    balance: s.balance || acc.balance,
+                    unread: typeof s.unread === 'number' ? s.unread : acc.unread,
+                    orders: typeof s.orders === 'number' ? s.orders : acc.orders,
+                    loginError: false,            // авторизованный снимок удался → ключ рабочий
+                    _snapTs: Date.now()
+                };
+            });
+            await chrome.storage.local.set({ fpToolsAccounts: merged });
         }
     } catch (_) {} finally {
         _fptOnlineRunning = false;
@@ -915,28 +955,34 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // 3.0: send plain text to a chat in the background (used for ordered template parts).
     if (request.action === 'fptSendChatText') {
         (async () => {
-            try {
-                const auth = await getAuthDetailsForBackground();
-                if (!auth.golden_key || !auth.csrf_token) throw new Error('Нет авторизации.');
-                const cookieStr = auth.phpsessid
-                    ? `golden_key=${auth.golden_key}; PHPSESSID=${auth.phpsessid}`
-                    : `golden_key=${auth.golden_key}`;
-                const payload = {
-                    objects: JSON.stringify([{ type: 'chat_node', id: request.chatId, tag: '00000000', data: { node: request.chatId, last_message: -1, content: '' } }]),
-                    request: JSON.stringify({ action: 'chat_message', data: { node: request.chatId, last_message: -1, content: request.text } }),
-                    csrf_token: auth.csrf_token
-                };
-                const res = await fetch('https://funpay.com/runner/', {
-                    method: 'POST',
-                    headers: { 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8', 'x-requested-with': 'XMLHttpRequest', 'cookie': cookieStr },
-                    body: new URLSearchParams(payload)
-                });
-                const json = await res.json().catch(() => null);
-                if (json?.error) throw new Error(json.error);
-                sendResponse({ ok: res.ok });
-            } catch (e) {
-                sendResponse({ ok: false, error: e.message });
+            try { await sendChatTextInBackground(request.chatId, request.text); sendResponse({ ok: true }); }
+            catch (e) { sendResponse({ ok: false, error: e.message }); }
+        })();
+        return true;
+    }
+
+    // Батч-отправка нескольких изображений (+ опц. текст) ОДНИМ сообщением: весь
+    // цикл крутится в service worker, поэтому переключение/сворачивание вкладки
+    // больше не обрывает отправку. Прогресс шлём в исходную вкладку (best-effort).
+    if (request.action === 'fptSendImageBatch') {
+        (async () => {
+            const images = Array.isArray(request.images) ? request.images : [];
+            const tabId = sender.tab && sender.tab.id;
+            const results = [];
+            for (let i = 0; i < images.length; i++) {
+                let ok = false, error = null;
+                try { await sendChatImageInBackground(request.chatId, images[i], request.chatName); ok = true; }
+                catch (e) { error = e.message; }
+                results.push({ i, ok, error });
+                if (tabId != null) { try { chrome.tabs.sendMessage(tabId, { action: 'fptImageBatchProgress', groupToken: request.groupToken, i, ok, error }); } catch (_) {} }
+                await new Promise(r => setTimeout(r, 300));
             }
+            let textOk = true, textError = null;
+            if (request.text) {
+                try { await sendChatTextInBackground(request.chatId, request.text); }
+                catch (e) { textOk = false; textError = e.message; }
+            }
+            sendResponse({ ok: results.every(r => r.ok) && textOk, results, textOk, textError });
         })();
         return true;
     }
