@@ -2,7 +2,7 @@
 
 import { fetchAIResponse, fetchAILotGeneration, fetchAITranslation, fetchAIImageGeneration } from './ai.js';
 import { BUMP_ALARM_NAME, startAutoBump, stopAutoBump, runBumpCycle } from './autobump.js';
-import { runAutoResponderCycle, resetAutoResponderState, runMultiAccountAutoReply } from './autoresponder.js';
+import { runAutoResponderCycle, resetAutoResponderState, runMultiAccountAutoReply, withCookieLock, fpIsRateLimited, fpFetch } from './autoresponder.js';
 import { startEngine, stopEngine, onHeartbeat, onKeepalivePing, ENGINE_HEARTBEAT_ALARM } from './fpt_engine.js';
 import { startSmartBump, stopSmartBump, runSmartBumpCycle, SMART_BUMP_ALARM } from './smart_bump.js';
 import {
@@ -814,11 +814,9 @@ async function processNextLotImport() {
 // страницу ПОД КОНКРЕТНЫМ аккаунтом — временно подменить cookie golden_key,
 // сделать запрос с credentials:'include', затем вернуть исходную cookie.
 //
-// Все вызовы сериализуются (очередь), чтобы параллельные снимки не затирали
-// cookie друг друга и не разлогинивали активную сессию.
+// Все вызовы сериализуются ОБЩИМ замком withCookieLock, чтобы параллельные снимки
+// и мульти-аккаунтные циклы не затирали cookie друг друга и не разлогинивали сессию.
 // =====================================================================
-let _fptSnapChain = Promise.resolve();
-
 function fptSnapshotForKey(key) {
     const run = async () => {
         // 1) Запоминаем текущую golden_key, чтобы вернуть её после запроса.
@@ -828,7 +826,7 @@ function fptSnapshotForKey(key) {
         // Если ключ совпадает с активным — просто грузим главную как есть.
         if (original && original.value === key) {
             try {
-                const resp = await fetch('https://funpay.com/', { credentials: 'include', cache: 'no-store' });
+                const resp = await fpFetch('https://funpay.com/', { credentials: 'include', cache: 'no-store' });
                 const html = await resp.text();
                 return await parseHtmlViaOffscreen(html, 'parseAccountSnapshot');
             } catch (e) { return null; }
@@ -850,8 +848,8 @@ function fptSnapshotForKey(key) {
         try {
             // 2) Ставим cookie целевого аккаунта.
             await setKey(key);
-            // 3) Грузим главную под этим аккаунтом.
-            const resp = await fetch('https://funpay.com/', { credentials: 'include', cache: 'no-store' });
+            // 3) Грузим главную под этим аккаунтом (через общий темп/бэк-офф).
+            const resp = await fpFetch('https://funpay.com/', { credentials: 'include', cache: 'no-store' });
             const html = await resp.text();
             const snap = await parseHtmlViaOffscreen(html, 'parseAccountSnapshot');
             return snap;
@@ -865,10 +863,8 @@ function fptSnapshotForKey(key) {
             } catch (_) {}
         }
     };
-    // сериализация
-    const next = _fptSnapChain.then(run, run);
-    _fptSnapChain = next.catch(() => {});
-    return next;
+    // общий замок на подмену куки: пинг онлайна и мульти-аккаунт не свапят разом
+    return withCookieLock(run);
 }
 
 // ── «Всегда в сети» для сохранённых аккаунтов ───────────────────────────────
@@ -881,12 +877,14 @@ const ONLINE_ALARM = 'fptOnlineHeartbeat';
 let _fptOnlineRunning = false;
 async function runOnlineHeartbeat() {
     if (_fptOnlineRunning) return;
+    if (fpIsRateLimited()) return;            // FunPay под бэк-оффом — пропускаем пинг
     _fptOnlineRunning = true;
     try {
         const { fpToolsAccounts = [] } = await chrome.storage.local.get('fpToolsAccounts');
         const online = fpToolsAccounts.filter(a => a && a.key && a.online !== false);
         const updates = {};   // key -> snapshot
         for (const a of online) {
+            if (fpIsRateLimited()) break;     // поймали лимит в процессе — стоп
             try {
                 // fptSnapshotForKey КОРРЕКТНО авторизуется (подменяет golden_key и
                 // возвращает обратно). Ручной заголовок Cookie браузер игнорирует —

@@ -21,14 +21,14 @@
 // Polling design ported from FP Tools's Runner: fresh RANDOM tag per cycle for
 // chat_bookmarks AND orders_counters, per-message dedup.
 
-import { runAutoResponderCycle, runMultiAccountAutoReply } from './autoresponder.js';
+import { runAutoResponderCycle, runMultiAccountAutoReply, fpIsRateLimited } from './autoresponder.js';
 
 export const ENGINE_HEARTBEAT_ALARM = 'fpToolsEngineHeartbeat';
 const OFFSCREEN_PATH = 'offscreen/offscreen.html';
 
 const POLL_INTERVAL_MS = 3000;        // active-loop cadence while worker is awake
 const MIN_CYCLE_GAP_MS = 2500;        // never hammer runner/ faster than this
-const MULTI_GAP_MS = 45000;           // мульти-аккаунт реже (свап куки = нагрузка на активную сессию)
+const MULTI_GAP_MS = 60000;           // мульти-аккаунт реже (свап куки = нагрузка на активную сессию + щадим API)
 const ERROR_BACKOFF_MS = 5000;        // FP Tools sleeps 5s after a runner error
 const STALL_MS = 90000;               // if no successful cycle in 90s -> force restart
 
@@ -96,6 +96,9 @@ async function tick() {
         const activeOn = await activeAutomationEnabled();
         const multiOn = await multiAccountEnabled();
         if (!activeOn && !multiOn) { running = false; loopTimer = null; return; }
+
+        // FunPay под бэк-оффом (429/5xx) — этот тик пропускаем целиком, не частим.
+        if (fpIsRateLimited()) { scheduleNext(POLL_INTERVAL_MS); return; }
 
         const now = Date.now();
         if (activeOn && now - lastCycleStart >= MIN_CYCLE_GAP_MS) {
