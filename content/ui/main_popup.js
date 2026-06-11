@@ -966,7 +966,16 @@ function createMainPopup() {
                 </div>
 
                 <div class="fp-tools-page-content" data-page="settings_io">
-                    <h3>Импорт и экспорт настроек</h3>
+                    <h3>Настройки профиля</h3>
+                    <p class="template-info">У каждого аккаунта могут быть свои настройки: авто-ответы, тема и фон, звуки уведомлений, шаблоны. Новый аккаунт получает настройки по умолчанию. <b>Каркас:</b> авто-переключение настроек при смене аккаунта включим после вашего подтверждения.</p>
+                    <div class="fpt-eyebrow fpt-blocklabel">Скопировать настройки с другого аккаунта</div>
+                    <div class="fpt-profcopy">
+                        <select id="fpt-profcopy-src" class="template-input"></select>
+                        <button id="fpt-profcopy-btn" class="btn">Скопировать</button>
+                    </div>
+                    <p class="template-info" style="margin-top:8px;">Перенесёт авто-ответы, шаблоны, тему и звуки с выбранного аккаунта в текущий.</p>
+
+                    <h3 style="margin-top:24px;">Импорт и экспорт настроек</h3>
                     <p class="template-info">Сохраните все настройки FunPay Tools в файл и восстановите на другом устройстве или аккаунте.</p>
                     <div style="display:flex;gap:12px;margin-bottom:20px;">
                         <button id="fp-settings-export-btn" class="btn" style="flex:1;"><span class="material-symbols-rounded" style="font-size:16px;vertical-align:-3px;margin-right:5px;">upload</span>Экспортировать настройки</button>
@@ -1205,6 +1214,7 @@ function setupPopupNavigation() {
             });
             if (pageId === 'epic_nicks') { if (typeof setupEpicEditor === 'function') setupEpicEditor(); }
             if (pageId === 'currency_calc') initializeCurrencyCalculator();
+            if (pageId === 'settings_io') { if (typeof fptSetupProfileSettingsUI === 'function') fptSetupProfileSettingsUI(); }
             if (pageId === 'notes') { if (typeof initializeNotes === 'function') initializeNotes(); }
             if (pageId === 'global_chat') { if (typeof initializeGlobalChat === 'function') initializeGlobalChat(); }
             if (pageId === 'templates') { if (typeof setupTemplateSettingsHandlers === 'function') setupTemplateSettingsHandlers(); }
