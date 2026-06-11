@@ -160,7 +160,7 @@
 
         const userMenuItem = rightNav.querySelector('li.dropdown.hidden-sm.hidden-xs');
         const toolsMenu = createElement('li', { class: 'dropdown fp-tools-header-item' });
-        toolsMenu.innerHTML = `<a href="javascript:void(0)" style="font-weight: 650; cursor: pointer; user-select: none;" id="fpToolsButton" data-fpt-location="header">FP Tools<span></span></a>`;
+        toolsMenu.innerHTML = `<a role="button" tabindex="0" style="font-weight: 650; cursor: pointer; user-select: none;" id="fpToolsButton" data-fpt-location="header">FP Tools<span></span></a>`;
         if (userMenuItem) {
             rightNav.insertBefore(toolsMenu, userMenuItem);
         } else {

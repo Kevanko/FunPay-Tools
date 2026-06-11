@@ -68,9 +68,10 @@
         // Outer form - identical classes to .promo-games-filter
         const form  = document.createElement('form');
         form.id     = WRAP_ID;
-        form.action = 'javascript:void(0)';
+        // без action="javascript:void(0)" — FunPay CSP блокирует javascript: URL.
         form.className = 'navbar-form navbar-left dropdown fp-rmthub-form';
         form.setAttribute('autocomplete', 'off');
+        form.addEventListener('submit', (e) => e.preventDefault());
 
         const group = document.createElement('div');
         group.className = 'form-group fp-rmthub-wrap';
