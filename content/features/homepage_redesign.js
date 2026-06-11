@@ -842,8 +842,11 @@ function anonymizeHomepageChat(chatElement) {
 async function initializeRedesign() {
     loadRedesignFonts();
 
+    // Поиск по играм из шапки (.promo-games-filter в навбаре) оставляем — раньше
+    // его удаляли целиком, и на главной поиск по играм пропадал. Убираем только
+    // если форма лежит внутри промо-контента (его всё равно заменяет редизайн).
     const promoFilterForm = document.querySelector('.promo-games-filter');
-    if (promoFilterForm) {
+    if (promoFilterForm && !promoFilterForm.closest('.navbar, #header, .navbar-default')) {
         promoFilterForm.remove();
     }
 

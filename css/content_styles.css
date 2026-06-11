@@ -8414,7 +8414,7 @@ textarea.fp-cw-input { line-height:1.4; }
     transition: transform .12s, opacity .12s, background .12s;
 }
 .fp-cw-btn-primary { background: var(--cw-accent); color:#fff; }
-.fp-cw-btn-primary:hover:not(:disabled) { transform: translateY(-1px); }
+.fp-cw-btn-primary:hover:not(:disabled) { filter: brightness(1.06); }
 .fp-cw-btn-primary:disabled { opacity:0.4; cursor:not-allowed; }
 .fp-cw-btn-secondary { background: var(--cw-subtle); color: var(--cw-color); border:1px solid var(--cw-border); }
 .fp-cw-btn-secondary:hover:not(:disabled) { border-color: var(--cw-accent); }
@@ -8516,6 +8516,8 @@ textarea.fp-cw-input { line-height:1.4; }
 }
 .fpt-accsw-row:hover:not(:disabled){background:var(--fpt-uacc-soft, color-mix(in srgb, var(--fpt-uacc, #5b86d8) 14%, transparent));}
 .fpt-accsw-row.active{background:var(--fpt-uacc-soft, color-mix(in srgb, var(--fpt-uacc, #5b86d8) 12%, transparent));cursor:default;}
+/* при наведении на другой аккаунт снимаем подсветку текущего — чтобы не сливались */
+.fpt-accsw-block:hover .fpt-accsw-row.active:not(:hover){background:transparent;}
 .fpt-accsw-row:disabled{opacity:.6;}
 .fpt-accsw-av{
     position:relative;width:30px;height:30px;border-radius:50%;flex-shrink:0;
@@ -8959,7 +8961,6 @@ textarea.fp-cw-input { line-height:1.4; }
     border-color: var(--fpt-accent-line);
     background: var(--fpt-surface-2);
     box-shadow: none;
-    transform: translateY(-1px);
 }
 
 .fpt-metric-card .material-symbols-rounded {
@@ -10791,7 +10792,7 @@ body.funpay-redesigned {
     background: var(--surface-1); border: 1px solid var(--line); color: var(--text);
     transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease), transform 0.18s var(--ease);
 }
-.fpt-home .gcard:hover { border-color: var(--accent-line); background: var(--surface-2); transform: translateY(-2px); }
+.fpt-home .gcard:hover { border-color: var(--accent-line); background: var(--surface-2); }
 .fpt-home .gcard:hover .gcard-mark { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
 .fpt-home .gcard:hover .gcard-go { color: var(--accent); }
 .fpt-home .gcard-link { position: absolute; inset: 0; z-index: 1; border-radius: inherit; }
@@ -10976,7 +10977,7 @@ body.funpay-redesigned {
     transition: border-color .18s ease, transform .18s ease;
 }
 .fp-tools-popup .fpt-wall::before { content: none; }
-.fp-tools-popup .fpt-wall:hover { border-color: var(--fpt-line-strong); transform: translateY(-1px); }
+.fp-tools-popup .fpt-wall:hover { border-color: var(--fpt-line-strong); }
 .fp-tools-popup .fpt-wall.is-active { border-color: var(--fpt-accent); box-shadow: 0 0 0 1px var(--fpt-accent); }
 .fp-tools-popup .fpt-wall-prev { display: block; height: 60px; position: relative; overflow: hidden; }
 .fp-tools-popup .fpt-wall-prev.wall-none {
