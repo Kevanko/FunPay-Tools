@@ -11645,38 +11645,53 @@ body.funpay-redesigned .fpt-home .tgl[data-on="true"]::after {
    СВЕТЛАЯ ТЕМА сайта: на белом фоне у блоков (лоты, чаты, сообщения, карточки)
    пропадают края — добавляем мягкую обводку + лёгкую тень, как на главной.
    ============================================================================ */
+/* Обводку/тень даём ТОЛЬКО внешним блокам (не вложенным), чтобы не было двойных
+   рамок. .tc внутри .offer и пузыри сообщений рамок НЕ получают. */
 html[data-fpt-preset="light"] .offer,
-html[data-fpt-preset="light"] .tc,
-html[data-fpt-preset="light"] .chat,
 html[data-fpt-preset="light"] .chat-contacts,
 html[data-fpt-preset="light"] .chat-detail,
-html[data-fpt-preset="light"] .chat-full .chat,
 html[data-fpt-preset="light"] .modal-content,
 html[data-fpt-preset="light"] .product-page .page-content,
 html[data-fpt-preset="light"] .counter-item,
 html[data-fpt-preset="light"] .payment-card,
 html[data-fpt-preset="light"] .details,
-html[data-fpt-preset="light"] .form-narrow,
-html[data-fpt-preset="light"] .review-item-answer,
-html[data-fpt-preset="light"] .chat-message-list-date .inside {
+html[data-fpt-preset="light"] .form-narrow {
     border: 1px solid rgba(20,25,35,.10) !important;
     box-shadow: 0 1px 2px rgba(40,50,70,.05), 0 6px 18px rgba(40,50,70,.05) !important;
 }
-/* строки лотов/таблиц — тонкий разделитель, чтобы различать края */
-html[data-fpt-preset="light"] a.tc-item,
-html[data-fpt-preset="light"] .tc.table-hover .tc-item {
-    border-bottom: 1px solid rgba(20,25,35,.07) !important;
+/* внутренние таблицы лотов внутри .offer — БЕЗ своей рамки/тени (убираем вложенность) */
+html[data-fpt-preset="light"] .offer .tc,
+html[data-fpt-preset="light"] .offer .tc-finance {
+    border: 0 !important; box-shadow: none !important; background-color: transparent !important;
 }
-/* пузыри сообщений в чате */
-html[data-fpt-preset="light"] .chat-msg-item .chat-msg-text,
-html[data-fpt-preset="light"] .chat-message .chat-msg-body {
-    border: 1px solid rgba(20,25,35,.08);
-    border-radius: 10px;
-}
-/* контакты в списке чата — разделители */
+/* строки лотов — только тонкий нижний разделитель */
+html[data-fpt-preset="light"] a.tc-item { border-bottom: 1px solid rgba(20,25,35,.07) !important; }
+/* контакты в списке чата — разделители (без рамок у самих пузырей) */
 html[data-fpt-preset="light"] .contact-item { border-bottom: 1px solid rgba(20,25,35,.06) !important; }
 /* поля ввода на сайте — видимая рамка */
 html[data-fpt-preset="light"] .form-control,
 html[data-fpt-preset="light"] .chat-form-input .form-control {
     border: 1px solid rgba(20,25,35,.14) !important;
 }
+
+/* Светлая тема: статистика профиля лежит поверх ТЁМНОЙ обложки игры — тёмный текст
+   на ней не читался. Делаем светлым + лёгкая тень (имя оставляем акцентным). */
+html[data-fpt-preset="light"] .profile-header h5,
+html[data-fpt-preset="light"] .profile-header .text-bold,
+html[data-fpt-preset="light"] .profile-header .inline-block-vat,
+html[data-fpt-preset="light"] .profile-header .rating-full-count,
+html[data-fpt-preset="light"] .profile-header .param-item,
+html[data-fpt-preset="light"] .profile-header .param-item *,
+html[data-fpt-preset="light"] .profile-cover .rating-full-count {
+    color: #f1f3f7 !important;
+    text-shadow: 0 1px 4px rgba(0,0,0,.6), 0 0 2px rgba(0,0,0,.45) !important;
+}
+/* Шапка: поиск по играм и поле «Продавец» (RMTHub) — светлое поле + тёмный текст */
+html[data-fpt-preset="light"] .navbar .form-control,
+html[data-fpt-preset="light"] .fp-rmthub-form input,
+html[data-fpt-preset="light"] .fp-rmthub-form .form-control {
+    background-color: #ffffff !important; color: #272b33 !important;
+    border: 1px solid rgba(20,25,35,.16) !important;
+}
+html[data-fpt-preset="light"] .navbar .form-control::placeholder,
+html[data-fpt-preset="light"] .fp-rmthub-form input::placeholder { color: #8a90a0 !important; }
