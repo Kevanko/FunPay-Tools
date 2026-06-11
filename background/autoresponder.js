@@ -17,11 +17,55 @@ function isBotMarked(text) {
 }
 
 
+const _sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+// ── Глобальный темп запросов к FunPay + адаптивный бэк-офф ────────────────────
+// Все запросы к FunPay в фоне идут через ОДНУ очередь с минимальным интервалом,
+// а при 429/5xx включается глобальная пауза (учитываем Retry-After). Так частые
+// циклы (мульти-аккаунт, автоответчик, пинг онлайна) не доводят API до 500.
+const FP_MIN_GAP_MS = 800;        // минимум между двумя запросами к FunPay
+let _fpReqChain = Promise.resolve();
+let _fpLastReq = 0;
+let _fpRlUntil = 0;               // глобальная пауза до этого времени (rate-limit)
+let _fpConsecRL = 0;             // подряд идущие rate-limit-ответы
+
+export function fpRateLimitedUntil() { return _fpRlUntil; }
+export function fpIsRateLimited() { return Date.now() < _fpRlUntil; }
+
+function _fpEnqueue(fn) { const next = _fpReqChain.then(fn, fn); _fpReqChain = next.catch(() => {}); return next; }
+
+// Единая точка запросов к FunPay: пауза при кулдауне + минимальный интервал +
+// фиксация rate-limit. Возвращает Response (вызывающий сам решает про ретрай).
+export async function fpFetch(url, options) {
+    return _fpEnqueue(async () => {
+        const waitRL = _fpRlUntil - Date.now();
+        if (waitRL > 0) await _sleep(waitRL);
+        const gap = FP_MIN_GAP_MS - (Date.now() - _fpLastReq);
+        if (gap > 0) await _sleep(gap);
+        _fpLastReq = Date.now();
+        let res;
+        try { res = await fetch(url, options); }
+        catch (e) { _fpRlUntil = Math.max(_fpRlUntil, Date.now() + 4000); throw e; }   // сетевой сбой — тоже притормозим
+        if (res.status === 429 || res.status >= 500) {
+            _fpConsecRL = Math.min(_fpConsecRL + 1, 6);
+            const ra = parseInt(res.headers.get('retry-after') || '', 10);
+            const backoff = !Number.isNaN(ra) && ra > 0
+                ? Math.min(ra * 1000, 120000)
+                : Math.min(2000 * Math.pow(2, _fpConsecRL), 60000) + Math.random() * 500;
+            _fpRlUntil = Date.now() + backoff;
+            console.warn(`FP Tools: FunPay ${res.status} → пауза ${Math.round(backoff)}мс`);
+        } else {
+            _fpConsecRL = 0;
+        }
+        return res;
+    });
+}
+
 async function fetchWithRetry(url, options, { retries = 4, baseDelay = 800 } = {}) {
     let lastErr;
     for (let attempt = 0; attempt <= retries; attempt++) {
         try {
-            const res = await fetch(url, options);
+            const res = await fpFetch(url, options);   // через глобальный темп/бэк-офф
             // Retry on rate-limit / server errors; return everything else to caller.
             if (res.status === 429 || res.status >= 500) {
                 lastErr = new Error(`HTTP ${res.status}`);
@@ -38,6 +82,10 @@ async function fetchWithRetry(url, options, { retries = 4, baseDelay = 800 } = {
     }
     throw lastErr || new Error('fetchWithRetry: exhausted');
 }
+
+// ── Общий замок на подмену куки (heartbeat и мульти-аккаунт не свапят разом) ──
+let _cookieLock = Promise.resolve();
+export function withCookieLock(fn) { const next = _cookieLock.then(fn, fn); _cookieLock = next.catch(() => {}); return next; }
 
 const RX = {
 
@@ -783,18 +831,22 @@ let _maChain = Promise.resolve();
 function _maSerialize(fn) { const next = _maChain.then(fn, fn); _maChain = next.catch(() => {}); return next; }
 
 // Выполнить fn, когда активна golden_key целевого аккаунта; затем вернуть исходную.
+// Под общим замком withCookieLock — чтобы пинг онлайна и мульти-аккаунт не
+// подменяли куку одновременно (иначе гонки и 500/выход из аккаунта).
 async function withAccountCookie(key, fn) {
-    const orig = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
-    if (orig && orig.value === key) return await fn();   // уже активен — без свапа
-    try { await chrome.cookies.remove({ url: 'https://funpay.com', name: 'PHPSESSID' }); } catch (_) {}
-    await _setGolden(key);
-    try {
-        return await fn();
-    } finally {
+    return withCookieLock(async () => {
+        const orig = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
+        if (orig && orig.value === key) return await fn();   // уже активен — без свапа
         try { await chrome.cookies.remove({ url: 'https://funpay.com', name: 'PHPSESSID' }); } catch (_) {}
-        if (orig && orig.value) await _setGolden(orig.value);
-        else { try { await chrome.cookies.remove({ url: 'https://funpay.com', name: 'golden_key' }); } catch (_) {} }
-    }
+        await _setGolden(key);
+        try {
+            return await fn();
+        } finally {
+            try { await chrome.cookies.remove({ url: 'https://funpay.com', name: 'PHPSESSID' }); } catch (_) {}
+            if (orig && orig.value) await _setGolden(orig.value);
+            else { try { await chrome.cookies.remove({ url: 'https://funpay.com', name: 'golden_key' }); } catch (_) {} }
+        }
+    });
 }
 
 // csrf + userId текущего (ambient) аккаунта.
@@ -846,6 +898,8 @@ export async function runMultiAccountAutoReply(opts = {}) {
     const { dryRun = false, onlyKey = null } = opts;
     return _maSerialize(async () => {
         const report = { accounts: [], errors: [], dryRun };
+        // FunPay сейчас под бэк-оффом — не лезем, чтобы не усугублять 429/500.
+        if (fpIsRateLimited()) { report.rateLimited = true; report.retryInMs = _fpRlUntil - Date.now(); return report; }
         const store = await chrome.storage.local.get(['fpToolsAccounts', 'fptProfiles', 'fptMultiAR', 'fptMultiAccountAR']);
         const accounts = store.fpToolsAccounts || [];
         const profiles = store.fptProfiles || {};
@@ -858,6 +912,7 @@ export async function runMultiAccountAutoReply(opts = {}) {
         if (onlyKey) targets = accounts.filter(a => a && a.key === onlyKey);  // dry-run может смотреть и активный
 
         for (const account of targets) {
+            if (fpIsRateLimited()) { report.rateLimited = true; break; }   // поймали бэк-офф — стоп до следующего цикла
             const settings = (profiles[account.name] || {}).fpToolsAutoReplies || {};
             const anyEnabled = settings.greetingEnabled || settings.keywordsEnabled;
             if (!dryRun && !anyEnabled) { report.accounts.push({ name: account.name, skipped: 'нет включённых авто-ответов в профиле' }); continue; }
