@@ -747,10 +747,12 @@ button.add-image-btn .material-symbols-rounded {
 .fp-tools-popup label code,
 .fp-tools-popup li code,
 .fp-tools-popup code {
-    background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 12%, transparent) !important;
-    background-color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 12%, transparent) !important;
-    color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, #ffffff) !important;
-    border: 1px solid color-mix(in srgb, var(--fpt-uacc, #5b86d8) 28%, transparent) !important;
+    /* фон плотнее (18% акцента поверх непрозрачной нейтрали), текст — ПОЛНЫЙ акцент:
+       читается и на тёмном, и на белом попапе (прежний 55%+белый сливался на светлой теме) */
+    background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 16%, rgba(128,128,128,.16)) !important;
+    background-color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 16%, rgba(128,128,128,.16)) !important;
+    color: var(--fpt-uacc, #5b86d8) !important;
+    border: 1px solid color-mix(in srgb, var(--fpt-uacc, #5b86d8) 32%, transparent) !important;
     border-radius: 6px !important;
     padding: 1px 6px !important;
     font-family: 'Geist Mono', 'SF Mono', ui-monospace, 'Consolas', monospace !important;

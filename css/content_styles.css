@@ -11580,3 +11580,43 @@ body.funpay-redesigned .fpt-home .tgl[data-on="true"]::after {
 .fpt-acc-item[data-scheme="light"] .fpt-acc-login-btn.active { color: #1f8a4c !important; background: rgba(31,138,76,.12) !important; }
 .fpt-acc-item[data-scheme="light"] .fpt-acc-login-btn.relogin { color: #fff !important; background: #d89a3a !important; }
 .fpt-acc-item[data-scheme="light"] .fpt-acc-active-dot { background: #1f8a4c !important; }
+
+/* ============================================================================
+   Полная читаемость СВЕТЛОГО (прозрачного) попапа: тёмный текст + контрастные
+   поля/чипы/кнопки. Активно только когда меню прозрачное И фон светлый.
+   ============================================================================ */
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .fp-tools-content span:not(.material-symbols-rounded):not(.material-icons):not(.nav-icon),
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .fp-tools-content small,
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .fp-tools-content li,
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .fp-tools-content b,
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .fp-tools-content strong,
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .fp-tools-content h5,
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .fp-tools-nav li small,
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .fp-tools-nav li span:not(.nav-icon):not(.material-symbols-rounded) {
+    color: #2a2f3a !important;
+}
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .feature-desc,
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .template-info,
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .info-toggle,
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .block-info {
+    color: #565d6b !important;
+}
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .variable-code,
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light code {
+    color: #234ea8 !important; background: rgba(91,134,216,.16) !important;
+}
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light input,
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light textarea,
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light select,
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .template-input,
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .template-text,
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .calculator-display,
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light #calcDisplay {
+    color: #222732 !important;
+    background-color: rgba(255,255,255,.74) !important;
+    border-color: rgba(20,25,35,.22) !important;
+}
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light input::placeholder,
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light textarea::placeholder { color: #8a90a0 !important; }
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .btn-default,
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .calc-btn { color: #222732 !important; }

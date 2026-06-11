@@ -801,7 +801,14 @@ async function applyFptMenuTransparency(override) {
         // чтобы текст читался при любой теме, не делая меню непрозрачным.
         let lightBg = false;
         try {
-            if (typeof fptResolveBg === 'function' && typeof fptLuma === 'function') {
+            // Светлый пресет (или нативная тема FunPay) = под прозрачным меню светлый фон →
+            // меню должно быть «на светлом» (тёмный текст). Проба яркости фона раньше
+            // ошибалась на светлой теме (брала тёмный тинт) → меню оставалось «на тёмном»
+            // и светлый текст сливался с белым фоном. Пресет — надёжный сигнал.
+            const LIGHT_PRESETS = new Set(['light', 'snow', 'paper', 'native']);
+            if (LIGHT_PRESETS.has(s.sitePreset)) {
+                lightBg = true;
+            } else if (typeof fptResolveBg === 'function' && typeof fptLuma === 'function') {
                 lightBg = fptLuma(fptResolveBg()) >= 0.5;
             }
         } catch (_) {}
