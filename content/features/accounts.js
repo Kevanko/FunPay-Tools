@@ -322,6 +322,21 @@ function setupAccountManagementHandlers() {
         addNewBtn.dataset.handlerAttached = 'true';
         addNewBtn.addEventListener('click', () => fptStartAddNewAccount());
     }
+
+    const maToggle = document.getElementById('fptMultiAccountARToggle');
+    if (maToggle && !maToggle.dataset.wired && _fptAlive()) {
+        maToggle.dataset.wired = '1';
+        chrome.storage.local.get('fptMultiAccountAR', ({ fptMultiAccountAR }) => { maToggle.checked = !!fptMultiAccountAR; });
+        maToggle.addEventListener('change', () => {
+            if (!_fptAlive()) return;
+            chrome.storage.local.set({ fptMultiAccountAR: maToggle.checked });
+            if (typeof showNotification === 'function') {
+                showNotification(maToggle.checked
+                    ? 'Фоновый авто-ответ включён. Существующие чаты не трогаются — только новые сообщения.'
+                    : 'Фоновый авто-ответ выключен.', false);
+            }
+        });
+    }
 }
 
 // Пункты в дропдауне профиля FunPay (шапка сайта): «Добавить аккаунт» и

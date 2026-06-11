@@ -764,6 +764,167 @@ async function _runAutoResponderCycleInner() {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// МУЛЬТИ-АККАУНТНЫЙ АВТООТВЕТ (для онлайн-аккаунтов, под которыми вы СЕЙЧАС не в
+// браузере). Ручной заголовок Cookie в SW не авторизует — поэтому на время цикла
+// аккаунта подменяем golden_key (как fptSnapshotForKey), работаем по ambient-куке
+// и ВОЗВРАЩАЕМ исходную куку. Включается флагом fptMultiAccountAR. Состояние и
+// настройки — у каждого аккаунта свои (профиль). Дедуп — на аккаунт.
+// ─────────────────────────────────────────────────────────────────────────────
+function _setGolden(value) {
+    return chrome.cookies.set({
+        url: 'https://funpay.com', name: 'golden_key', value,
+        domain: '.funpay.com', path: '/', secure: true, sameSite: 'lax',
+        expirationDate: Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60
+    });
+}
+
+let _maChain = Promise.resolve();
+function _maSerialize(fn) { const next = _maChain.then(fn, fn); _maChain = next.catch(() => {}); return next; }
+
+// Выполнить fn, когда активна golden_key целевого аккаунта; затем вернуть исходную.
+async function withAccountCookie(key, fn) {
+    const orig = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
+    if (orig && orig.value === key) return await fn();   // уже активен — без свапа
+    try { await chrome.cookies.remove({ url: 'https://funpay.com', name: 'PHPSESSID' }); } catch (_) {}
+    await _setGolden(key);
+    try {
+        return await fn();
+    } finally {
+        try { await chrome.cookies.remove({ url: 'https://funpay.com', name: 'PHPSESSID' }); } catch (_) {}
+        if (orig && orig.value) await _setGolden(orig.value);
+        else { try { await chrome.cookies.remove({ url: 'https://funpay.com', name: 'golden_key' }); } catch (_) {} }
+    }
+}
+
+// csrf + userId текущего (ambient) аккаунта.
+async function _ambientAuth() {
+    const res = await fetchWithRetry('https://funpay.com/', { credentials: 'include', cache: 'no-store' });
+    const text = await res.text();
+    const m = text.match(/<body[^>]*data-app-data="([^"]+)"/);
+    if (!m) return null;
+    let u;
+    try { const d = JSON.parse(m[1].replace(/&quot;/g, '"')); u = Array.isArray(d) ? d[0] : d; } catch (_) { return null; }
+    if (!u || !u['csrf-token'] || !u.userId) return null;
+    const gk = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
+    const php = await chrome.cookies.get({ url: 'https://funpay.com', name: 'PHPSESSID' });
+    return { csrf_token: u['csrf-token'], userId: u.userId, username: u.userName, golden_key: gk?.value || '', phpsessid: php?.value || '' };
+}
+
+// Чаты аккаунта через runner (ambient-кука = целевой аккаунт).
+async function _ambientChats(auth) {
+    const payload = {
+        objects: JSON.stringify([{ type: 'chat_bookmarks', id: auth.userId, tag: randomTag(), data: false }]),
+        request: false, csrf_token: auth.csrf_token
+    };
+    const res = await fetchWithRetry('https://funpay.com/runner/', {
+        method: 'POST', credentials: 'include',
+        headers: { 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8', 'x-requested-with': 'XMLHttpRequest' },
+        body: new URLSearchParams(payload)
+    }, { retries: 2, baseDelay: 600 });
+    if (!res.ok) throw new Error(`runner HTTP ${res.status}`);
+    const data = await res.json();
+    const chatObj = data.objects?.find(o => o.type === 'chat_bookmarks');
+    if (!chatObj?.data?.html) return [];
+    return await parseViaOffscreen(chatObj.data.html, 'parseChatList');
+}
+
+// Подбор ответа по ключевым словам (как handleKeywords, но чистая функция).
+function matchKeywordReply(text, settings) {
+    if (!settings.keywordsEnabled || !settings.keywords?.length) return null;
+    const clean = (text || '').replace(/[​‌‍﻿⁠]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+    for (const rule of settings.keywords) {
+        const kw = (rule.keyword || '').replace(/[​‌‍﻿⁠]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+        if (!kw) continue;
+        const m = rule.matchMode === 'contains' ? clean.includes(kw) : clean === kw;
+        if (m) return { text: applyVariables(rule.response, {}), images: rule.images, sendOrder: rule.sendOrder };
+    }
+    return null;
+}
+
+export async function runMultiAccountAutoReply(opts = {}) {
+    const { dryRun = false, onlyKey = null } = opts;
+    return _maSerialize(async () => {
+        const report = { accounts: [], errors: [], dryRun };
+        const store = await chrome.storage.local.get(['fpToolsAccounts', 'fptProfiles', 'fptMultiAR', 'fptMultiAccountAR']);
+        const accounts = store.fpToolsAccounts || [];
+        const profiles = store.fptProfiles || {};
+        const stateMap = store.fptMultiAR || {};
+        if (!dryRun && !store.fptMultiAccountAR) { report.disabled = true; return report; }
+
+        const active = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
+        const activeKey = active?.value;
+        let targets = accounts.filter(a => a && a.key && a.online !== false && a.key !== activeKey);
+        if (onlyKey) targets = accounts.filter(a => a && a.key === onlyKey);  // dry-run может смотреть и активный
+
+        for (const account of targets) {
+            const settings = (profiles[account.name] || {}).fpToolsAutoReplies || {};
+            const anyEnabled = settings.greetingEnabled || settings.keywordsEnabled;
+            if (!dryRun && !anyEnabled) { report.accounts.push({ name: account.name, skipped: 'нет включённых авто-ответов в профиле' }); continue; }
+
+            const state = stateMap[account.key] || { seeded: false, lastSeen: {}, greeted: [] };
+            try {
+                await withAccountCookie(account.key, async () => {
+                    const auth = await _ambientAuth();
+                    if (!auth) { report.errors.push(`${account.name}: не удалось авторизоваться`); return; }
+                    const chats = await _ambientChats(auth);
+                    const acc = { name: account.name, userId: auth.userId, totalChats: chats.length, seeded: state.seeded, settings: { greeting: !!settings.greetingEnabled, keywords: !!settings.keywordsEnabled, keywordRules: (settings.keywords || []).length }, items: [], sent: [] };
+                    const greeted = new Set(state.greeted || []);
+                    const lastSeen = state.lastSeen || {};
+
+                    for (const chat of chats) {
+                        const nodeMsg = chat.nodeMsg;
+                        const prev = lastSeen[chat.chatId] || 0;
+                        const isNew = nodeMsg != null ? nodeMsg > prev : !!chat.isUnread;
+                        const needsReply = (chat.isUnread || isNew) && !chat.lastByBot;
+
+                        // dry-run: показываем КАЖДЫЙ требующий ответа чат и какой ответ был бы
+                        if (dryRun) {
+                            if (!needsReply) continue;
+                            const kw = matchKeywordReply(chat.messageText, settings);
+                            const wouldGreet = settings.greetingEnabled && settings.greetingText && !greeted.has(chat.chatId);
+                            acc.items.push({
+                                chatId: chat.chatId, buyer: chat.chatName,
+                                lastMsg: (chat.messageText || '').slice(0, 60),
+                                msgType: getMessageType(chat.messageText),
+                                wouldReply: kw ? { kind: 'keyword', text: kw.text.slice(0, 60) } : (wouldGreet ? { kind: 'greeting', text: applyVariables(settings.greetingText || '', { buyerName: chat.chatName }).slice(0, 60) } : null)
+                            });
+                            continue;
+                        }
+
+                        // реальный режим
+                        if (chat.lastByBot) { if (nodeMsg != null) lastSeen[chat.chatId] = Math.max(prev, nodeMsg); continue; }
+                        if (!isNew) continue;
+                        if (nodeMsg != null) lastSeen[chat.chatId] = Math.max(prev, nodeMsg);
+                        if (!state.seeded) continue;                       // первый проход — только базовая отметка
+                        if (getMessageType(chat.messageText) !== 'NON_SYSTEM') continue;
+
+                        const kw = matchKeywordReply(chat.messageText, settings);
+                        let reply = null, kind = null, images = null, order = null;
+                        if (kw) { reply = kw.text; kind = 'keyword'; images = kw.images; order = kw.sendOrder; }
+                        else if (settings.greetingEnabled && settings.greetingText && !greeted.has(chat.chatId)) {
+                            reply = applyVariables(settings.greetingText, { buyerName: chat.chatName, chatId: chat.chatId });
+                            kind = 'greeting'; images = settings.greetingImages; order = settings.greetingSendOrder;
+                        }
+                        if (!reply) continue;
+                        try {
+                            await sendReplyContent(chat.chatId, reply, auth, images, order);
+                            if (kind === 'greeting') greeted.add(chat.chatId);
+                            acc.sent.push({ chatId: chat.chatId, kind });
+                        } catch (e) { report.errors.push(`${account.name}/${chat.chatId}: ${e.message}`); }
+                    }
+
+                    if (!dryRun) { state.lastSeen = lastSeen; state.greeted = [...greeted]; state.seeded = true; stateMap[account.key] = state; }
+                    report.accounts.push(acc);
+                });
+            } catch (e) { report.errors.push(`${account.name}: ${e.message}`); }
+            await new Promise(r => setTimeout(r, 400));
+        }
+        if (!dryRun) await chrome.storage.local.set({ fptMultiAR: stateMap });
+        return report;
+    });
+}
+
 export async function resetAutoResponderState() {
     await chrome.storage.local.remove(RUNNER_TAG_KEY);
     // also clear per-chat tracking so re-enabling re-seeds cleanly

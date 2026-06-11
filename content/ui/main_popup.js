@@ -343,6 +343,13 @@ function createMainPopup() {
                         <button id="addCurrentAccountBtn" class="btn">+ Добавить текущий</button>
                         <button id="addNewAccountBtn" class="btn btn-default"><span class="material-symbols-rounded" style="font-size:17px;vertical-align:-3px;margin-right:5px;">login</span>Войти в другой аккаунт</button>
                     </div>
+                    <label class="fpt-multiar-toggle" style="display:flex;align-items:flex-start;gap:11px;margin-top:16px;padding:12px 14px;border:1px solid var(--fpt-line);border-radius:11px;cursor:pointer;">
+                        <input type="checkbox" id="fptMultiAccountARToggle" style="margin-top:3px;flex:none;">
+                        <span style="flex:1;">
+                            <span style="font-weight:600;display:block;margin-bottom:3px;">Фоновый авто-ответ за онлайн-аккаунты</span>
+                            <span style="font-size:11.5px;color:var(--fpt-text-dim,#9099b8);line-height:1.45;">Отвечает приветствием и по ключевым словам за аккаунты, под которыми вы сейчас не в браузере — по <b>их</b> настройкам авто-ответа (вкладка «Авто-ответы» в профиле каждого). Существующие чаты не трогает: реагирует только на <b>новые</b> сообщения после включения.</span>
+                        </span>
+                    </label>
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-top:22px;margin-bottom:10px;">
                         <h4 style="margin:0;">Сохраненные аккаунты:</h4>
                         <button id="fptRefreshAccountsBtn" class="btn btn-default" style="padding:4px 10px;font-size:12px;" title="Обновить баланс, аватары и непрочитанные">
