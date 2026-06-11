@@ -2085,6 +2085,19 @@ chrome.storage.onChanged.addListener((changes, area) => {
             });
         }
     }
+    // Авто-поднятие теперь ПО АККАУНТУ (свап при смене) — при изменении флага/кулдауна
+    // переармируем будильник под состояние АКТИВНОГО аккаунта. Иначе включение на одном
+    // аккаунте продолжало бы «работать на всех».
+    if (changes.autoBumpEnabled || changes.autoBumpCooldown) {
+        chrome.storage.local.get(['autoBumpEnabled', 'autoBumpCooldown', 'fpToolsSmartBumpEnabled'], (s) => {
+            if (s.fpToolsSmartBumpEnabled) return;   // умным поднятием управляет свой обработчик
+            if (s.autoBumpEnabled && s.autoBumpCooldown) {
+                chrome.alarms.create(BUMP_ALARM_NAME, { delayInMinutes: 1, periodInMinutes: parseInt(s.autoBumpCooldown, 10) });
+            } else {
+                chrome.alarms.clear(BUMP_ALARM_NAME);
+            }
+        });
+    }
 });
 
 chrome.runtime.onUpdateAvailable.addListener(function(details) {
