@@ -79,7 +79,7 @@
         overlay.innerHTML = `
             <div class="fpt-addgame-modal">
                 <div class="fpt-addgame-head">
-                    <span>Добавить лоты по игре</span>
+                    <span>Добавить лот по игре</span>
                     <button type="button" class="fpt-addgame-close"><span class="material-symbols-rounded">close</span></button>
                 </div>
                 <div class="fpt-addgame-body">
@@ -89,16 +89,27 @@
                         <div class="fpt-addgame-suggest"></div>
                         <div class="fpt-addgame-chosen" style="display:none;"></div>
                     </div>
-                    <div class="fpt-addgame-step">
-                        <div class="fpt-addgame-steplabel">2 · Какие лоты скопировать</div>
-                        <div class="fpt-addgame-lots"></div>
+                    <div class="fpt-addgame-step fpt-addgame-step2" style="display:none;">
+                        <div class="fpt-addgame-steplabel">2 · Раздел игры</div>
+                        <select class="fpt-addgame-cat template-input"></select>
+                        <div class="fpt-addgame-cathint">У каждой игры свои разделы — выберите, куда добавить лот.</div>
+                    </div>
+                    <div class="fpt-addgame-step fpt-addgame-step3" style="display:none;">
+                        <div class="fpt-addgame-steplabel">3 · Как создать лот</div>
+                        <div class="fpt-addgame-modes">
+                            <label class="fpt-addgame-mode"><input type="radio" name="fpt-addgame-mode" value="empty" checked><span class="material-symbols-rounded">note_add</span><span class="fpt-addgame-mode-t">Пустой лот<small>создать чистый, без настроек</small></span></label>
+                            <label class="fpt-addgame-mode"><input type="radio" name="fpt-addgame-mode" value="copy"><span class="material-symbols-rounded">content_copy</span><span class="fpt-addgame-mode-t">Скопировать существующий<small>перенести выбранные лоты</small></span></label>
+                            <label class="fpt-addgame-mode"><input type="radio" name="fpt-addgame-mode" value="ai"><span class="material-symbols-rounded">auto_awesome</span><span class="fpt-addgame-mode-t">Создать с ИИ<small>название и описание сгенерирует ИИ</small></span></label>
+                        </div>
+                        <div class="fpt-addgame-lots" style="display:none;"></div>
+                        <div class="fpt-addgame-ainote" style="display:none;">ИИ создаст название и описание в вашем стиле на основе существующих лотов. Можно отредактировать перед публикацией.</div>
                     </div>
                 </div>
                 <div class="fpt-addgame-foot">
                     <span class="fpt-addgame-note">Каркас. Реальное создание лотов включим после вашего подтверждения.</span>
                     <div class="fpt-addgame-actions">
                         <button type="button" class="fpt-addgame-cancel">Отмена</button>
-                        <button type="button" class="fpt-addgame-create" disabled>Создать раздел и скопировать</button>
+                        <button type="button" class="fpt-addgame-create" disabled>Создать лот</button>
                     </div>
                 </div>
             </div>`;
@@ -109,32 +120,44 @@
         overlay.querySelector('.fpt-addgame-close').addEventListener('click', close);
         overlay.querySelector('.fpt-addgame-cancel').addEventListener('click', close);
 
-        // лоты для копирования
-        const lotsBox = overlay.querySelector('.fpt-addgame-lots');
-        const lots = collectExistingLots();
-        if (!lots.length) {
-            lotsBox.innerHTML = '<div class="fpt-addgame-empty">Лоты не найдены на странице.</div>';
-        } else {
-            lotsBox.innerHTML = lots.map((l, i) => `
-                <label class="fpt-addgame-lot">
-                    <input type="checkbox" data-lot="${i}">
-                    <span class="fpt-addgame-lot-desc">${escapeHtml(l.desc)}</span>
-                    <span class="fpt-addgame-lot-meta">${escapeHtml(l.game)}${l.price ? ' · ' + escapeHtml(l.price) : ''}</span>
-                </label>`).join('');
-        }
-
-        // выбор игры
         const search = overlay.querySelector('.fpt-addgame-search');
         const suggest = overlay.querySelector('.fpt-addgame-suggest');
         const chosen = overlay.querySelector('.fpt-addgame-chosen');
+        const step2 = overlay.querySelector('.fpt-addgame-step2');
+        const step3 = overlay.querySelector('.fpt-addgame-step3');
+        const catSel = overlay.querySelector('.fpt-addgame-cat');
+        const lotsBox = overlay.querySelector('.fpt-addgame-lots');
+        const aiNote = overlay.querySelector('.fpt-addgame-ainote');
         const createBtn = overlay.querySelector('.fpt-addgame-create');
         let chosenGame = null;
 
+        const lots = collectExistingLots();
+
+        const currentMode = () => overlay.querySelector('input[name="fpt-addgame-mode"]:checked')?.value || 'empty';
         const updateCreate = () => {
-            const anyLot = !!overlay.querySelector('.fpt-addgame-lot input:checked');
-            createBtn.disabled = !(chosenGame && anyLot);
+            const mode = currentMode();
+            // копирование НЕ обязательно: пустой/ИИ — достаточно игры; копирование — нужен хотя бы один лот
+            let ok = !!chosenGame;
+            if (mode === 'copy') ok = ok && !!overlay.querySelector('.fpt-addgame-lot input:checked');
+            createBtn.disabled = !ok;
+            createBtn.textContent = mode === 'copy' ? 'Создать и скопировать' : (mode === 'ai' ? 'Создать с ИИ' : 'Создать пустой лот');
         };
-        lotsBox.addEventListener('change', updateCreate);
+
+        // переключение способа создания
+        step3.addEventListener('change', e => {
+            if (e.target.name === 'fpt-addgame-mode') {
+                const mode = currentMode();
+                lotsBox.style.display = mode === 'copy' ? '' : 'none';
+                aiNote.style.display = mode === 'ai' ? '' : 'none';
+                if (mode === 'copy' && !lotsBox.dataset.filled) {
+                    lotsBox.dataset.filled = '1';
+                    lotsBox.innerHTML = lots.length
+                        ? lots.map((l, i) => `<label class="fpt-addgame-lot"><input type="checkbox" data-lot="${i}"><span class="fpt-addgame-lot-desc">${escapeHtml(l.desc)}</span><span class="fpt-addgame-lot-meta">${escapeHtml(l.game)}${l.price ? ' · ' + escapeHtml(l.price) : ''}</span></label>`).join('')
+                        : '<div class="fpt-addgame-empty">Лоты не найдены на странице.</div>';
+                }
+            }
+            updateCreate();
+        });
 
         let games = [];
         loadGames().then(g => { games = g; });
@@ -154,18 +177,28 @@
         suggest.addEventListener('click', e => {
             const b = e.target.closest('.fpt-addgame-sg');
             if (!b) return;
-            chosenGame = games.find(g => g.url === b.dataset.url) || { name: b.textContent.trim(), url: b.dataset.url };
+            chosenGame = games.find(g => g.url === b.dataset.url) || { name: b.textContent.trim(), url: b.dataset.url, cats: [] };
             chosen.style.display = '';
             chosen.innerHTML = `<span class="material-symbols-rounded">check_circle</span>Игра: <b>${escapeHtml(chosenGame.name)}</b>`;
             suggest.innerHTML = '';
             search.value = chosenGame.name;
+            // разделы выбранной игры (у каждой игры свои)
+            const cats = chosenGame.cats || [];
+            catSel.innerHTML = cats.length
+                ? cats.map(c => `<option value="${escapeHtml(c.url)}">${escapeHtml(c.name)}</option>`).join('')
+                : '<option value="">У игры нет доступных разделов</option>';
+            catSel.disabled = !cats.length;
+            step2.style.display = '';
+            step3.style.display = '';
             updateCreate();
         });
 
-        // создание — пока ЗАГЕЙЧЕНО
+        // создание — пока ЗАГЕЙЧЕНО (каркас)
         createBtn.addEventListener('click', () => {
+            const mode = currentMode();
+            const map = { empty: 'создаст пустой лот', copy: 'создаст лоты копированием выбранных', ai: 'создаст лот через ИИ' };
             if (typeof showNotification === 'function') {
-                showNotification('Это каркас. Скажите «включить» — и кнопка начнёт реально создавать раздел и копировать выбранные лоты.', false);
+                showNotification(`Каркас. Скажите «включить» — кнопка ${map[mode]} в выбранном разделе игры.`, false);
             }
         });
     }

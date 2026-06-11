@@ -6048,6 +6048,18 @@ a.contact-item:hover {
 .fpt-addgame-sg{display:flex;align-items:center;justify-content:space-between;gap:8px;border:0;background:transparent;color:var(--fpt-pTx);text-align:left;padding:9px 11px;border-radius:9px;cursor:pointer;font-size:13.5px;}
 .fpt-addgame-sg small{color:var(--fpt-pTxFaint, #8a90a6);font-size:11px;}
 .fpt-addgame-sg:hover{background:var(--fpt-uacc-soft, rgba(91,134,216,.12));}
+.fpt-addgame-cat{width:100%;height:40px;padding:0 11px;border-radius:10px;border:1px solid var(--fpt-pLine, rgba(255,255,255,.12));background:var(--fpt-pInput, #14151b);color:var(--fpt-pTx);font-size:14px;box-sizing:border-box;cursor:pointer;}
+.fpt-addgame-cat:focus{outline:none;border-color:var(--fpt-uacc, #5b86d8);}
+.fpt-addgame-cathint{font-size:11.5px;color:var(--fpt-pTxFaint, #8a90a6);margin-top:6px;}
+.fpt-addgame-modes{display:flex;flex-direction:column;gap:8px;}
+.fpt-addgame-mode{display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:11px;border:1px solid var(--fpt-pLine, rgba(255,255,255,.1));background:var(--fpt-pInput, #14151b);cursor:pointer;margin:0;transition:border-color .15s ease,background .15s ease;}
+.fpt-addgame-mode:hover{border-color:var(--fpt-uacc-line, rgba(91,134,216,.4));}
+.fpt-addgame-mode input{accent-color:var(--fpt-uacc, #5b86d8);width:16px;height:16px;flex:none;}
+.fpt-addgame-mode>.material-symbols-rounded{font-size:20px;color:var(--fpt-uacc, #5b86d8);flex:none;}
+.fpt-addgame-mode-t{display:flex;flex-direction:column;font-size:13.5px;font-weight:560;color:var(--fpt-pTx);line-height:1.3;}
+.fpt-addgame-mode-t small{font-size:11.5px;font-weight:400;color:var(--fpt-pTxFaint, #8a90a6);}
+.fpt-addgame-mode:has(input:checked){border-color:var(--fpt-uacc, #5b86d8);background:var(--fpt-uacc-soft, rgba(91,134,216,.1));}
+.fpt-addgame-ainote{margin-top:10px;padding:10px 12px;border-radius:9px;background:var(--fpt-uacc-soft, rgba(91,134,216,.1));font-size:12.5px;color:var(--fpt-pTxDim, #cfd2dc);line-height:1.45;}
 .fpt-addgame-chosen{display:flex;align-items:center;gap:7px;margin-top:8px;font-size:13px;color:var(--fpt-pTxDim, #cfd2dc);}
 .fpt-addgame-chosen .material-symbols-rounded{font-size:17px;color:#3fbf6f;}
 .fpt-addgame-lots{display:flex;flex-direction:column;gap:4px;max-height:240px;overflow-y:auto;border:1px solid var(--fpt-pLine, rgba(255,255,255,.08));border-radius:10px;padding:6px;}
