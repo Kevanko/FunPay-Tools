@@ -1542,51 +1542,31 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             try {
                 if (!request.key) throw new Error('Пустой ключ аккаунта.');
 
-                // --- FIX (multi-account login) ---
-                // Прежняя реализация ломала вход по нескольким причинам:
-                //   1. chrome.cookies.set НЕ умеет ставить httpOnly — этот флаг
-                //      нельзя задать через API, и его передача приводит к тому, что
-                //      запись куки молча проваливается (или ведёт себя непредсказуемо).
-                //   2. FunPay ставит golden_key на домен ".funpay.com" (host-wide,
-                //      с ведущей точкой). Запись с domain:"funpay.com" создаёт ОТДЕЛЬНУЮ
-                //      host-only куку, которая конфликтует с уже существующей доменной.
-                //      В итоге сервер видит рассинхрон и разлогинивает пользователя.
-                // Решение: сначала полностью удаляем все варианты golden_key и сессию,
-                // затем ставим новый golden_key на домен ".funpay.com" БЕЗ httpOnly.
-
-                // 1) Удаляем PHPSESSID — пусть FunPay выдаст свежую сессию под новый ключ.
-                for (const url of ['https://funpay.com', 'https://funpay.com/']) {
-                    try { await chrome.cookies.remove({ url, name: 'PHPSESSID' }); } catch (_) {}
-                }
-
-                // 2) Удаляем ВСЕ существующие golden_key (и host-only, и доменные варианты),
-                //    чтобы не было конфликта двух кук с одинаковым именем.
-                try {
-                    const existing = await chrome.cookies.getAll({ name: 'golden_key', domain: 'funpay.com' });
-                    for (const c of existing) {
-                        const proto = c.secure ? 'https' : 'http';
-                        const host = c.domain.replace(/^\./, '');
-                        try {
-                            await chrome.cookies.remove({
-                                url: `${proto}://${host}${c.path || '/'}`,
-                                name: 'golden_key',
-                                storeId: c.storeId
-                            });
-                        } catch (_) {}
+                // ВАЖНО: переключение аккаунта подменяет ту же golden_key, что и фоновые
+                // снимки/мульти-аккаунтный авто-ответ. Без общего замка фоновый свап мог
+                // ВОССТАНОВИТЬ старую куку прямо во время входа → «ключ устарел» и неверные
+                // аватарки. Поэтому всю работу с кукой делаем под withCookieLock.
+                const setResult = await withCookieLock(async () => {
+                    // 1) Удаляем PHPSESSID — пусть FunPay выдаст свежую сессию под новый ключ.
+                    for (const url of ['https://funpay.com', 'https://funpay.com/']) {
+                        try { await chrome.cookies.remove({ url, name: 'PHPSESSID' }); } catch (_) {}
                     }
-                } catch (_) {}
-
-                // 3) Ставим новый golden_key так же, как это делает сам FunPay:
-                //    domain ".funpay.com" (host-wide), secure, без httpOnly.
-                const setResult = await chrome.cookies.set({
-                    url: 'https://funpay.com',
-                    name: 'golden_key',
-                    value: request.key,
-                    domain: '.funpay.com',
-                    path: '/',
-                    secure: true,
-                    sameSite: 'lax',
-                    expirationDate: Math.floor(Date.now() / 1000) + (365 * 24 * 60 * 60)
+                    // 2) Удаляем ВСЕ существующие golden_key (host-only и доменные), чтобы не
+                    //    было конфликта двух кук с одним именем.
+                    try {
+                        const existing = await chrome.cookies.getAll({ name: 'golden_key', domain: 'funpay.com' });
+                        for (const c of existing) {
+                            const proto = c.secure ? 'https' : 'http';
+                            const host = c.domain.replace(/^\./, '');
+                            try { await chrome.cookies.remove({ url: `${proto}://${host}${c.path || '/'}`, name: 'golden_key', storeId: c.storeId }); } catch (_) {}
+                        }
+                    } catch (_) {}
+                    // 3) Ставим новый golden_key так же, как FunPay: domain ".funpay.com", secure, без httpOnly.
+                    return chrome.cookies.set({
+                        url: 'https://funpay.com', name: 'golden_key', value: request.key,
+                        domain: '.funpay.com', path: '/', secure: true, sameSite: 'lax',
+                        expirationDate: Math.floor(Date.now() / 1000) + (365 * 24 * 60 * 60)
+                    });
                 });
 
                 if (!setResult) {
