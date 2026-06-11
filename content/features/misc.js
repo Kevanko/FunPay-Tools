@@ -720,52 +720,67 @@ function initializeMarkAllAsRead() {
                 return;
             }
 
+            // csrf-токен из app-data — нужен для runner-запроса «открыть чат» (= прочитано).
+            let csrf = '';
+            try { const d = JSON.parse(document.body.dataset.appData); csrf = (Array.isArray(d) ? d[0] : d)['csrf-token'] || ''; } catch (_) {}
+
             // --- Start: Immediate visual update ---
             readAllBtn.classList.add('loading');
             readAllBtn.disabled = true;
 
-            const nodeIdsToRead = [];
+            // node + id последнего сообщения (для отметки «прочитано до этого id»)
+            const toRead = [];
             unreadItems.forEach(item => {
-                const nodeId = item.dataset.id;
-                if (nodeId) {
-                    nodeIdsToRead.push(nodeId);
-                }
-                item.classList.remove('unread'); // Visually mark as read immediately
+                const node = item.dataset.id;
+                if (node) toRead.push({ node, last: item.dataset.nodeMsg || '-1' });
+                item.classList.remove('unread'); // визуально сразу
             });
 
             const counter = document.querySelector('.chat-full-header .badge');
-            if (counter) {
-                counter.textContent = '0';
-                counter.style.display = 'none';
-            }
-            
-            showNotification(`Начинаю отмечать ${unreadItems.length} диалогов как прочитанные...`, false);
+            if (counter) { counter.textContent = '0'; counter.style.display = 'none'; }
+
+            showNotification(`Отмечаю ${toRead.length} диалогов как прочитанные…`, false);
             // --- End: Immediate visual update ---
 
-            let processedCount = 0;
+            // FunPay помечает чат прочитанным, когда «открываешь» его — то есть шлёшь
+            // на /runner/ объект chat_node с last_message = id последнего сообщения.
+            // Простой GET страницы чата этого больше НЕ делает (баг старой версии).
+            const markRead = async ({ node, last }) => {
+                if (csrf) {
+                    const payload = {
+                        objects: JSON.stringify([{ type: 'chat_node', id: node, tag: '00000000', data: { node, last_message: parseInt(last, 10) || -1, content: '' } }]),
+                        request: false,
+                        csrf_token: csrf
+                    };
+                    const res = await fetch('https://funpay.com/runner/', {
+                        method: 'POST',
+                        headers: { 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8', 'x-requested-with': 'XMLHttpRequest' },
+                        body: new URLSearchParams(payload)
+                    });
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    const j = await res.json().catch(() => null);
+                    if (j && j.error) throw new Error(j.error);
+                } else {
+                    // запасной путь без csrf
+                    await fetch(`https://funpay.com/chat/?node=${node}`, { headers: { 'x-requested-with': 'XMLHttpRequest' } });
+                }
+            };
+
+            let processedCount = 0, failed = 0;
             const intervalId = setInterval(async () => {
-                // If the list of IDs is empty, we're done.
-                if (nodeIdsToRead.length === 0) {
+                if (toRead.length === 0) {
                     clearInterval(intervalId);
                     readAllBtn.classList.remove('loading');
                     readAllBtn.disabled = false;
-                    showNotification(`Завершено: ${processedCount} диалогов отмечены прочитанными.`, false);
+                    showNotification(failed
+                        ? `Готово: ${processedCount} прочитано, ${failed} с ошибкой.`
+                        : `Завершено: ${processedCount} диалогов отмечены прочитанными.`, failed > 0);
                     return;
                 }
-
-                const nodeId = nodeIdsToRead.shift();
-                const chatUrl = `https://funpay.com/chat/?node=${nodeId}`;
-
-                try {
-                    // Just making the GET request is enough to mark it as read on the server
-                    await fetch(chatUrl);
-                    processedCount++;
-                } catch (error) {
-                    console.error(`FP Tools: Ошибка при "посещении" чата ${nodeId} для прочтения`, error);
-                    // We don't re-add the nodeId to the list to avoid getting stuck on a failing one.
-                }
-
-            }, 800); // 0.8 second interval
+                const item = toRead.shift();
+                try { await markRead(item); processedCount++; }
+                catch (error) { failed++; console.error(`FP Tools: не удалось отметить чат ${item.node} прочитанным`, error); }
+            }, 450); // быстрее, чем раньше
         });
         
         const filterCheckbox = document.getElementById('filter-marked-checkbox');

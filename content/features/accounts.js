@@ -427,13 +427,30 @@ async function fptRenderAccountSwitcher(menu) {
     });
 }
 
-// Набор ключей «настроек профиля» — у каждого аккаунта свой набор (свап при смене).
-const FPT_PROFILE_KEYS = [
+// НАСТРОЙКИ профиля (тема/авто-ответы/шаблоны/звуки) — их можно КОПИРОВАТЬ между
+// аккаунтами и они свапаются при смене.
+const FPT_SETTINGS_KEYS = [
     'fpToolsAutoReplies', 'reviewTemplates', 'reviewTemplateImages', 'fpToolsSlashCommands',
     'fpToolsTemplateSettings', 'fpToolsTheme', 'enableCustomTheme', 'notificationSound',
     'notificationVolume', 'fpToolsCustomSoundData', 'fpToolsCustomSoundMeta',
     'fpToolsCursorFx', 'fpToolsCustomCursor', 'keywords', 'greetingText'
 ];
+
+// ЛИЧНЫЕ ДАННЫЕ аккаунта — НЕ должны смешиваться между аккаунтами (продажи/графики,
+// чёрный список, метки и заметки о покупателях, копилки, закреплённое, авто-выдача
+// по лотам, отключённые лоты, ник, выбранные категории авто-поднятия). Копировать
+// их между аккаунтами НЕ нужно — но при смене аккаунта они свапаются (у каждого свои).
+const FPT_DATA_KEYS = [
+    'fpToolsSalesData', 'fpToolsSalesChartPeriod', 'fpToolsAutoDeliveryLots',
+    'fpToolsBlacklist', 'fpToolsCustomLabels', 'fpToolsUserStatuses', 'fpToolsUserNotes',
+    'fpToolsDeactivatedLots', 'fpToolsPiggyBanks', 'fpToolsPinnedChats', 'fpToolsPinnedLots',
+    'fpToolsMyEpicNick', 'fpToolsSelectedBumpCategories'
+];
+
+// Полный набор «локального» для аккаунта (настройки + данные) — свап при смене.
+const FPT_ACCOUNT_KEYS = [...FPT_SETTINGS_KEYS, ...FPT_DATA_KEYS];
+// обратная совместимость
+const FPT_PROFILE_KEYS = FPT_ACCOUNT_KEYS;
 
 function _fptCurName() { const e = document.querySelector('.user-link-name'); return e ? e.textContent.trim() : null; }
 
@@ -467,9 +484,14 @@ async function fptApplyProfile(name) {
         const profiles = await fptGetProfiles();
         const bundle = profiles[name];
         if (bundle && Object.keys(bundle).length) {
+            // ВАЖНО: глобальное состояние должно ТОЧНО совпасть с бандлом профиля.
+            // Ключи, которых в бандле нет (напр. продажи у старого бандла без них),
+            // нужно УДАЛИТЬ — иначе данные предыдущего аккаунта «протекут» на новый.
+            const missing = FPT_ACCOUNT_KEYS.filter(k => bundle[k] === undefined);
+            if (missing.length) await chrome.storage.local.remove(missing);
             await chrome.storage.local.set(bundle);
         } else {
-            await chrome.storage.local.remove(FPT_PROFILE_KEYS);   // дефолтные настройки
+            await chrome.storage.local.remove(FPT_ACCOUNT_KEYS);   // новый аккаунт → дефолт/пусто
         }
         return true;
     } catch (_) { return false; }
@@ -495,16 +517,21 @@ function fptSetupProfileSettingsUI() {
         if (!_fptAlive()) return;
         const profiles = await fptGetProfiles();
         const bundle = profiles[src];
-        if (!bundle || !Object.keys(bundle).length) {
+        // копируем ТОЛЬКО настройки (тема/авто-ответы/шаблоны/звуки), без личных
+        // данных аккаунта (продажи, метки, копилки и т.п. — они не смешиваются).
+        const settingsOnly = {};
+        if (bundle) FPT_SETTINGS_KEYS.forEach(k => { if (bundle[k] !== undefined) settingsOnly[k] = bundle[k]; });
+        if (!Object.keys(settingsOnly).length) {
             if (typeof showNotification === 'function') showNotification(`У «${src}» ещё нет сохранённых настроек. Переключитесь на него один раз — настройки запомнятся, потом копируйте.`, true);
             return;
         }
-        if (!confirm(`Скопировать настройки с «${src}» в текущий аккаунт? Текущие авто-ответы, шаблоны, тема и звуки будут заменены.`)) return;
+        if (!confirm(`Скопировать настройки с «${src}» в текущий аккаунт? Будут заменены авто-ответы, шаблоны, тема и звуки (продажи, метки и прочие личные данные не затрагиваются).`)) return;
         try {
             // текущий профиль перед заменой не теряем — фиксируем под его именем
             if (curName) await fptSnapshotProfile(curName);
-            await chrome.storage.local.set(bundle);                 // применить к глобальным ключам
-            if (curName) { const p = await fptGetProfiles(); p[curName] = { ...bundle }; await chrome.storage.local.set({ fptProfiles: p }); }
+            await chrome.storage.local.set(settingsOnly);           // применяем только настройки
+            // в бандле текущего аккаунта обновляем настройки, СОХРАНЯЯ его личные данные
+            if (curName) { const p = await fptGetProfiles(); p[curName] = { ...(p[curName] || {}), ...settingsOnly }; await chrome.storage.local.set({ fptProfiles: p }); }
             if (typeof showNotification === 'function') showNotification(`Настройки с «${src}» скопированы. Перезагружаю…`, false);
             setTimeout(() => { try { location.reload(); } catch (_) {} }, 600);
         } catch (e) {
