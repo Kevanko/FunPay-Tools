@@ -433,15 +433,40 @@ document.addEventListener('click', (e) => {
     } catch (_) {}
 });
 
+// Когда вы вышли из аккаунта, шапка не имеет .navbar-right.logged — кнопка FP Tools
+// и свитчер пропадают. Чтобы можно было вернуться в сохранённый аккаунт, добавляем
+// в разлогиненную шапку выпадашку «FP Tools» со списком аккаунтов (переключение).
+function fptInjectLoggedOutSwitcher() {
+    const navs = [...document.querySelectorAll('.navbar-right:not(.logged)')].filter(n => n.querySelector('.menu-item-login'));
+    const nav = navs.find(n => n.offsetParent !== null) || navs[0];   // предпочитаем видимую шапку
+    if (!nav) return false; // не разлогинен
+    if (document.querySelector('.fpt-loggedout-acc')) return true;
+    if (!_fptAlive()) return true;
+    chrome.storage.local.get('fpToolsAccounts', ({ fpToolsAccounts: accts = [] }) => {
+        if (!accts.length || document.querySelector('.fpt-loggedout-acc')) return; // нечего переключать
+        const li = document.createElement('li');
+        li.className = 'dropdown fpt-loggedout-acc';
+        li.innerHTML = '<a href="#" class="dropdown-toggle" role="button" style="font-weight:650;">FP Tools <span class="caret"></span></a><ul class="dropdown-menu fpt-loggedout-menu"></ul>';
+        const loginLi = nav.querySelector('.menu-item-login').closest('li');
+        nav.insertBefore(li, loginLi);
+        const menu = li.querySelector('.fpt-loggedout-menu');
+        li.querySelector('.dropdown-toggle').addEventListener('click', (e) => { e.preventDefault(); li.classList.toggle('open'); });
+        document.addEventListener('click', (e) => { if (!li.contains(e.target)) li.classList.remove('open'); });
+        fptRenderAccountSwitcher(menu);
+    });
+    return true;
+}
+
 (function fptBootAccountMenu() {
     if (window !== window.top) return;
     // после входа/перезагрузки: подхватить добавление аккаунта и проверить вход
     fptCheckPendingAdd();
     fptCheckSwitchResult();
-    if (fptInjectAccountMenuItems()) return;
-    const mo = new MutationObserver(() => { if (fptInjectAccountMenuItems()) mo.disconnect(); });
+    const tryInject = () => fptInjectAccountMenuItems() || fptInjectLoggedOutSwitcher();
+    if (tryInject()) return;
+    const mo = new MutationObserver(() => { if (tryInject()) mo.disconnect(); });
     mo.observe(document.documentElement, { childList: true, subtree: true });
-    document.addEventListener('DOMContentLoaded', () => fptInjectAccountMenuItems(), { once: true });
+    document.addEventListener('DOMContentLoaded', () => tryInject(), { once: true });
     setTimeout(() => mo.disconnect(), 15000);
     // обновлять список в дропдауне при изменении аккаунтов
     try {

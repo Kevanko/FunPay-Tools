@@ -8574,8 +8574,10 @@ textarea.fp-cw-input { line-height:1.4; }
     font-size:14px;font-weight:600;color:#e8eaf0;
     display:flex;align-items:center;gap:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
-/* Переключатель аккаунтов в дропдауне профиля (шапка сайта) */
-.navbar-right.logged .dropdown-menu .fpt-accsw-block{padding:8px 8px 6px;border-bottom:1px solid var(--fpt-pLine, rgba(255,255,255,.08));list-style:none;}
+/* Переключатель аккаунтов в дропдауне профиля (шапка сайта; и в разлогиненной шапке) */
+.fpt-accsw-block{padding:8px 8px 6px;border-bottom:1px solid var(--fpt-pLine, rgba(255,255,255,.08));list-style:none;}
+.fpt-loggedout-acc>.dropdown-toggle{cursor:pointer;}
+.fpt-loggedout-acc .dropdown-menu{min-width:240px;}
 .fpt-accsw-head{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--fpt-pTxFaint, #8a90a6);padding:2px 8px 6px;}
 .fpt-accsw-row{
     display:flex;align-items:center;gap:10px;width:100%;text-align:left;cursor:pointer;
