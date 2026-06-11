@@ -11618,5 +11618,57 @@ body.funpay-redesigned .fpt-home .tgl[data-on="true"]::after {
 }
 .fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light input::placeholder,
 .fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light textarea::placeholder { color: #8a90a0 !important; }
-.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .btn-default,
-.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .calc-btn { color: #222732 !important; }
+
+/* ВАЖНО: элементы с ЦВЕТНЫМ/ТЁМНЫМ фоном (карточки командного центра — синие,
+   кнопки темы — тёмные/градиент) должны иметь СВЕТЛЫЙ текст в ЛЮБОЙ теме.
+   Иначе общий «тёмный текст» светлого попапа делает их нечитаемыми. */
+.fp-tools-popup .fpt-metric-card strong,
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .fpt-metric-card strong { color: #ffffff !important; }
+.fp-tools-popup .fpt-metric-card small,
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .fpt-metric-card small { color: rgba(255,255,255,.88) !important; }
+.fp-tools-popup .fpt-metric-card .material-symbols-rounded { color: #ffffff !important; }
+.fp-tools-popup .theme-actions-grid .btn,
+.fp-tools-popup .theme-actions-grid .btn .material-icons,
+.fp-tools-popup .theme-actions-grid .btn span { color: #ffffff !important; }
+/* кнопка "цвета фона" иногда на светлом градиенте — добавим тень тексту для читаемости */
+.fp-tools-popup #generatePaletteBtn, .fp-tools-popup #generatePaletteBtn span { text-shadow: 0 1px 2px rgba(0,0,0,.4) !important; }
+
+/* ============================================================================
+   СВЕТЛАЯ ТЕМА сайта: на белом фоне у блоков (лоты, чаты, сообщения, карточки)
+   пропадают края — добавляем мягкую обводку + лёгкую тень, как на главной.
+   ============================================================================ */
+html[data-fpt-preset="light"] .offer,
+html[data-fpt-preset="light"] .tc,
+html[data-fpt-preset="light"] .chat,
+html[data-fpt-preset="light"] .chat-contacts,
+html[data-fpt-preset="light"] .chat-detail,
+html[data-fpt-preset="light"] .chat-full .chat,
+html[data-fpt-preset="light"] .modal-content,
+html[data-fpt-preset="light"] .product-page .page-content,
+html[data-fpt-preset="light"] .counter-item,
+html[data-fpt-preset="light"] .payment-card,
+html[data-fpt-preset="light"] .details,
+html[data-fpt-preset="light"] .form-narrow,
+html[data-fpt-preset="light"] .review-item-answer,
+html[data-fpt-preset="light"] .chat-message-list-date .inside {
+    border: 1px solid rgba(20,25,35,.10) !important;
+    box-shadow: 0 1px 2px rgba(40,50,70,.05), 0 6px 18px rgba(40,50,70,.05) !important;
+}
+/* строки лотов/таблиц — тонкий разделитель, чтобы различать края */
+html[data-fpt-preset="light"] a.tc-item,
+html[data-fpt-preset="light"] .tc.table-hover .tc-item {
+    border-bottom: 1px solid rgba(20,25,35,.07) !important;
+}
+/* пузыри сообщений в чате */
+html[data-fpt-preset="light"] .chat-msg-item .chat-msg-text,
+html[data-fpt-preset="light"] .chat-message .chat-msg-body {
+    border: 1px solid rgba(20,25,35,.08);
+    border-radius: 10px;
+}
+/* контакты в списке чата — разделители */
+html[data-fpt-preset="light"] .contact-item { border-bottom: 1px solid rgba(20,25,35,.06) !important; }
+/* поля ввода на сайте — видимая рамка */
+html[data-fpt-preset="light"] .form-control,
+html[data-fpt-preset="light"] .chat-form-input .form-control {
+    border: 1px solid rgba(20,25,35,.14) !important;
+}
