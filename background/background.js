@@ -483,18 +483,18 @@ async function parseHtmlViaOffscreen(html, action, extra = {}) {
     });
 }
 
-async function cloneBuildFieldsInternal(auth, nodeId, attributes) {
+async function cloneBuildFieldsInternal(auth, nodeId, attributes, fillDefaults) {
     if (!nodeId) throw new Error('Неизвестна подкатегория (node) лота.');
-    
+
     const editUrl = `https://funpay.com/lots/offerEdit?node=${nodeId}&setlocale=en`;
     const resp = await fetch(editUrl, { headers: { 'Cookie': `golden_key=${auth.golden_key}` } });
     if (!resp.ok) throw new Error(`Не удалось открыть форму категории: ${resp.status}`);
     const html = await resp.text();
-    
+
     // ВОЗВРАЩАЕМ русский язык вашему аккаунту
     await fetch(`https://funpay.com/?setlocale=ru`, { headers: { 'Cookie': `golden_key=${auth.golden_key}` } });
-    
-    const fields = await parseHtmlViaOffscreen(html, 'solveCloneForm', { attributes: attributes || [] });
+
+    const fields = await parseHtmlViaOffscreen(html, 'solveCloneForm', { attributes: attributes || [], fillDefaults: !!fillDefaults });
     if (!fields) throw new Error('Не удалось разобрать форму категории.');
     fields.node_id = String(nodeId);
     fields.offer_id = '0';
@@ -1153,7 +1153,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             try {
                 const auth = await getAuthDetailsForBackground();
                 if (!auth.golden_key) throw new Error('Не авторизован.');
-                const fields = await cloneBuildFieldsInternal(auth, request.nodeId, request.attributes || []);
+                const fields = await cloneBuildFieldsInternal(auth, request.nodeId, request.attributes || [], request.fillDefaults);
                 sendResponse({ success: true, fields });
             } catch (e) {
                 sendResponse({ success: false, error: e.message });

@@ -41,6 +41,47 @@
         return win;
     }
 
+    // Серверное создание лота в выбранном разделе — СРАЗУ НЕАКТИВНЫМ (active не
+    // отправляем). copy: переносит тексты/цену/кол-во/атрибуты; empty: минимальная
+    // заглушка с любой ценой. Возвращает id нового лота (для отката).
+    async function buildAndCreate({ node, source, mode }) {
+        if (!node) throw new Error('Не определён раздел игры (node).');
+        const attrs = (mode === 'copy' && source) ? (source.matchAttributes || []) : [];
+        // fillDefaults: параметры исходного лота применяются первыми (attrs), а
+        // незаполненные обязательные поля целевого раздела добиваются значениями
+        // по умолчанию — иначе FunPay отклонит лот (особенно при копировании в
+        // другую категорию). Лот создаётся неактивным, детали отредактируете.
+        const bf = await sendMsg({ action: 'cloneBuildFields', nodeId: node, attributes: attrs, fillDefaults: true });
+        if (!bf || !bf.success) throw new Error(bf && bf.error ? bf.error : 'Не удалось построить форму раздела (возможно, раздел валюты/чипов — там серверное создание недоступно).');
+
+        const fields = { ...bf.fields };
+        fields['offer_id'] = '0';
+        if (mode === 'copy' && source) {
+            fields['fields[summary][ru]'] = source.summary_ru || '';
+            fields['fields[summary][en]'] = source.enDiffers ? (source.summary_en || '') : '';
+            fields['fields[desc][ru]'] = source.desc_ru || '';
+            fields['fields[desc][en]'] = source.enDiffers ? (source.desc_en || '') : '';
+            const fp = source.finalPrice;
+            if (fp != null && !Number.isNaN(fp) && fp > 0) fields['price'] = String(fp);
+            else if (source.rawPrice) fields['price'] = String(source.rawPrice);
+            fields['amount'] = (source.amount && /^\d+$/.test(source.amount)) ? source.amount : (fields['amount'] || '1');
+        } else {
+            fields['fields[summary][ru]'] = fields['fields[summary][ru]'] || 'Черновик';
+            fields['fields[summary][en]'] = fields['fields[summary][en]'] || 'Draft';
+            fields['fields[desc][ru]'] = fields['fields[desc][ru]'] || '—';
+            fields['fields[desc][en]'] = fields['fields[desc][en]'] || '—';
+            fields['price'] = fields['price'] || '1';
+            fields['amount'] = fields['amount'] || '1';
+        }
+        delete fields['active'];                          // ← создаём НЕактивным
+        fields['secrets'] = fields['secrets'] || '';
+        fields['fields[images]'] = fields['fields[images]'] || '';
+
+        const resp = await sendMsg({ action: 'cloneCreateLot', fields, location: 'trade' });
+        if (!resp || !resp.success) throw new Error(resp && resp.error ? resp.error : 'Ошибка создания лота.');
+        return resp.newId || null;
+    }
+
     // На странице offerEdit: подставляем сохранённый черновик в русские поля.
     // Черновик при копировании пишется через 1–2 с после открытия вкладки —
     // поэтому опрашиваем storage несколько раз.
@@ -172,9 +213,9 @@
                         <div class="fpt-addgame-step fpt-addgame-step3" style="display:none;">
                             <div class="fpt-addgame-steplabel">3 · Как создать лот</div>
                             <div class="fpt-addgame-modes">
-                                <label class="fpt-addgame-mode"><input type="radio" name="fpt-addgame-mode" value="empty" checked><span class="material-symbols-rounded">note_add</span><span class="fpt-addgame-mode-t">Пустой лот<small>создать чистый, без настроек</small></span></label>
-                                <label class="fpt-addgame-mode"><input type="radio" name="fpt-addgame-mode" value="copy"><span class="material-symbols-rounded">content_copy</span><span class="fpt-addgame-mode-t">Скопировать существующий<small>перенести выбранные лоты</small></span></label>
-                                <label class="fpt-addgame-mode"><input type="radio" name="fpt-addgame-mode" value="ai"><span class="material-symbols-rounded">auto_awesome</span><span class="fpt-addgame-mode-t">Создать с ИИ<small>опишите задачу — ИИ соберёт готовый вариант</small></span></label>
+                                <label class="fpt-addgame-mode"><input type="radio" name="fpt-addgame-mode" value="empty" checked><span class="material-symbols-rounded">note_add</span><span class="fpt-addgame-mode-t">Пустой лот<small>создаётся сразу неактивным, с любой ценой</small></span></label>
+                                <label class="fpt-addgame-mode"><input type="radio" name="fpt-addgame-mode" value="copy"><span class="material-symbols-rounded">content_copy</span><span class="fpt-addgame-mode-t">Скопировать существующий<small>копирует всё, включая цену — добавляется неактивным</small></span></label>
+                                <label class="fpt-addgame-mode"><input type="radio" name="fpt-addgame-mode" value="ai"><span class="material-symbols-rounded">auto_awesome</span><span class="fpt-addgame-mode-t">Создать с ИИ<small>опишите задачу — откроется готовая форма</small></span></label>
                             </div>
                             <div class="fpt-addgame-lots" style="display:none;"></div>
                             <div class="fpt-addgame-ainote" style="display:none;">Выберите «Создать с ИИ» и нажмите кнопку ниже — откроется окно, где можно описать лот или собрать его на основе ваших существующих лотов.</div>
@@ -183,7 +224,7 @@
                     <div class="fpt-addgame-view fpt-addgame-view-ai" style="display:none;"></div>
                 </div>
                 <div class="fpt-addgame-foot">
-                    <span class="fpt-addgame-note">Откроется форма создания лота в выбранном разделе — проверьте поля и цену, затем «Сохранить».</span>
+                    <span class="fpt-addgame-note">Копия и пустой лот создаются сразу неактивными — найдёте их в «Мои лоты». ИИ откроет форму.</span>
                     <div class="fpt-addgame-actions">
                         <button type="button" class="fpt-addgame-cancel">Отмена</button>
                         <button type="button" class="fpt-addgame-create" disabled>Создать лот</button>
@@ -293,28 +334,34 @@
                 return;
             }
             const node = currentNode();
-            if (mode === 'empty') {
-                openCreateForm({ node, mode: 'empty' });
+            if (!node) { if (typeof showNotification === 'function') showNotification('Не удалось определить раздел игры.', true); return; }
+            const prev = createBtn.textContent;
+            const fail = (m) => { if (typeof showNotification === 'function') showNotification(m, true); createBtn.disabled = false; createBtn.textContent = prev; };
+            const done = (id, label) => {
+                if (typeof showNotification === 'function') showNotification(`${label} создан неактивным в разделе. Откройте «Мои лоты», проверьте и активируйте.`, false);
                 close();
+            };
+
+            if (mode === 'empty') {
+                createBtn.disabled = true; createBtn.textContent = 'Создаю…';
+                try { const id = await buildAndCreate({ node, mode: 'empty' }); done(id, 'Пустой лот'); }
+                catch (err) { fail('Не удалось создать пустой лот: ' + err.message); }
                 return;
             }
-            // copy: открываем форму раздела СРАЗУ (без блокировки попапа), затем
-            // читаем полный текст выбранного лота и дописываем черновик — страница
-            // подхватит его опросом storage.
-            if (!node) { if (typeof showNotification === 'function') showNotification('Не удалось определить раздел игры.', true); return; }
+
+            // copy: читаем выбранный лот и создаём его копию СРАЗУ неактивной.
             const checked = overlay.querySelector('.fpt-addgame-lot input:checked');
             const lot = checked ? lots[+checked.dataset.lot] : null;
             if (!lot || !lot.id) { if (typeof showNotification === 'function') showNotification('Выберите лот с доступным ID для копирования.', true); return; }
-            window.open(`https://funpay.com/lots/offerEdit?node=${node}`, '_blank');
-            if (typeof showNotification === 'function') showNotification('Открываю форму и читаю лот…', false);
-            close();
+            createBtn.disabled = true; createBtn.textContent = 'Читаю лот…';
             try {
                 const resp = await sendMsg({ action: 'cloneGetSource', offerId: lot.id });
-                if (!resp || !resp.success) throw new Error(resp && resp.error ? resp.error : 'Не удалось прочитать лот.');
-                const s = resp.source || {};
-                stashDraft({ node, mode: 'copy', title: s.summary_ru || '', desc: s.desc_ru || '' });
+                if (!resp || !resp.success) throw new Error(resp && resp.error ? resp.error : 'не удалось прочитать лот.');
+                createBtn.textContent = 'Копирую…';
+                const id = await buildAndCreate({ node, source: resp.source || {}, mode: 'copy' });
+                done(id, 'Лот-копия');
             } catch (err) {
-                if (typeof showNotification === 'function') showNotification('Ошибка копирования: ' + err.message + ' Поля придётся заполнить вручную.', true);
+                fail('Ошибка копирования: ' + err.message);
             }
         });
     }
