@@ -6077,6 +6077,55 @@ a.contact-item:hover {
 .fpt-addgame-create{background:var(--fpt-uacc, #5b86d8);color:#fff;border-color:transparent;}
 .fpt-addgame-create:disabled{opacity:.45;cursor:not-allowed;}
 
+/* шапка-навигация (кнопка «назад» в ИИ-окне) */
+.fpt-addgame-head{gap:10px;}
+.fpt-addgame-title-h{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fpt-addgame-back{border:0;background:transparent;color:var(--fpt-pTxDim, #9099b8);cursor:pointer;display:flex;padding:4px;border-radius:8px;flex:none;}
+.fpt-addgame-back:hover{background:var(--fpt-p2, rgba(255,255,255,.06));color:var(--fpt-pTx);}
+.fpt-addgame-view{display:flex;flex-direction:column;gap:18px;}
+
+/* ── ИИ-генератор лота ─────────────────────────────────────────── */
+.fpt-aigen{display:flex;flex-direction:column;gap:12px;}
+.fpt-aigen-target{display:flex;align-items:center;gap:9px;padding:11px 13px;border-radius:11px;
+    background:var(--fpt-uacc-soft, rgba(91,134,216,.1));border:1px solid var(--fpt-uacc-line, rgba(91,134,216,.28));
+    font-size:13.5px;color:var(--fpt-pTx);}
+.fpt-aigen-target .material-symbols-rounded{font-size:19px;color:var(--fpt-uacc, #5b86d8);flex:none;}
+.fpt-aigen-target b{font-weight:650;}
+.fpt-aigen-label{font-size:12px;font-weight:650;color:var(--fpt-pTxDim, #cfd2dc);}
+.fpt-aigen-prompt,.fpt-aigen-rdesc,.fpt-aigen-rmsg,.fpt-aigen-rtitle{
+    width:100%;box-sizing:border-box;padding:11px 13px;border-radius:10px;
+    border:1px solid var(--fpt-pLine, rgba(255,255,255,.12));background:var(--fpt-pInput, #14151b);
+    color:var(--fpt-pTx);font-size:13.5px;font-family:inherit;line-height:1.5;resize:vertical;}
+.fpt-aigen-rtitle{resize:none;}
+.fpt-aigen-prompt:focus,.fpt-aigen-rdesc:focus,.fpt-aigen-rmsg:focus,.fpt-aigen-rtitle:focus{outline:none;border-color:var(--fpt-uacc, #5b86d8);}
+.fpt-aigen-baselabel{display:flex;align-items:baseline;gap:8px;margin-top:2px;}
+.fpt-aigen-baselabel span{font-size:12px;font-weight:650;color:var(--fpt-pTxDim, #cfd2dc);}
+.fpt-aigen-baselabel small{font-size:11px;color:var(--fpt-pTxFaint, #8a90a6);}
+.fpt-aigen-base{display:flex;flex-wrap:wrap;gap:6px;max-height:120px;overflow-y:auto;}
+.fpt-aigen-chip{max-width:100%;border:1px solid var(--fpt-pLine, rgba(255,255,255,.14));background:var(--fpt-pInput, #14151b);
+    color:var(--fpt-pTxDim, #cfd2dc);font-size:12px;padding:6px 11px;border-radius:999px;cursor:pointer;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:border-color .15s ease,background .15s ease,color .15s ease;}
+.fpt-aigen-chip:hover{border-color:var(--fpt-uacc-line, rgba(91,134,216,.4));}
+.fpt-aigen-chip.is-on{border-color:var(--fpt-uacc, #5b86d8);background:var(--fpt-uacc-soft, rgba(91,134,216,.16));color:var(--fpt-pTx);}
+.fpt-aigen-check{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--fpt-pTxDim, #cfd2dc);cursor:pointer;margin:0;}
+.fpt-aigen-check input{accent-color:var(--fpt-uacc, #5b86d8);width:15px;height:15px;flex:none;}
+.fpt-aigen-run{display:flex;align-items:center;justify-content:center;gap:8px;height:42px;border:0;border-radius:11px;
+    background:var(--fpt-uacc, #5b86d8);color:#fff;font-size:14px;font-weight:600;cursor:pointer;margin-top:2px;
+    transition:opacity .15s ease;}
+.fpt-aigen-run .material-symbols-rounded{font-size:19px;}
+.fpt-aigen-run:hover{opacity:.92;}
+.fpt-aigen-run:disabled{opacity:.6;cursor:default;}
+.fpt-aigen-run.is-loading .material-symbols-rounded{animation:fpt-aigen-spin 1s linear infinite;}
+@keyframes fpt-aigen-spin{to{transform:rotate(360deg);}}
+.fpt-aigen-result{display:flex;flex-direction:column;gap:9px;padding-top:14px;margin-top:4px;border-top:1px solid var(--fpt-pLine, rgba(255,255,255,.08));}
+.fpt-aigen-reshead{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--fpt-uacc, #5b86d8);}
+.fpt-aigen-resact{display:flex;gap:8px;margin-top:4px;}
+.fpt-aigen-copy,.fpt-aigen-regen{display:flex;align-items:center;gap:6px;height:36px;padding:0 14px;border-radius:9px;cursor:pointer;
+    font-size:12.5px;font-weight:560;border:1px solid var(--fpt-pLine, rgba(255,255,255,.14));background:var(--fpt-p2, #262a34);color:var(--fpt-pTx);}
+.fpt-aigen-copy .material-symbols-rounded,.fpt-aigen-regen .material-symbols-rounded{font-size:17px;}
+.fpt-aigen-copy{background:var(--fpt-uacc, #5b86d8);color:#fff;border-color:transparent;}
+.fpt-aigen-copy:hover,.fpt-aigen-regen:hover{filter:brightness(1.06);}
+
 /* Поддержка: крипто-кошельки */
 .fp-tools-popup .fpt-wallets { display: flex; flex-direction: column; gap: 12px; margin: 6px 0 4px; }
 .fp-tools-popup .fpt-wallet { display: flex; flex-direction: column; gap: 5px; }

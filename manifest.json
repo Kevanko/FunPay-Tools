@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "FunPay Tools",
-    "version": "3.8.2",
+    "version": "3.8.3",
     "description": "Инструменты продавца для FunPay: статистика продаж, автоматизация, авто-выдача, массовые действия с лотами, темы оформления.",
     "permissions": [
         "storage",
