@@ -109,10 +109,14 @@ async function getHomepageRealData() {
 
     // Orders + automation toggle states from chrome.storage
     try {
+        // продажи берём ПО ТЕКУЩЕМУ аккаунту (ключ с userId), чтобы на главной не
+        // показывалась статистика другого аккаунта. Фолбэк — общий ключ.
+        let salesKey = 'fpToolsSalesData';
+        try { const d = JSON.parse(document.body.dataset.appData); const u = Array.isArray(d) ? d[0] : d; if (u && u.userId) salesKey = `fpToolsSalesData__${u.userId}`; } catch (_) {}
         const store = await chrome.storage.local.get([
-            'fpToolsSalesData', 'autoBumpEnabled', 'fpToolsSmartBumpEnabled', 'fpToolsAutoReplies', 'fpToolsSlashCommands'
+            salesKey, 'fpToolsSalesData', 'autoBumpEnabled', 'fpToolsSmartBumpEnabled', 'fpToolsAutoReplies', 'fpToolsSlashCommands'
         ]);
-        const fpToolsSalesData = store.fpToolsSalesData;
+        const fpToolsSalesData = store[salesKey] || store.fpToolsSalesData;
         if (fpToolsSalesData && typeof fpToolsSalesData === 'object') {
             const all = Object.values(fpToolsSalesData);
             result.salesCount = all.length;
