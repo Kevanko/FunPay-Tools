@@ -356,7 +356,7 @@ function parseSellerLotPrice(html, offerId) {
 
 // Сопоставляет видимые параметры жертвы с полями НАШЕЙ пустой формы offerEdit?node=...
 // Логика повторяет solve_form из официального плагина AutoCopy, но аккуратнее с радио/чекбоксами.
-function solveCloneForm(html, attributes) {
+function solveCloneForm(html, attributes, fillDefaults) {
     try {
         const doc = new DOMParser().parseFromString(html, 'text/html');
         const form = doc.querySelector('form.form-offer-editor');
@@ -468,6 +468,26 @@ function solveCloneForm(html, attributes) {
                 if (matchText(o.label)) { data[n] = o.value; break; }
             }
         });
+
+        // Режим «пустого лота»: FunPay требует ВСЕ параметры категории (даже без
+        // HTML required). Заполняем все незаданные поля разумными значениями по
+        // умолчанию, чтобы лот сохранился (создаётся неактивным — потом отредактируют).
+        if (fillDefaults) {
+            const skip = ['offer_id', 'active', 'price', 'amount', 'location', 'csrf_token', 'secrets', 'fields[images]', 'query', 'deleted'];
+            form.querySelectorAll('select').forEach(s => {
+                const name = s.getAttribute('name');
+                if (!name || data[name] !== undefined) return;
+                const opt = Array.from(s.querySelectorAll('option')).find(o => { const v = o.getAttribute('value'); return v && v !== '0'; });
+                if (opt) data[name] = opt.getAttribute('value');
+            });
+            form.querySelectorAll('input').forEach(inp => {
+                const n = inp.getAttribute('name');
+                const t = (inp.getAttribute('type') || 'text').toLowerCase();
+                if (!n || data[n] !== undefined || skip.includes(n)) return;
+                if (/^fields\[(summary|desc|payment_msg)\]/.test(n)) return;   // тексты задаём отдельно
+                if (t === 'text' || t === 'number') data[n] = (inp.getAttribute('value') || '1');
+            });
+        }
 
         return data;
     } catch (e) {
@@ -1091,7 +1111,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             sendResponse(parseSellerLotPrice(message.html, message.offerId));
             break;
         case 'solveCloneForm':
-            sendResponse(solveCloneForm(message.html, message.attributes));
+            sendResponse(solveCloneForm(message.html, message.attributes, message.fillDefaults));
             break;
         case 'parseChatList':
             sendResponse(parseChatList(message.html));

@@ -91,9 +91,9 @@ function initChatListColorCoding() {
         const style = document.createElement('style');
         style.id = 'fp-chat-colors';
         style.textContent = `
-            .contact-item.fp-sc-paid    .media-user-name::after { content:' 2'; font-size:13px; color:#e6b46b; }
-            .contact-item.fp-sc-done    .media-user-name::after { content:' 2'; font-size:13px; color:#74d596; }
-            .contact-item.fp-sc-refund  .media-user-name::after { content:' 2'; font-size:13px; color:#e08585; }
+            .contact-item.fp-sc-paid    .media-user-name::after { content:' ●'; font-size:13px; color:#e6b46b; }
+            .contact-item.fp-sc-done    .media-user-name::after { content:' ●'; font-size:13px; color:#74d596; }
+            .contact-item.fp-sc-refund  .media-user-name::after { content:' ●'; font-size:13px; color:#e08585; }
         `;
         document.head.appendChild(style);
     }
