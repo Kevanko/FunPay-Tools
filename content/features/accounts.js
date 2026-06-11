@@ -160,7 +160,7 @@ async function renderAccountsList() {
     fpToolsAccounts.forEach((account, index) => {
         const isActive = account.name === currentUsername;
         const isOnline = isActive || account.online !== false;   // новые/без флага — в сети
-        const item = createElement('div', { class: `fpt-acc-item ${isActive ? 'active' : ''}` });
+        const item = createElement('div', { class: `fpt-acc-item ${isActive ? 'active' : ''}`, 'data-acc-name': account.name });
 
         // аватар (зелёный кружок = в сети)
         const avatar = createElement('div', { class: `fpt-acc-avatar ${isOnline ? 'is-online' : ''}` });
@@ -253,8 +253,37 @@ async function renderAccountsList() {
         listContainer.appendChild(item);
     });
 
+    // подложка строки = тема этого аккаунта (тёмная/светлая) — наглядно видно, какая тема
+    fptApplyAccountThemeTints(currentUsername);
+
     // авто-обновление снимков раз в ~55 минут (если давно не обновляли)
     maybeAutoRefreshAccounts();
+}
+
+// Цвет фона строки аккаунта = его тема (sitePreset). Активный — текущая тема,
+// остальные — из их профиля. Видно, у кого тёмная, у кого светлая.
+const _FPT_PRESET_TINT = {
+    graphite: { bg: '#16181d', tx: '#f1f3f7', dim: '#c6cbd4', line: 'rgba(255,255,255,.10)', scheme: 'dark' },
+    obsidian: { bg: '#0f1014', tx: '#f2f3f7', dim: '#c4c8d2', line: 'rgba(255,255,255,.09)', scheme: 'dark' },
+    slate:    { bg: '#242e44', tx: '#f2f5fa', dim: '#cbd4e4', line: 'rgba(255,255,255,.12)', scheme: 'dark' },
+    light:    { bg: '#ffffff', tx: '#272b33', dim: '#535a66', line: 'rgba(20,25,35,.16)', scheme: 'light' }
+};
+async function fptApplyAccountThemeTints(activeName) {
+    if (!_fptAlive()) return;
+    let profiles = {}, activeTheme = {};
+    try { const g = await chrome.storage.local.get(['fptProfiles', 'fpToolsTheme']); profiles = g.fptProfiles || {}; activeTheme = g.fpToolsTheme || {}; } catch (_) {}
+    document.querySelectorAll('#fpToolsAccountsList .fpt-acc-item').forEach(item => {
+        const name = item.dataset.accName;
+        const theme = (name === activeName) ? activeTheme : ((profiles[name] || {}).fpToolsTheme || {});
+        const t = _FPT_PRESET_TINT[theme.sitePreset] || _FPT_PRESET_TINT.graphite;
+        item.style.background = t.bg;
+        item.style.borderColor = t.line;
+        item.dataset.scheme = t.scheme;                 // CSS подстроит контролы под светлую/тёмную строку
+        const nm = item.querySelector('.fpt-acc-name'); if (nm) nm.style.color = t.tx;
+        const bal = item.querySelector('.fpt-acc-balance'); if (bal) bal.style.color = t.dim;
+        item.querySelectorAll('.fpt-acc-meta, .fpt-acc-meta-i').forEach(m => m.style.color = t.dim);
+        item.querySelectorAll('.fpt-acc-meta .material-symbols-rounded').forEach(m => m.style.color = t.dim);
+    });
 }
 
 // Снимок принадлежит ДРУГОМУ сохранённому аккаунту (его имя) → куку подменили во
@@ -467,8 +496,25 @@ const FPT_SETTINGS_KEYS = [
     'fpToolsAutoReplies', 'reviewTemplates', 'reviewTemplateImages', 'fpToolsSlashCommands',
     'fpToolsTemplateSettings', 'fpToolsTheme', 'enableCustomTheme', 'notificationSound',
     'notificationVolume', 'fpToolsCustomSoundData', 'fpToolsCustomSoundMeta',
-    'fpToolsCursorFx', 'fpToolsCustomCursor', 'keywords', 'greetingText'
+    'fpToolsCursorFx', 'fpToolsCustomCursor', 'keywords', 'greetingText',
+    // авто-поднятие (вкл на 1 аккаунте больше НЕ включает на всех)
+    'autoBumpEnabled', 'autoBumpCooldown', 'fpToolsSmartBumpEnabled',
+    // оформление и отображение
+    'fpToolsLiveStyles', 'enableRedesignedHomepage', 'showSalesStats', 'hideBalance',
+    'viewSellersPromo', 'fpToolsDisabledFeatures'
 ];
+
+// Соответствие «пункт меню (data-page) → его ключи настроек» для ВЫБОРОЧНОГО
+// копирования с другого аккаунта (кнопка-иконка в углу раздела).
+const FPT_SECTION_KEYS = {
+    auto_review: ['fpToolsAutoReplies', 'keywords', 'greetingText', 'reviewTemplates', 'reviewTemplateImages'],
+    templates: ['fpToolsTemplateSettings'],
+    slash_commands: ['fpToolsSlashCommands'],
+    theme: ['fpToolsTheme', 'enableCustomTheme', 'fpToolsLiveStyles', 'enableRedesignedHomepage'],
+    effects: ['fpToolsCursorFx', 'fpToolsCustomCursor'],
+    general: ['notificationSound', 'notificationVolume', 'fpToolsCustomSoundData', 'fpToolsCustomSoundMeta', 'showSalesStats', 'hideBalance', 'viewSellersPromo', 'fpToolsDisabledFeatures'],
+    autobump: ['autoBumpEnabled', 'autoBumpCooldown', 'fpToolsSmartBumpEnabled']
+};
 
 // ЛИЧНЫЕ ДАННЫЕ аккаунта — НЕ должны смешиваться между аккаунтами (продажи/графики,
 // чёрный список, метки и заметки о покупателях, копилки, закреплённое, авто-выдача
@@ -531,6 +577,54 @@ async function fptApplyProfile(name) {
         }
         return true;
     } catch (_) { return false; }
+}
+
+// Копирование ТОЛЬКО раздела pageId с аккаунта srcName в текущий.
+async function fptCopySection(pageId, srcName) {
+    const keys = FPT_SECTION_KEYS[pageId];
+    if (!keys || !srcName || !_fptAlive()) return;
+    const profiles = await fptGetProfiles();
+    const bundle = profiles[srcName] || {};
+    const subset = {};
+    keys.forEach(k => { if (bundle[k] !== undefined) subset[k] = bundle[k]; });
+    if (!Object.keys(subset).length) {
+        if (typeof showNotification === 'function') showNotification(`У «${srcName}» нет сохранённых настроек этого раздела (переключитесь на него один раз).`, true);
+        return;
+    }
+    if (!confirm(`Скопировать настройки этого раздела с «${srcName}» в текущий аккаунт?`)) return;
+    try {
+        const cur = _fptCurName();
+        if (cur) await fptSnapshotProfile(cur);
+        await chrome.storage.local.set(subset);
+        if (cur) { const p = await fptGetProfiles(); p[cur] = { ...(p[cur] || {}), ...subset }; await chrome.storage.local.set({ fptProfiles: p }); }
+        if (typeof showNotification === 'function') showNotification(`Раздел скопирован с «${srcName}». Перезагружаю…`, false);
+        setTimeout(() => { try { location.reload(); } catch (_) {} }, 600);
+    } catch (e) {
+        if (typeof showNotification === 'function') showNotification('Ошибка копирования: ' + e.message, true);
+    }
+}
+
+// Иконка «скопировать раздел с другого аккаунта» в углу каждого подходящего пункта меню.
+function fptInjectSectionCopy(pageId) {
+    if (!FPT_SECTION_KEYS[pageId]) return;
+    const page = document.querySelector(`.fp-tools-page-content[data-page="${pageId}"]`);
+    if (!page || page.querySelector('.fpt-seccopy')) return;
+    const curName = _fptCurName();
+    const others = (typeof fpToolsAccounts !== 'undefined' ? fpToolsAccounts : []).filter(a => a && a.name && a.name !== curName);
+    if (!others.length) return;   // некого копировать
+
+    const wrap = document.createElement('div');
+    wrap.className = 'fpt-seccopy';
+    wrap.innerHTML = `<button type="button" class="fpt-seccopy-btn" title="Скопировать этот раздел с другого аккаунта"><span class="material-symbols-rounded">content_copy</span></button>
+        <div class="fpt-seccopy-menu">${others.map(a => `<button type="button" class="fpt-seccopy-acc" data-name="${_fptEsc(a.name)}">${_fptEsc(a.name)}</button>`).join('')}</div>`;
+    if (getComputedStyle(page).position === 'static') page.style.position = 'relative';
+    page.appendChild(wrap);
+
+    const btn = wrap.querySelector('.fpt-seccopy-btn');
+    const menu = wrap.querySelector('.fpt-seccopy-menu');
+    btn.addEventListener('click', (e) => { e.stopPropagation(); menu.classList.toggle('open'); });
+    document.addEventListener('click', (e) => { if (!wrap.contains(e.target)) menu.classList.remove('open'); });
+    menu.querySelectorAll('.fpt-seccopy-acc').forEach(b => b.addEventListener('click', () => { menu.classList.remove('open'); fptCopySection(pageId, b.dataset.name); }));
 }
 
 // UI «Настройки профиля» во вкладке Настройки: копирование настроек с другого

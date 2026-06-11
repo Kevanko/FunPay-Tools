@@ -1219,6 +1219,8 @@ function setupPopupNavigation() {
             contentPages.forEach(page => {
                 page.classList.toggle('active', page.dataset.page === pageId);
             });
+            // иконка выборочного копирования раздела с другого аккаунта
+            if (typeof fptInjectSectionCopy === 'function') fptInjectSectionCopy(pageId);
             if (pageId === 'epic_nicks') { if (typeof setupEpicEditor === 'function') setupEpicEditor(); }
             if (pageId === 'currency_calc') initializeCurrencyCalculator();
             if (pageId === 'settings_io') { if (typeof fptSetupProfileSettingsUI === 'function') fptSetupProfileSettingsUI(); }

@@ -11536,3 +11536,47 @@ body.funpay-redesigned .fpt-home .tgl[data-on="true"]::after {
 [data-fpt-preset="light"] .contact-item.unread { background: #fdeece !important; }
 [data-fpt-preset="light"] .contact-item.unread, 
 [data-fpt-preset="light"] .contact-item.unread .contact-item-message { color: #4a4f5a !important; }
+
+/* Выборочное копирование раздела с другого аккаунта (иконка в углу пункта меню) */
+.fp-tools-popup .fpt-seccopy { position: absolute; top: 14px; right: 16px; z-index: 30; }
+.fp-tools-popup .fpt-seccopy-btn {
+    display: flex; align-items: center; justify-content: center; width: 30px; height: 30px;
+    border: 1px solid var(--fpt-line, rgba(255,255,255,.14)); border-radius: 8px;
+    background: var(--fpt-surface-2, rgba(255,255,255,.05)); color: var(--fpt-text-dim, #9099b8);
+    cursor: pointer; transition: border-color .15s ease, color .15s ease; padding: 0;
+}
+.fp-tools-popup .fpt-seccopy-btn:hover { color: var(--fpt-uacc, #5b86d8); border-color: var(--fpt-uacc, #5b86d8); }
+.fp-tools-popup .fpt-seccopy-btn .material-symbols-rounded { font-size: 17px; }
+.fp-tools-popup .fpt-seccopy-menu {
+    position: absolute; top: 34px; right: 0; min-width: 150px; display: none; flex-direction: column;
+    background: var(--fpt-bg, #1a1c26); border: 1px solid var(--fpt-line, rgba(255,255,255,.12));
+    border-radius: 10px; box-shadow: 0 14px 34px -10px rgba(0,0,0,.6); padding: 5px; gap: 2px;
+}
+.fp-tools-popup .fpt-seccopy-menu.open { display: flex; }
+.fp-tools-popup .fpt-seccopy-menu::before {
+    content: 'Скопировать с:'; font-size: 10.5px; color: var(--fpt-text-dim, #8a90a6);
+    padding: 4px 8px 2px; letter-spacing: .03em;
+}
+.fp-tools-popup .fpt-seccopy-acc {
+    text-align: left; padding: 8px 10px; border: 0; border-radius: 7px; cursor: pointer;
+    background: transparent; color: var(--fpt-text, #e8eaf0); font-size: 13px; width: 100%;
+}
+.fp-tools-popup .fpt-seccopy-acc:hover { background: var(--fpt-accent-soft, rgba(91,134,216,.14)); color: var(--fpt-uacc, #5b86d8); }
+
+/* Светлая строка аккаунта (его тема светлая) — контролы делаем тёмными/читаемыми */
+.fpt-acc-item[data-scheme="light"] .fpt-acc-meta-i,
+.fpt-acc-item[data-scheme="light"] .fpt-acc-meta .material-symbols-rounded { color: #535a66 !important; }
+.fpt-acc-item[data-scheme="light"] .fpt-acc-status.on { color: #1f8a4c !important; }
+.fpt-acc-item[data-scheme="light"] .fpt-acc-status { color: #6b7280 !important; }
+.fpt-acc-item[data-scheme="light"] .fpt-acc-online-btn,
+.fpt-acc-item[data-scheme="light"] .fpt-acc-btn {
+    color: #535a66 !important; border-color: rgba(20,25,35,.18) !important; background: rgba(20,25,35,.04) !important;
+}
+.fpt-acc-item[data-scheme="light"] .fpt-acc-online-btn.on { color: #1f8a4c !important; }
+.fpt-acc-item[data-scheme="light"] .fpt-acc-btn-delete:hover { color: #d34b4b !important; }
+.fpt-acc-item[data-scheme="light"] .fpt-acc-login-btn:not(.active) {
+    color: #fff !important; background: var(--fpt-uacc,#5b86d8) !important; border-color: transparent !important;
+}
+.fpt-acc-item[data-scheme="light"] .fpt-acc-login-btn.active { color: #1f8a4c !important; background: rgba(31,138,76,.12) !important; }
+.fpt-acc-item[data-scheme="light"] .fpt-acc-login-btn.relogin { color: #fff !important; background: #d89a3a !important; }
+.fpt-acc-item[data-scheme="light"] .fpt-acc-active-dot { background: #1f8a4c !important; }
