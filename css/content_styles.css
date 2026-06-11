@@ -6039,13 +6039,12 @@ a.contact-item:hover {
 
 /* Оформление: нижние настройки — в две сбалансированные колонки,
    каждая карточка целиком (не рвётся между колонками). Иначе длинная простыня. */
-.fp-tools-popup .fpt-theme-extra { column-count: 2; column-gap: 14px; margin-top: 4px; }
+/* Сетка коротких контролов: ровные 2 колонки (равные ячейки, без «масонри»,
+   которое выглядело неровно и «сливалось») */
+.fp-tools-popup .fpt-theme-extra { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin-top: 4px; }
 .fp-tools-popup .fpt-theme-extra > .template-container,
-.fp-tools-popup .fpt-theme-extra > .setting-group {
-    display: inline-block; width: 100%; margin: 0 0 12px;
-    break-inside: avoid; -webkit-column-break-inside: avoid;
-}
-@media (max-width: 760px) { .fp-tools-popup .fpt-theme-extra { column-count: 1; } }
+.fp-tools-popup .fpt-theme-extra > .setting-group { margin: 0; }
+@media (max-width: 760px) { .fp-tools-popup .fpt-theme-extra { grid-template-columns: 1fr; } }
 
 /* Две колонки: 5 шаблонов оценок не растягивают меню вниз простынёй */
 .review-templates-grid {
@@ -8937,9 +8936,9 @@ textarea.fp-cw-input { line-height:1.4; }
     line-height: 1.35;
 }
 
-.checkbox-label-inline,
-.fp-tools-popup .template-container,
-.fp-tools-popup .setting-group,
+/* Рамку получают ТОЛЬКО намеренные карточки (выделенная фича, консоль,
+   инфо-колауты). Обычные строки контролов — без коробки: иначе каждый блок
+   в своей обводке = визуальный шум и «непрофессионально». */
 .fp-tools-popup .fpt-smart-bump-card,
 .fp-tools-popup .fp-tools-console,
 .support-promo {
@@ -8949,9 +8948,46 @@ textarea.fp-cw-input { line-height:1.4; }
     box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
 }
 
+/* Чекбокс-строка — чистая строка без рамки, с лёгким ховером */
 .checkbox-label-inline {
-    padding: 12px 14px;
-    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    border: none;
+    background: none;
+    box-shadow: none;
+    border-radius: 9px;
+    padding: 8px 8px 8px 6px;
+    margin: 0 0 2px;
+    transition: background .14s ease;
+}
+.checkbox-label-inline:hover { background: var(--fpt-surface-2, rgba(255,255,255,.03)); }
+
+/* Поле с подписью — без коробки; рамку несёт само поле ввода */
+.fp-tools-popup .template-container {
+    border: none;
+    background: none;
+    box-shadow: none;
+    border-radius: 0;
+    padding: 0;
+    margin-bottom: 14px;
+}
+
+/* Группа настроек — заголовок + контролы, отделяется тонкой линией, без рамки */
+.fp-tools-popup .setting-group {
+    border: none;
+    background: none;
+    box-shadow: none;
+    border-radius: 0;
+    padding: 0;
+    margin: 0 0 14px;
+}
+.fp-tools-popup .setting-group > h4 {
+    font-size: 12px;
+    font-weight: 650;
+    letter-spacing: -.01em;
+    color: var(--fpt-text);
+    margin: 4px 0 9px;
 }
 
 .fp-tools-popup label,
