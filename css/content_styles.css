@@ -11601,6 +11601,12 @@ body.funpay-redesigned .fpt-home .tgl[data-on="true"]::after {
 .fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .block-info {
     color: #565d6b !important;
 }
+/* «Обзор функций»: заголовки/иконки/локации были белыми/светлыми — делаем тёмными */
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .feature-title { color: #222732 !important; }
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .feature-title .material-icons { color: var(--fpt-uacc, #5b86d8) !important; }
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .feature-location { color: #3a4150 !important; background: rgba(20,25,35,.07) !important; }
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .feature-item { background: rgba(20,25,35,.035) !important; border-color: rgba(20,25,35,.12) !important; }
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .feature-list-container h3 { color: #1b1f29 !important; }
 .fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .variable-code,
 .fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light code {
     color: #234ea8 !important; background: rgba(91,134,216,.16) !important;
@@ -11609,13 +11615,15 @@ body.funpay-redesigned .fpt-home .tgl[data-on="true"]::after {
 .fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light textarea,
 .fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light select,
 .fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .template-input,
-.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .template-text,
-.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .calculator-display,
-.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light #calcDisplay {
+.fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light .template-text {
     color: #222732 !important;
     background-color: rgba(255,255,255,.74) !important;
     border-color: rgba(20,25,35,.22) !important;
 }
+/* Калькулятор — самостоятельный ТЁМНЫЙ виджет в любой теме (иначе белые цифры на
+   светлом фоне не видно). Контейнер + дисплей фиксируем тёмными. */
+.fp-tools-popup .calculator-container { background-color: #1c1f27 !important; }
+.fp-tools-popup .calculator-display, .fp-tools-popup #calcDisplay { color: #ffffff !important; }
 .fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light input::placeholder,
 .fp-tools-popup.fpt-menu-transparent.fpt-menu-on-light textarea::placeholder { color: #8a90a0 !important; }
 
