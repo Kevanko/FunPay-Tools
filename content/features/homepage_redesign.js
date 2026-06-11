@@ -517,7 +517,7 @@ function createRedesignedUI(allGamesData, yourGamesData, realData) {
         <div class="home-inner">
             <div class="home-hero">
                 <span class="home-eyebrow eyebrow">FunPay · кабинет продавца</span>
-                <h1 class="home-h1">${titleText}</h1>
+                <h1 class="home-h1" id="fpt-home-h1" data-has-name="${displayName ? '1' : '0'}">${titleText}</h1>
                 <p class="home-lead">Биржа игровых ценностей без визуального шума. Всё, что нужно для торговли — в одном спокойном интерфейсе.</p>
             </div>
 
@@ -892,6 +892,36 @@ async function initializeRedesign() {
             }
         }
     }, 1200);
+
+    // Имя продавца в шапке порой не готово в момент сборки (appData/шапка
+    // дорисовываются после смены аккаунта и при первой загрузке). Дожидаемся
+    // имени короткими повторами и обновляем заголовок без перерисовки.
+    fptKeepHeroNameFresh();
+}
+
+// Подхватывает имя продавца, когда оно появится (после смены аккаунта/загрузки),
+// и проставляет «С возвращением, …» вместо запасного «FunPay».
+function fptKeepHeroNameFresh() {
+    const h1 = document.getElementById('fpt-home-h1');
+    if (!h1 || h1.dataset.hasName === '1') return;
+    let tries = 0;
+    const tick = () => {
+        const h = document.getElementById('fpt-home-h1');
+        if (!h) return;
+        let name = '';
+        try {
+            const raw = document.body?.dataset?.appData;
+            if (raw) { const d = JSON.parse(raw); const ad = Array.isArray(d) ? d[0] : d; if (ad?.userName) name = ad.userName; }
+        } catch (_) {}
+        if (!name) name = getSellerDisplayName();
+        if (name) {
+            h.textContent = `С возвращением, ${name}`;
+            h.dataset.hasName = '1';
+            return;
+        }
+        if (++tries < 12) setTimeout(tick, 250);   // ~3 c ожидания
+    };
+    setTimeout(tick, 200);
 }
 
 async function handleHomepageRedesign() {
