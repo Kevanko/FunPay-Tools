@@ -891,7 +891,14 @@ async function runOnlineHeartbeat() {
                 // поэтому он не годится ни для онлайна, ни для подсчёта. Этот запрос
                 // и регистрирует аккаунт онлайн, и даёт счётчики.
                 const snap = await fptSnapshotForKey(a.key);
-                if (snap && snap.loggedIn) updates[a.key] = snap;
+                if (snap && snap.loggedIn) {
+                    // защита от перекрёстного заражения: если снимок принадлежит ДРУГОМУ
+                    // аккаунту из списка (его имя), значит куку кто-то подменил во время
+                    // запроса — отбрасываем, чтобы не присвоить чужую аватарку/баланс.
+                    const u = snap.username;
+                    const belongsToOther = u && fpToolsAccounts.some(o => o.key && o.key !== a.key && o.name === u);
+                    if (!belongsToOther) updates[a.key] = snap;
+                }
             } catch (_) {}
             await new Promise(r => setTimeout(r, 500));
         }
