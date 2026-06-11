@@ -18,7 +18,7 @@ async function saveAccountsList() {
 async function fptStartAddNewAccount() {
     if (!_fptAlive()) return;
     try { await chrome.storage.local.set({ fptPendingAddAccount: { ts: Date.now() } }); } catch (_) {}
-    try { chrome.runtime.sendMessage({ action: 'deleteCookiesAndReload' }); } catch (_) {}
+    try { chrome.runtime.sendMessage({ action: 'deleteCookiesAndLogin' }); } catch (_) {}  // выход + страница входа FunPay
 }
 
 // На загрузке: если ждём добавления и пользователь УЖЕ вошёл — берём текущий
@@ -304,6 +304,12 @@ function setupAccountManagementHandlers() {
             try { await fptRefreshAllAccounts(); } finally { refreshBtn.disabled = false; }
         });
     }
+
+    const addNewBtn = document.getElementById('addNewAccountBtn');
+    if (addNewBtn && !addNewBtn.dataset.handlerAttached) {
+        addNewBtn.dataset.handlerAttached = 'true';
+        addNewBtn.addEventListener('click', () => fptStartAddNewAccount());
+    }
 }
 
 // Пункты в дропдауне профиля FunPay (шапка сайта): «Добавить аккаунт» и
@@ -327,15 +333,8 @@ function fptInjectAccountMenuItems() {
             setTimeout(() => document.querySelector('.fp-tools-popup li[data-page="accounts"] a')?.click(), 320);
         });
     }
-    if (!menu.querySelector('.fpt-menu-add-new')) {
-        const li = document.createElement('li');
-        li.innerHTML = '<a href="#" class="fpt-menu-add-new">Добавить новый аккаунт</a>';
-        logoutLi.parentElement.insertBefore(li, logoutLi);
-        li.querySelector('a').addEventListener('click', (e) => {
-            e.preventDefault();
-            fptStartAddNewAccount();   // чистим куки + перезагрузка для входа; после входа добавится сам
-        });
-    }
+    // «Добавить новый аккаунт» теперь — призрачный профиль в свитчере (под аккаунтами),
+    // отдельный пункт меню убран, чтобы не дублировать.
     if (!menu.querySelector('.fp-tools-logout-clean')) {
         const li = document.createElement('li');
         li.innerHTML = '<a href="#" class="fp-tools-logout-clean" style="color:#e06b6b !important;">Выйти (очистить куки)</a>';
@@ -367,17 +366,25 @@ async function fptRenderAccountSwitcher(menu) {
         const active = a.name === curName;
         const online = active || a.online !== false;
         const av = a.avatar ? ` style="background-image:url('${_fptEsc(a.avatar)}')"` : '';
+        const err = !active && a.loginError;
         return `<button type="button" class="fpt-accsw-row${active ? ' active' : ''}" data-acc-idx="${i}">
             <span class="fpt-accsw-av${online ? ' on' : ''}"${av}>${a.avatar ? '' : '<span class="material-symbols-rounded">person</span>'}</span>
-            <span class="fpt-accsw-info"><span class="fpt-accsw-name">${_fptEsc(a.name)}</span><span class="fpt-accsw-bal">${_fptEsc(_fptCleanBal(a.balance))}</span></span>
-            ${active ? '<span class="fpt-accsw-cur">текущий</span>' : '<span class="material-symbols-rounded fpt-accsw-go">login</span>'}
+            <span class="fpt-accsw-info"><span class="fpt-accsw-name">${_fptEsc(a.name)}</span><span class="fpt-accsw-bal">${err ? 'ошибка входа' : _fptEsc(_fptCleanBal(a.balance))}</span></span>
+            ${active ? '<span class="fpt-accsw-cur">текущий</span>' : `<span class="material-symbols-rounded fpt-accsw-go">${err ? 'refresh' : 'login'}</span>`}
         </button>`;
-    }).join('');
+    }).join('') +
+        // «призрачный» профиль-заглушка: добавить новый аккаунт
+        `<button type="button" class="fpt-accsw-row fpt-accsw-add" data-acc-add="1">
+            <span class="fpt-accsw-av fpt-accsw-av-ghost"><span class="material-symbols-rounded">add</span></span>
+            <span class="fpt-accsw-info"><span class="fpt-accsw-name">Добавить аккаунт</span><span class="fpt-accsw-bal">войти в новый профиль</span></span>
+            <span class="material-symbols-rounded fpt-accsw-go">chevron_right</span>
+        </button>`;
     menu.insertBefore(li, menu.firstChild);
 
     li.querySelectorAll('.fpt-accsw-row').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             e.preventDefault(); e.stopPropagation();
+            if (btn.dataset.accAdd) { fptStartAddNewAccount(); return; }
             const acc = accts[parseInt(btn.dataset.accIdx, 10)];
             if (!acc || acc.name === curName) return;
             li.querySelectorAll('.fpt-accsw-row').forEach(b => b.disabled = true);
