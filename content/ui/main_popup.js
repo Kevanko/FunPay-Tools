@@ -1144,13 +1144,28 @@ function createMainPopup() {
                 </div>
 
                 <div class="fp-tools-page-content" data-page="support">
-                    <h3>Оставить отзыв</h3>
-                    <div class="support-container">
-                        <p>Положительный отзыв помогает другим пользователям найти FP Tools и поддерживает дальнейшее развитие расширения. Это займёт около минуты.</p>
-                        <a href="https://chromewebstore.google.com/detail/funpay-tools/pibmnjjfpojnakckilflcboodkndkibb/reviews" target="_blank" class="btn review-btn"><span class="material-icons" style="font-size: 20px; margin-right: 8px;">rate_review</span>Оставить отзыв в Chrome Store</a>
+                    <h3>Поддержка автора форка</h3>
+                    <p class="template-info">Если расширение оказалось полезным — можно поддержать автора форка. USDT в разных сетях, нажмите на адрес, чтобы скопировать. <b>Не принимаю переводы с бирж под санкциями (HTX, EXMO и т.п.)</b> — они могут не дойти.</p>
+                    <div class="fpt-wallets">
+                        <div class="fpt-wallet">
+                            <div class="fpt-wallet-net">TON</div>
+                            <button type="button" class="fpt-wallet-addr" data-addr="UQB-SA6hyUZ0nse40I8LvHqJFShZ443MO1lRqGNbxZp1Kl30" title="Скопировать"><span class="fpt-wallet-text">UQB-SA6hyUZ0nse40I8LvHqJFShZ443MO1lRqGNbxZp1Kl30</span><span class="material-symbols-rounded">content_copy</span></button>
+                        </div>
+                        <div class="fpt-wallet">
+                            <div class="fpt-wallet-net">USDT · TRON (TRC20)</div>
+                            <button type="button" class="fpt-wallet-addr" data-addr="TUZjiFiDi1XScM4DDhqBRg9fbjRuWgc9tH" title="Скопировать"><span class="fpt-wallet-text">TUZjiFiDi1XScM4DDhqBRg9fbjRuWgc9tH</span><span class="material-symbols-rounded">content_copy</span></button>
+                        </div>
+                        <div class="fpt-wallet">
+                            <div class="fpt-wallet-net">USDT · Ethereum (ERC20)</div>
+                            <button type="button" class="fpt-wallet-addr" data-addr="0x8EBe92e82E92BFC24BAF5471015bfc5077684eFb" title="Скопировать"><span class="fpt-wallet-text">0x8EBe92e82E92BFC24BAF5471015bfc5077684eFb</span><span class="material-symbols-rounded">content_copy</span></button>
+                        </div>
+                        <div class="fpt-wallet">
+                            <div class="fpt-wallet-net">USDT · Solana (SPL)</div>
+                            <button type="button" class="fpt-wallet-addr" data-addr="xnB1k5ZAp8XzqrjWSpd6AagxwHizUpspFqF12LWxbTf" title="Скопировать"><span class="fpt-wallet-text">xnB1k5ZAp8XzqrjWSpd6AagxwHizUpspFqF12LWxbTf</span><span class="material-symbols-rounded">content_copy</span></button>
+                        </div>
                     </div>
-                    <div style="margin-top:24px;text-align:left;border-top:1px solid rgba(255,255,255,0.06);padding-top:16px;">
-                        <a href="https://funpay.tools" target="_blank" class="fp-site-footer-link"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:-2px;margin-right:4px;">link</span>funpay.tools</a>
+                    <div style="margin-top:18px;">
+                        <a href="https://chromewebstore.google.com/detail/funpay-tools/pibmnjjfpojnakckilflcboodkndkibb/reviews" target="_blank" class="btn btn-default review-btn"><span class="material-icons" style="font-size: 18px; margin-right: 8px;">rate_review</span>Оставить отзыв в Chrome Store</a>
                     </div>
                 </div>
             </main>
