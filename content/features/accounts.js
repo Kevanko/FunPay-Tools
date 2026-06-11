@@ -76,10 +76,22 @@ async function fptCheckSwitchResult() {
     try { await chrome.storage.local.set({ fpToolsAccounts: accts, fptSwitchCheck: null }); } catch (_) {}
 }
 
-// Переключение на сохранённый аккаунт с пометкой проверки результата.
+// Переключение на сохранённый аккаунт. Перед сменой куки: сохраняем настройки
+// текущего профиля в его бандл и заранее применяем настройки целевого профиля в
+// глобальные ключи — после перезагрузки фичи прочитают уже СВОИ настройки.
 async function fptSwitchToAccount(acc) {
     if (!acc || !acc.key) return;
-    try { await chrome.storage.local.set({ fptSwitchCheck: { name: acc.name, ts: Date.now() } }); } catch (_) {}
+    const cur = _fptCurName();
+    try {
+        // применяем чужой профиль ТОЛЬКО если успели сохранить текущий (иначе не рискуем)
+        const snapped = cur && cur !== acc.name ? await fptSnapshotProfile(cur) : true;
+        if (snapped) await fptApplyProfile(acc.name);
+        // помечаем как «последний виденный», чтобы загрузка не делала свап повторно
+        await chrome.storage.local.set({
+            fptSwitchCheck: { name: acc.name, ts: Date.now() },
+            fptLastSeen: { key: acc.key, name: acc.name }
+        });
+    } catch (_) {}
     try { await chrome.runtime.sendMessage({ action: 'setGoldenKey', key: acc.key }); } catch (e) {
         if (typeof showNotification === 'function') showNotification(`Ошибка переключения: ${e.message}`, true);
     }
@@ -393,7 +405,7 @@ async function fptRenderAccountSwitcher(menu) {
     });
 }
 
-// Набор ключей «настроек профиля» (для будущего свапа при смене аккаунта).
+// Набор ключей «настроек профиля» — у каждого аккаунта свой набор (свап при смене).
 const FPT_PROFILE_KEYS = [
     'fpToolsAutoReplies', 'reviewTemplates', 'reviewTemplateImages', 'fpToolsSlashCommands',
     'fpToolsTemplateSettings', 'fpToolsTheme', 'enableCustomTheme', 'notificationSound',
@@ -401,13 +413,53 @@ const FPT_PROFILE_KEYS = [
     'fpToolsCursorFx', 'fpToolsCustomCursor', 'keywords', 'greetingText'
 ];
 
-// UI «Настройки профиля» во вкладке Настройки: список аккаунтов + копирование.
-// Каркас: кнопка пока поясняет, что перенос включится после подтверждения.
+function _fptCurName() { const e = document.querySelector('.user-link-name'); return e ? e.textContent.trim() : null; }
+
+// Карта профилей: { [имяАккаунта]: { ключ: значение, … } } — личные настройки каждого.
+async function fptGetProfiles() {
+    if (!_fptAlive()) return {};
+    try { const { fptProfiles = {} } = await chrome.storage.local.get('fptProfiles'); return fptProfiles || {}; } catch (_) { return {}; }
+}
+
+// Снимок текущих настроек (глобальные ключи) → бандл профиля name. Не теряем то,
+// что пользователь настроил, перед переключением/копированием.
+async function fptSnapshotProfile(name) {
+    if (!name || !_fptAlive()) return false;
+    try {
+        const cur = await chrome.storage.local.get(FPT_PROFILE_KEYS);
+        const bundle = {};
+        FPT_PROFILE_KEYS.forEach(k => { if (cur[k] !== undefined) bundle[k] = cur[k]; });
+        const profiles = await fptGetProfiles();
+        profiles[name] = bundle;
+        await chrome.storage.local.set({ fptProfiles: profiles });
+        return true;
+    } catch (_) { return false; }
+}
+
+// Применить бандл профиля name к глобальным ключам. Если бандла нет — чистим ключи,
+// чтобы новый аккаунт получил НАСТРОЙКИ ПО УМОЛЧАНИЮ (а не унаследовал чужие).
+// Возвращает true, если что-то изменили (нужна перезагрузка для применения).
+async function fptApplyProfile(name) {
+    if (!name || !_fptAlive()) return false;
+    try {
+        const profiles = await fptGetProfiles();
+        const bundle = profiles[name];
+        if (bundle && Object.keys(bundle).length) {
+            await chrome.storage.local.set(bundle);
+        } else {
+            await chrome.storage.local.remove(FPT_PROFILE_KEYS);   // дефолтные настройки
+        }
+        return true;
+    } catch (_) { return false; }
+}
+
+// UI «Настройки профиля» во вкладке Настройки: копирование настроек с другого
+// аккаунта в текущий (авто-ответы, шаблоны, тема, звуки). Реальный перенос.
 function fptSetupProfileSettingsUI() {
     const sel = document.getElementById('fpt-profcopy-src');
     const btn = document.getElementById('fpt-profcopy-btn');
     if (!sel || !btn) return;
-    const curName = document.querySelector('.user-link-name')?.textContent.trim();
+    const curName = _fptCurName();
     const others = (typeof fpToolsAccounts !== 'undefined' ? fpToolsAccounts : []).filter(a => a && a.name !== curName);
     sel.innerHTML = others.length
         ? others.map(a => `<option value="${_fptEsc(a.name)}">${_fptEsc(a.name)}</option>`).join('')
@@ -415,10 +467,27 @@ function fptSetupProfileSettingsUI() {
     sel.disabled = !others.length;
     if (btn.dataset.wired) return;
     btn.dataset.wired = '1';
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
         const src = sel.value;
         if (!src) { if (typeof showNotification === 'function') showNotification('Сначала добавьте другой аккаунт.', true); return; }
-        if (typeof showNotification === 'function') showNotification(`Каркас. Скажите «включить» — и кнопка перенесёт авто-ответы, шаблоны, тему и звуки с аккаунта «${src}» в текущий.`, false);
+        if (!_fptAlive()) return;
+        const profiles = await fptGetProfiles();
+        const bundle = profiles[src];
+        if (!bundle || !Object.keys(bundle).length) {
+            if (typeof showNotification === 'function') showNotification(`У «${src}» ещё нет сохранённых настроек. Переключитесь на него один раз — настройки запомнятся, потом копируйте.`, true);
+            return;
+        }
+        if (!confirm(`Скопировать настройки с «${src}» в текущий аккаунт? Текущие авто-ответы, шаблоны, тема и звуки будут заменены.`)) return;
+        try {
+            // текущий профиль перед заменой не теряем — фиксируем под его именем
+            if (curName) await fptSnapshotProfile(curName);
+            await chrome.storage.local.set(bundle);                 // применить к глобальным ключам
+            if (curName) { const p = await fptGetProfiles(); p[curName] = { ...bundle }; await chrome.storage.local.set({ fptProfiles: p }); }
+            if (typeof showNotification === 'function') showNotification(`Настройки с «${src}» скопированы. Перезагружаю…`, false);
+            setTimeout(() => { try { location.reload(); } catch (_) {} }, 600);
+        } catch (e) {
+            if (typeof showNotification === 'function') showNotification('Ошибка копирования настроек: ' + e.message, true);
+        }
     });
 }
 
@@ -457,16 +526,62 @@ function fptInjectLoggedOutSwitcher() {
     return true;
 }
 
+// Авто-подхват входа в ЛЮБОЙ аккаунт (не только через кнопку расширения) +
+// свап настроек профиля. Срабатывает, когда golden_key изменился с прошлой загрузки:
+// вошли в новый — добавляем; вошли в другой сохранённый — подгружаем его настройки.
+async function fptAccountBoot() {
+    if (!_fptAlive()) return;
+    const name = _fptCurName();
+    if (!name) return;                                   // не залогинен — ждём
+    let key = null;
+    try { const r = await chrome.runtime.sendMessage({ action: 'getGoldenKey' }); if (r && r.success) key = r.key; } catch (_) {}
+    if (!key) return;
+
+    let lastSeen, accts = [];
+    try { ({ fptLastSeen: lastSeen, fpToolsAccounts: accts = [] } = await chrome.storage.local.get(['fptLastSeen', 'fpToolsAccounts'])); } catch (_) { return; }
+    const prevKey = lastSeen && lastSeen.key;
+    const prevName = lastSeen && lastSeen.name;
+
+    // первый раз — просто фиксируем, без свапа и добавления (не трогаем уже настроенное)
+    if (!prevKey) { try { await chrome.storage.local.set({ fptLastSeen: { key, name } }); } catch (_) {} return; }
+    if (key === prevKey) return;                         // тот же аккаунт — ничего
+
+    // ── произошёл вход в ДРУГОЙ аккаунт ──
+    let added = false;
+    if (!accts.some(a => a.key === key) && !accts.some(a => a.name === name)) {
+        accts.push({ name, key, online: true });         // новый — добавляем сразу
+        added = true;
+    } else {
+        const ex = accts.find(a => a.name === name) || accts.find(a => a.key === key);
+        if (ex) { ex.key = key; ex.loginError = false; ex.online = ex.online !== false; }
+    }
+
+    // настройки профиля: текущие глобальные ключи принадлежат ПРЕДЫДУЩЕМУ аккаунту
+    let changed = false;
+    if (prevName && prevName !== name) {
+        const snapped = await fptSnapshotProfile(prevName);   // сохранить настройки прежнего
+        if (snapped) changed = await fptApplyProfile(name);   // применить настройки нового (или дефолт)
+    }
+    try { await chrome.storage.local.set({ fpToolsAccounts: accts, fptLastSeen: { key, name } }); } catch (_) {}
+    if (typeof fpToolsAccounts !== 'undefined') { try { fpToolsAccounts.length = 0; accts.forEach(a => fpToolsAccounts.push(a)); renderAccountsList(); } catch (_) {} }
+    if (added && typeof showNotification === 'function') showNotification(`Аккаунт «${name}» добавлен автоматически.`);
+    if (changed) {                                       // применили личный профиль → перезагрузка для применения
+        if (typeof showNotification === 'function') showNotification('Загружаю настройки профиля…', false);
+        setTimeout(() => { try { location.reload(); } catch (_) {} }, 500);
+    }
+}
+
 (function fptBootAccountMenu() {
     if (window !== window.top) return;
     // после входа/перезагрузки: подхватить добавление аккаунта и проверить вход
     fptCheckPendingAdd();
     fptCheckSwitchResult();
+    fptAccountBoot();
     const tryInject = () => fptInjectAccountMenuItems() || fptInjectLoggedOutSwitcher();
     if (tryInject()) return;
     const mo = new MutationObserver(() => { if (tryInject()) mo.disconnect(); });
     mo.observe(document.documentElement, { childList: true, subtree: true });
-    document.addEventListener('DOMContentLoaded', () => tryInject(), { once: true });
+    document.addEventListener('DOMContentLoaded', () => { tryInject(); fptAccountBoot(); }, { once: true });
     setTimeout(() => mo.disconnect(), 15000);
     // обновлять список в дропдауне при изменении аккаунтов
     try {
