@@ -393,6 +393,35 @@ async function fptRenderAccountSwitcher(menu) {
     });
 }
 
+// Набор ключей «настроек профиля» (для будущего свапа при смене аккаунта).
+const FPT_PROFILE_KEYS = [
+    'fpToolsAutoReplies', 'reviewTemplates', 'reviewTemplateImages', 'fpToolsSlashCommands',
+    'fpToolsTemplateSettings', 'fpToolsTheme', 'enableCustomTheme', 'notificationSound',
+    'notificationVolume', 'fpToolsCustomSoundData', 'fpToolsCustomSoundMeta',
+    'fpToolsCursorFx', 'fpToolsCustomCursor', 'keywords', 'greetingText'
+];
+
+// UI «Настройки профиля» во вкладке Настройки: список аккаунтов + копирование.
+// Каркас: кнопка пока поясняет, что перенос включится после подтверждения.
+function fptSetupProfileSettingsUI() {
+    const sel = document.getElementById('fpt-profcopy-src');
+    const btn = document.getElementById('fpt-profcopy-btn');
+    if (!sel || !btn) return;
+    const curName = document.querySelector('.user-link-name')?.textContent.trim();
+    const others = (typeof fpToolsAccounts !== 'undefined' ? fpToolsAccounts : []).filter(a => a && a.name !== curName);
+    sel.innerHTML = others.length
+        ? others.map(a => `<option value="${_fptEsc(a.name)}">${_fptEsc(a.name)}</option>`).join('')
+        : '<option value="">Нет других аккаунтов</option>';
+    sel.disabled = !others.length;
+    if (btn.dataset.wired) return;
+    btn.dataset.wired = '1';
+    btn.addEventListener('click', () => {
+        const src = sel.value;
+        if (!src) { if (typeof showNotification === 'function') showNotification('Сначала добавьте другой аккаунт.', true); return; }
+        if (typeof showNotification === 'function') showNotification(`Каркас. Скажите «включить» — и кнопка перенесёт авто-ответы, шаблоны, тему и звуки с аккаунта «${src}» в текущий.`, false);
+    });
+}
+
 // Копирование крипто-адреса по клику (страница «Поддержка»).
 document.addEventListener('click', (e) => {
     const btn = e.target.closest && e.target.closest('.fpt-wallet-addr');

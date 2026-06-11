@@ -6012,6 +6012,59 @@ a.contact-item:hover {
 .fp-tools-popup .fpt-fx-row > .template-container { margin-bottom: 0; }
 @media (max-width: 720px) { .fp-tools-popup .fpt-fx-row { grid-template-columns: 1fr; } }
 
+/* Настройки профиля: копирование с аккаунта */
+.fp-tools-popup .fpt-profcopy{display:flex;gap:8px;align-items:center;}
+.fp-tools-popup .fpt-profcopy select{flex:1;min-width:0;}
+.fp-tools-popup .fpt-profcopy .btn{flex:none;}
+
+/* Профиль: карточка-заглушка «Добавить лоты по игре» */
+.fpt-addgame-card{
+    display:flex;align-items:center;gap:14px;margin:14px 0 6px;padding:16px 18px;cursor:pointer;
+    border:1.5px dashed var(--fpt-pLine, rgba(120,130,150,.4));border-radius:14px;
+    background:var(--fpt-pA, rgba(255,255,255,.02));transition:border-color .15s ease,background .15s ease;
+}
+.fpt-addgame-card:hover{border-color:var(--fpt-uacc, #5b86d8);background:var(--fpt-uacc-soft, rgba(91,134,216,.08));}
+.fpt-addgame-ic{width:40px;height:40px;flex:none;border-radius:11px;display:flex;align-items:center;justify-content:center;background:var(--fpt-uacc-soft, rgba(91,134,216,.14));color:var(--fpt-uacc, #5b86d8);}
+.fpt-addgame-ic .material-symbols-rounded{font-size:22px;}
+.fpt-addgame-txt{flex:1;min-width:0;}
+.fpt-addgame-title{font-size:15px;font-weight:650;color:var(--fpt-pTx, #e8eaf0);}
+.fpt-addgame-sub{font-size:12.5px;color:var(--fpt-pTxDim, #9099b8);margin-top:2px;}
+.fpt-addgame-go{color:var(--fpt-pTxFaint, #8a90a6);flex:none;}
+.fpt-addgame-card:hover .fpt-addgame-go{color:var(--fpt-uacc, #5b86d8);}
+
+.fpt-addgame-overlay{position:fixed;inset:0;z-index:2147483600;display:flex;align-items:center;justify-content:center;
+    background:rgba(8,10,15,.62);backdrop-filter:blur(3px);padding:20px;}
+.fpt-addgame-modal{width:560px;max-width:100%;max-height:86vh;display:flex;flex-direction:column;
+    background:var(--fpt-p1, #1a1c26);border:1px solid var(--fpt-pLine, rgba(255,255,255,.1));border-radius:16px;
+    box-shadow:0 30px 70px -20px rgba(0,0,0,.7);font-family:'Geist','Segoe UI',sans-serif;color:var(--fpt-pTx, #e8eaf0);overflow:hidden;}
+.fpt-addgame-head{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--fpt-pLine, rgba(255,255,255,.08));font-size:15px;font-weight:650;}
+.fpt-addgame-close{border:0;background:transparent;color:var(--fpt-pTxDim, #9099b8);cursor:pointer;display:flex;padding:4px;border-radius:8px;}
+.fpt-addgame-close:hover{background:var(--fpt-p2, rgba(255,255,255,.06));color:var(--fpt-pTx);}
+.fpt-addgame-body{padding:16px 18px;overflow-y:auto;display:flex;flex-direction:column;gap:18px;}
+.fpt-addgame-steplabel{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--fpt-uacc, #5b86d8);margin-bottom:9px;}
+.fpt-addgame-search{width:100%;height:40px;padding:0 13px;border-radius:10px;border:1px solid var(--fpt-pLine, rgba(255,255,255,.12));background:var(--fpt-pInput, #14151b);color:var(--fpt-pTx);font-size:14px;box-sizing:border-box;}
+.fpt-addgame-search:focus{outline:none;border-color:var(--fpt-uacc, #5b86d8);}
+.fpt-addgame-suggest{display:flex;flex-direction:column;gap:2px;margin-top:6px;}
+.fpt-addgame-sg{display:flex;align-items:center;justify-content:space-between;gap:8px;border:0;background:transparent;color:var(--fpt-pTx);text-align:left;padding:9px 11px;border-radius:9px;cursor:pointer;font-size:13.5px;}
+.fpt-addgame-sg small{color:var(--fpt-pTxFaint, #8a90a6);font-size:11px;}
+.fpt-addgame-sg:hover{background:var(--fpt-uacc-soft, rgba(91,134,216,.12));}
+.fpt-addgame-chosen{display:flex;align-items:center;gap:7px;margin-top:8px;font-size:13px;color:var(--fpt-pTxDim, #cfd2dc);}
+.fpt-addgame-chosen .material-symbols-rounded{font-size:17px;color:#3fbf6f;}
+.fpt-addgame-lots{display:flex;flex-direction:column;gap:4px;max-height:240px;overflow-y:auto;border:1px solid var(--fpt-pLine, rgba(255,255,255,.08));border-radius:10px;padding:6px;}
+.fpt-addgame-lot{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;margin:0;}
+.fpt-addgame-lot:hover{background:var(--fpt-p2, rgba(255,255,255,.04));}
+.fpt-addgame-lot input{accent-color:var(--fpt-uacc, #5b86d8);width:15px;height:15px;flex:none;}
+.fpt-addgame-lot-desc{flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fpt-addgame-lot-meta{font-size:11px;color:var(--fpt-pTxFaint, #8a90a6);flex:none;}
+.fpt-addgame-empty{padding:14px;text-align:center;font-size:12.5px;color:var(--fpt-pTxFaint, #8a90a6);}
+.fpt-addgame-foot{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 18px;border-top:1px solid var(--fpt-pLine, rgba(255,255,255,.08));flex-wrap:wrap;}
+.fpt-addgame-note{font-size:11.5px;color:var(--fpt-pTxFaint, #8a90a6);flex:1;min-width:160px;}
+.fpt-addgame-actions{display:flex;gap:8px;}
+.fpt-addgame-cancel,.fpt-addgame-create{height:36px;padding:0 16px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:560;border:1px solid var(--fpt-pLine, rgba(255,255,255,.12));}
+.fpt-addgame-cancel{background:var(--fpt-p2, #262a34);color:var(--fpt-pTx);}
+.fpt-addgame-create{background:var(--fpt-uacc, #5b86d8);color:#fff;border-color:transparent;}
+.fpt-addgame-create:disabled{opacity:.45;cursor:not-allowed;}
+
 /* Поддержка: крипто-кошельки */
 .fp-tools-popup .fpt-wallets { display: flex; flex-direction: column; gap: 12px; margin: 6px 0 4px; }
 .fp-tools-popup .fpt-wallet { display: flex; flex-direction: column; gap: 5px; }
