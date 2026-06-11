@@ -104,6 +104,7 @@ async function openBulkEditor() {
                             <option value="sub">Вычесть −</option>
                             <option value="pct_up">Поднять на %</option>
                             <option value="pct_down">Снизить на %</option>
+                            <option value="round">Выровнять (без копеек)</option>
                         </select>
                         <input type="number" id="fp-bulk-price-value" step="0.01" placeholder="0" disabled style="flex:1;min-width:120px;background:#0e0f16;border:1px solid #22253a;border-radius:6px;padding:8px;color:#d8dae8;font-size:13px;">
                         <span id="fp-bulk-price-unit" style="font-size:12px;color:#5a5f7a;min-width:14px;"></span>
@@ -181,8 +182,8 @@ async function openBulkEditor() {
     const priceUnit = $('fp-bulk-price-unit');
     priceMode.addEventListener('change', () => {
         const m = priceMode.value;
-        priceVal.disabled = (m === 'none');
-        if (m === 'none') { priceVal.value = ''; priceUnit.textContent = ''; }
+        priceVal.disabled = (m === 'none' || m === 'round');   // round не требует значения
+        if (m === 'none' || m === 'round') { priceVal.value = ''; priceUnit.textContent = (m === 'round') ? '→ ₽' : ''; }
         else if (m === 'pct_up' || m === 'pct_down') priceUnit.textContent = '%';
         else priceUnit.textContent = '₽';
     });
@@ -256,7 +257,7 @@ async function openBulkEditor() {
             }
         }
 
-        if (priceWanted && (isNaN(pVal) || pVal < 0)) {
+        if (priceWanted && pMode !== 'round' && (isNaN(pVal) || pVal < 0)) {
             showNotification('Укажите корректное значение цены', true);
             return;
         }
@@ -334,7 +335,7 @@ async function openBulkEditor() {
 
                 if (priceWanted) {
                     const cur = parseFloat(editData.price);
-                    if (isNaN(cur) && (pMode === 'add' || pMode === 'sub' || pMode === 'pct_up' || pMode === 'pct_down')) {
+                    if (isNaN(cur) && (pMode === 'add' || pMode === 'sub' || pMode === 'pct_up' || pMode === 'pct_down' || pMode === 'round')) {
                         throw new Error('не удалось прочитать текущую цену');
                     }
                     let np;
@@ -344,10 +345,12 @@ async function openBulkEditor() {
                         case 'sub':      np = cur - pVal; break;
                         case 'pct_up':   np = cur * (1 + pVal / 100); break;
                         case 'pct_down': np = cur * (1 - pVal / 100); break;
+                        case 'round':    np = Math.round(cur); break;   // ≥50 коп. вверх, <50 коп. вниз
                     }
                     np = Math.max(0, np);
                     if (!isNaN(pMin)) np = Math.max(pMin, np);
-                    np = pRound ? Math.round(np) : Math.round(np * 100) / 100;
+                    // 'round' уже целое; иначе — по галочке «округлять до целого»
+                    np = (pRound || pMode === 'round') ? Math.round(np) : Math.round(np * 100) / 100;
                     formData.price = String(np);
                 }
 
