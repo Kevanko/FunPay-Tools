@@ -21,13 +21,14 @@
 // Polling design ported from FP Tools's Runner: fresh RANDOM tag per cycle for
 // chat_bookmarks AND orders_counters, per-message dedup.
 
-import { runAutoResponderCycle } from './autoresponder.js';
+import { runAutoResponderCycle, runMultiAccountAutoReply } from './autoresponder.js';
 
 export const ENGINE_HEARTBEAT_ALARM = 'fpToolsEngineHeartbeat';
 const OFFSCREEN_PATH = 'offscreen/offscreen.html';
 
 const POLL_INTERVAL_MS = 3000;        // active-loop cadence while worker is awake
 const MIN_CYCLE_GAP_MS = 2500;        // never hammer runner/ faster than this
+const MULTI_GAP_MS = 45000;           // мульти-аккаунт реже (свап куки = нагрузка на активную сессию)
 const ERROR_BACKOFF_MS = 5000;        // FP Tools sleeps 5s after a runner error
 const STALL_MS = 90000;               // if no successful cycle in 90s -> force restart
 
@@ -36,13 +37,14 @@ let watchdogTimer = null;
 let running = false;
 let lastCycleStart = 0;
 let lastCycleOk = 0;
+let lastMultiRun = 0;
 
 // FP Tools: utils.random_tag() -> 8 hex chars. Fresh tag per cycle keeps FunPay returning data.
 export function randomTag() {
     return Math.floor(Math.random() * 0xffffffff).toString(16).padStart(8, '0');
 }
 
-async function anyAutomationEnabled() {
+async function activeAutomationEnabled() {
     const { fpToolsAutoReplies = {} } = await chrome.storage.local.get('fpToolsAutoReplies');
     return !!(
         fpToolsAutoReplies.greetingEnabled ||
@@ -53,6 +55,17 @@ async function anyAutomationEnabled() {
         fpToolsAutoReplies.orderConfirmReplyEnabled ||
         fpToolsAutoReplies.autoDeliveryEnabled
     );
+}
+
+async function multiAccountEnabled() {
+    const { fptMultiAccountAR } = await chrome.storage.local.get('fptMultiAccountAR');
+    return !!fptMultiAccountAR;
+}
+
+// движок работает, если включена авто-автоматизация активного аккаунта ИЛИ
+// фоновый авто-ответ за онлайн-аккаунты
+async function anyAutomationEnabled() {
+    return (await activeAutomationEnabled()) || (await multiAccountEnabled());
 }
 
 // Layer 2 enabler: make sure the offscreen document exists so its keepalive interval runs.
@@ -80,18 +93,23 @@ async function ensureOffscreen() {
 async function tick() {
     if (!running) return;
     try {
-        if (await anyAutomationEnabled()) {
-            const now = Date.now();
-            if (now - lastCycleStart >= MIN_CYCLE_GAP_MS) {
-                lastCycleStart = now;
-                await runAutoResponderCycle();
-                lastCycleOk = Date.now();
-            }
-            scheduleNext(POLL_INTERVAL_MS);
-        } else {
-            running = false;
-            loopTimer = null;
+        const activeOn = await activeAutomationEnabled();
+        const multiOn = await multiAccountEnabled();
+        if (!activeOn && !multiOn) { running = false; loopTimer = null; return; }
+
+        const now = Date.now();
+        if (activeOn && now - lastCycleStart >= MIN_CYCLE_GAP_MS) {
+            lastCycleStart = now;
+            await runAutoResponderCycle();
+            lastCycleOk = Date.now();
         }
+        // мульти-аккаунт реже: свап куки на время цикла → не частим, чтобы не мешать активной сессии
+        if (multiOn && Date.now() - lastMultiRun >= MULTI_GAP_MS) {
+            lastMultiRun = Date.now();
+            try { await runMultiAccountAutoReply({}); } catch (e) { console.error('FP Tools engine: multi-AR', e && e.message || e); }
+            lastCycleOk = Date.now();
+        }
+        scheduleNext(POLL_INTERVAL_MS);
     } catch (e) {
         console.error('FP Tools engine: tick error', e && e.message || e);
         scheduleNext(ERROR_BACKOFF_MS);

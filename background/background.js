@@ -2,7 +2,7 @@
 
 import { fetchAIResponse, fetchAILotGeneration, fetchAITranslation, fetchAIImageGeneration } from './ai.js';
 import { BUMP_ALARM_NAME, startAutoBump, stopAutoBump, runBumpCycle } from './autobump.js';
-import { runAutoResponderCycle, resetAutoResponderState } from './autoresponder.js';
+import { runAutoResponderCycle, resetAutoResponderState, runMultiAccountAutoReply } from './autoresponder.js';
 import { startEngine, stopEngine, onHeartbeat, onKeepalivePing, ENGINE_HEARTBEAT_ALARM } from './fpt_engine.js';
 import { startSmartBump, stopSmartBump, runSmartBumpCycle, SMART_BUMP_ALARM } from './smart_bump.js';
 import {
@@ -1606,6 +1606,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         })();
         return true;
     }
+    // Мульти-аккаунтный автоответ: проверка (dry-run, без отправки) и ручной запуск.
+    if (request.action === 'fptMultiARDryRun') {
+        (async () => { try { sendResponse(await runMultiAccountAutoReply({ dryRun: true, onlyKey: request.key || null })); } catch (e) { sendResponse({ error: e.message }); } })();
+        return true;
+    }
+    if (request.action === 'fptMultiARRun') {
+        (async () => { try { sendResponse(await runMultiAccountAutoReply({})); } catch (e) { sendResponse({ error: e.message }); } })();
+        return true;
+    }
     // ACCOUNT SNAPSHOT (avatar / balance / unread) для вкладки мультиаккаунтов
     if (request.action === 'getAccountSnapshot') {
         (async () => {
@@ -1927,7 +1936,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 });
 
 function setupInitialAlarms() {
-    chrome.storage.local.get(['autoBumpEnabled', 'autoBumpCooldown', 'fpToolsDiscord', 'fpToolsAutoReplies', 'fpToolsSmartBumpEnabled'], (settings) => {
+    chrome.storage.local.get(['autoBumpEnabled', 'autoBumpCooldown', 'fpToolsDiscord', 'fpToolsAutoReplies', 'fpToolsSmartBumpEnabled', 'fptMultiAccountAR'], (settings) => {
         if (settings.fpToolsSmartBumpEnabled) {
             // 3.0: smart raise takes over; the fixed-interval bump is disabled to avoid double-raising.
             chrome.alarms.clear(BUMP_ALARM_NAME);
@@ -1967,7 +1976,7 @@ function setupInitialAlarms() {
             autoReplies.autoReviewEnabled || autoReplies.bonusForReviewEnabled ||
             autoReplies.newOrderReplyEnabled || autoReplies.orderConfirmReplyEnabled ||
             autoReplies.autoDeliveryEnabled;
-        if (arAnyEnabled) {
+        if (arAnyEnabled || settings.fptMultiAccountAR) {
             // 3.0: start the MV3-safe active loop instead of the broken 0.25-min alarm.
             startEngine();
         }
@@ -2025,9 +2034,26 @@ chrome.storage.onChanged.addListener((changes, area) => {
         if (isEnabled) {
             startEngine();
         } else {
-            stopEngine();
-            chrome.alarms.clear(AUTO_RESPONDER_ALARM_NAME);
-            resetAutoResponderState();
+            // не глушим движок, если включён фоновый авто-ответ за онлайн-аккаунты
+            chrome.storage.local.get('fptMultiAccountAR', ({ fptMultiAccountAR }) => {
+                if (fptMultiAccountAR) { startEngine(); return; }
+                stopEngine();
+                chrome.alarms.clear(AUTO_RESPONDER_ALARM_NAME);
+                resetAutoResponderState();
+            });
+        }
+    }
+
+    // Фоновый мульти-аккаунтный авто-ответ: вкл/выкл двигателя.
+    if (changes.fptMultiAccountAR) {
+        if (changes.fptMultiAccountAR.newValue) {
+            startEngine();
+        } else {
+            chrome.storage.local.get('fpToolsAutoReplies', ({ fpToolsAutoReplies = {} }) => {
+                const activeOn = fpToolsAutoReplies.greetingEnabled || fpToolsAutoReplies.keywordsEnabled || fpToolsAutoReplies.autoReviewEnabled ||
+                    fpToolsAutoReplies.bonusForReviewEnabled || fpToolsAutoReplies.newOrderReplyEnabled || fpToolsAutoReplies.orderConfirmReplyEnabled || fpToolsAutoReplies.autoDeliveryEnabled;
+                if (!activeOn) stopEngine();   // у активного тоже ничего — можно глушить
+            });
         }
     }
     // 3.0: smart auto-raise toggle
