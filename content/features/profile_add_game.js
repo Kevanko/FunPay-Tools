@@ -67,7 +67,8 @@
             '<div class="fpt-addgame-txt"><div class="fpt-addgame-title">Добавить лоты по игре</div>' +
             '<div class="fpt-addgame-sub">Выберите игру и скопируйте в новый раздел существующие лоты</div></div>' +
             '<span class="material-symbols-rounded fpt-addgame-go">chevron_right</span>';
-        offers[offers.length - 1].after(card);
+        // в начале списка лотов — перед первым разделом (после панели управления лотами)
+        offers[0].before(card);
         card.addEventListener('click', openModal);
     }
 
