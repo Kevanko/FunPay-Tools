@@ -39,8 +39,13 @@ async function fptCheckPendingAdd() {
     const existing = accts.find(a => a.name === name);
     let msg = null;
     if (existing) {
+        // вошли в уже сохранённый аккаунт (передумали / забыли пароль и т.п.)
+        const wasError = existing.loginError;
+        const keyChanged = existing.key !== key;
         existing.key = key; existing.loginError = false; existing.online = existing.online !== false;
-        msg = `Аккаунт «${name}» обновлён.`;
+        if (wasError) msg = `Вход в «${name}» восстановлен.`;
+        else if (keyChanged) msg = `Аккаунт «${name}» обновлён.`;
+        // если ничего не изменилось — молча (просто вернулись в свой аккаунт)
     } else if (!accts.some(a => a.key === key)) {
         accts.push({ name, key, online: true });
         msg = `Аккаунт «${name}» добавлен.`;
@@ -380,6 +385,17 @@ async function fptRenderAccountSwitcher(menu) {
         });
     });
 }
+
+// Копирование крипто-адреса по клику (страница «Поддержка»).
+document.addEventListener('click', (e) => {
+    const btn = e.target.closest && e.target.closest('.fpt-wallet-addr');
+    if (!btn || !btn.dataset.addr) return;
+    try {
+        navigator.clipboard.writeText(btn.dataset.addr).then(() => {
+            if (typeof showNotification === 'function') showNotification('Адрес скопирован');
+        }).catch(() => {});
+    } catch (_) {}
+});
 
 (function fptBootAccountMenu() {
     if (window !== window.top) return;

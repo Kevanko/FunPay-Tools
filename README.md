@@ -63,6 +63,19 @@
 
 Работает в Chrome и других браузерах на Chromium (Edge, Opera, Яндекс Браузер).
 
+## Поддержка автора форка
+
+Если расширение оказалось полезным — можно поддержать автора форка. USDT в разных сетях.
+
+> **Не принимаю переводы с бирж под санкциями (HTX, EXMO и т.п.)** — они могут не дойти.
+
+| Сеть | Адрес |
+| :--- | :--- |
+| **TON** | `UQB-SA6hyUZ0nse40I8LvHqJFShZ443MO1lRqGNbxZp1Kl30` |
+| **USDT · TRON (TRC20)** | `TUZjiFiDi1XScM4DDhqBRg9fbjRuWgc9tH` |
+| **USDT · Ethereum (ERC20)** | `0x8EBe92e82E92BFC24BAF5471015bfc5077684eFb` |
+| **USDT · Solana (SPL)** | `xnB1k5ZAp8XzqrjWSpd6AagxwHizUpspFqF12LWxbTf` |
+
 ## Лицензия
 
 MIT — см. [LICENSE](LICENSE). Основано на проекте [FunPay Tools](https://github.com/XaviersDev/FunPay-Tools) автора XaviersDev.

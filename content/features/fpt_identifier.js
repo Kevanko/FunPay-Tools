@@ -59,6 +59,19 @@ function initializeFPTIdentifier() {
         }
     }
 
+    // Подпись из нулевой ширины: ZWJ/ZWNJ (U+200C/U+200D) в шрифте FunPay рисуются
+    // как пустой квадрат □. Чистим их из ОТОБРАЖЕНИЯ (детект делаем до очистки).
+    function cleanSigIn(el) {
+        if (!el) return;
+        const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
+        let n;
+        while (n = w.nextNode()) {
+            if (/[​‌‍⁠﻿]/.test(n.nodeValue)) {
+                n.nodeValue = n.nodeValue.replace(/[​‌‍⁠﻿]/g, '');
+            }
+        }
+    }
+
     // ── Message scanning ────────────────────────────────────────────────────
     function processMessage(node) {
         let authorId = null;
@@ -68,14 +81,23 @@ function initializeFPTIdentifier() {
         } else {
             authorId = lastSeenAuthorId;
         }
-        if (!authorId) return;
         const txt = node.querySelector('.chat-msg-text');
-        if (txt?.textContent.includes(FPT_SIGNATURE)) {
+        // детект подписи ДО очистки
+        if (authorId && txt && txt.textContent.includes(FPT_SIGNATURE)) {
             if (!identifiedUsers.has(authorId)) {
                 identifiedUsers.add(authorId);
                 if (authorId === currentChatUserId) updateHeaderStatus();
             }
         }
+        if (txt) cleanSigIn(txt);   // убираем □ из тела сообщения
+    }
+
+    // Превью последних сообщений в списке контактов тоже содержат подпись → □.
+    function setupSignatureCleaner() {
+        const clean = () => { try { document.querySelectorAll('.contact-item-message').forEach(cleanSigIn); } catch (_) {} };
+        clean();
+        const obs = new MutationObserver(clean);
+        obs.observe(document.body, { childList: true, subtree: true, characterData: true });
     }
 
     // ── Injection guard ──────────────────────────────────────────────────────
@@ -192,6 +214,7 @@ function initializeFPTIdentifier() {
         if (fpToolsIdentifierEnabled === false) return;
 
         addIdentifierStyles();
+        setupSignatureCleaner();
         // Run both in parallel - they each wait independently
         await Promise.all([setupFormInjection(), setupMessageObserver()]);
     }
