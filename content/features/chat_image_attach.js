@@ -662,20 +662,35 @@
         closeModal({ sent: true });
         basket = [];
 
+        // Весь цикл отправки выполняет background — переключение вкладки больше не
+        // обрывает процесс. Прогресс по каждой картинке прилетает сообщением.
+        const groupToken = 'g' + Date.now() + Math.random().toString(36).slice(2, 7);
+        const onProgress = (msg) => {
+            if (!msg || msg.action !== 'fptImageBatchProgress' || msg.groupToken !== groupToken) return;
+            if (msg.ok) markTileSent(group, msg.i); else markTileError(group, msg.i);
+        };
+        try { chrome.runtime.onMessage.addListener(onProgress); } catch (_) {}
+
         try {
-            for (let i = 0; i < imgs.length; i++) {
-                const resp = await chrome.runtime.sendMessage({
-                    action: 'fptSendImage', chatId, dataUrl: imgs[i].dataUrl, chatName
-                });
-                if (resp && resp.ok) markTileSent(group, i);
-                else { markTileError(group, i); notify('Не удалось отправить изображение: ' + ((resp && resp.error) || 'ошибка'), true); }
-                await new Promise(r => setTimeout(r, 250));
+            const resp = await chrome.runtime.sendMessage({
+                action: 'fptSendImageBatch', chatId, chatName, groupToken,
+                images: imgs.map(i => i.dataUrl), text
+            });
+            // финальная сверка (на случай, если прогресс-сообщения не дошли — вкладка была свёрнута)
+            if (resp && Array.isArray(resp.results)) {
+                resp.results.forEach(r => { if (r.ok) markTileSent(group, r.i); else markTileError(group, r.i); });
+                const failed = resp.results.filter(r => !r.ok).length;
+                if (failed) notify(`Не отправлено изображений: ${failed}. Проверьте вход в аккаунт.`, true);
+            } else if (!resp || !resp.ok) {
+                notify('Не удалось отправить изображения: ' + ((resp && resp.error) || 'ошибка связи'), true);
             }
-            if (text) await chrome.runtime.sendMessage({ action: 'fptSendChatText', chatId, text });
+            if (resp && resp.textOk === false) notify('Текст не отправился: ' + (resp.textError || ''), true);
             finishPendingGroup(group);
         } catch (e) {
             console.error('FP Tools: ошибка отправки', e);
             notify('Ошибка при отправке: ' + e.message, true);
+        } finally {
+            try { chrome.runtime.onMessage.removeListener(onProgress); } catch (_) {}
         }
     }
 
