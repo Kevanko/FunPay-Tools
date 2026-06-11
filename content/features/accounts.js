@@ -223,6 +223,13 @@ async function renderAccountsList() {
     maybeAutoRefreshAccounts();
 }
 
+// Снимок принадлежит ДРУГОМУ сохранённому аккаунту (его имя) → куку подменили во
+// время запроса, данные чужие, присваивать нельзя (защита от дублей аватарок).
+function _fptSnapWrongAccount(snap, ownKey) {
+    const u = snap && snap.username;
+    return !!(u && fpToolsAccounts.some(o => o && o.key && o.key !== ownKey && o.name === u));
+}
+
 // Автообновление аватар/баланс/непрочитанных не чаще раза в 55 минут.
 let _fptAccAutoRefreshing = false;
 async function maybeAutoRefreshAccounts() {
@@ -238,7 +245,7 @@ async function maybeAutoRefreshAccounts() {
             if (!account.key) continue;
             if (account._snapTs && (now - account._snapTs) <= STALE) continue;
             const snap = await fptFetchAccountSnapshot(account.key);
-            if (snap) {
+            if (snap && !_fptSnapWrongAccount(snap, account.key)) {
                 account.avatar = snap.avatar || account.avatar || '';
                 account.balance = snap.balance || account.balance || '';
                 account.unread = typeof snap.unread === 'number' ? snap.unread : (account.unread || 0);
@@ -259,7 +266,7 @@ async function fptRefreshAllAccounts() {
     for (const account of fpToolsAccounts) {
         if (!account.key) continue;
         const snap = await fptFetchAccountSnapshot(account.key);
-        if (snap) {
+        if (snap && !_fptSnapWrongAccount(snap, account.key)) {
             account.avatar = snap.avatar || account.avatar || '';
             account.balance = snap.balance || account.balance || '';
             account.unread = typeof snap.unread === 'number' ? snap.unread : (account.unread || 0);
