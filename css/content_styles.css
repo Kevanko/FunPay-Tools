@@ -6003,20 +6003,32 @@ a.contact-item:hover {
 }
 
 /* === СТИЛИ ДЛЯ ВКЛАДКИ АВТО-ОТВЕТОВ === */
+/* Две колонки: 5 шаблонов оценок не растягивают меню вниз простынёй */
 .review-templates-grid {
     display: grid;
-    grid-template-columns: 1fr;
-    gap: 15px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 14px;
     margin-top: 15px;
 }
 
 .review-templates-grid .template-container {
     margin-bottom: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.review-templates-grid .template-container textarea {
+    min-height: 76px;
+    flex: 1;
 }
 
 .review-templates-grid label {
     font-size: 14px;
-    color: #a0a0a0;
+    color: var(--fpt-text-muted, #a0a0a0);
+}
+
+@media (max-width: 720px) {
+    .review-templates-grid { grid-template-columns: 1fr; }
 }
 
 .keywords-list {

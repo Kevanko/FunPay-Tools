@@ -203,3 +203,45 @@ function setupAccountManagementHandlers() {
         });
     }
 }
+
+// Пункты в дропдауне профиля FunPay (шапка сайта): «Добавить аккаунт» и
+// «Выйти (очистить куки)». Вставляются на загрузке страницы — раньше чистый
+// выход добавлялся только при первом открытии панели, поэтому в меню профиля
+// его не было, пока панель не открыли.
+function fptInjectAccountMenuItems() {
+    const userLi = document.querySelector('.navbar-right.logged li.dropdown.hidden-sm.hidden-xs');
+    const menu = userLi && userLi.querySelector('.dropdown-menu');
+    const logoutA = menu && menu.querySelector('.menu-item-logout');
+    const logoutLi = logoutA && logoutA.closest('li');
+    if (!menu || !logoutLi) return false;
+
+    if (!menu.querySelector('.fpt-menu-add-account')) {
+        const li = document.createElement('li');
+        li.innerHTML = '<a href="#" class="fpt-menu-add-account">Добавить аккаунт</a>';
+        logoutLi.parentElement.insertBefore(li, logoutLi);
+        li.querySelector('a').addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('fpToolsButton')?.click();
+            setTimeout(() => document.querySelector('.fp-tools-popup li[data-page="accounts"] a')?.click(), 320);
+        });
+    }
+    if (!menu.querySelector('.fp-tools-logout-clean')) {
+        const li = document.createElement('li');
+        li.innerHTML = '<a href="#" class="fp-tools-logout-clean" style="color:#e06b6b !important;">Выйти (очистить куки)</a>';
+        logoutLi.parentElement.insertBefore(li, logoutLi.nextSibling);
+        li.querySelector('a').addEventListener('click', (e) => {
+            e.preventDefault();
+            try { chrome.runtime.sendMessage({ action: 'deleteCookiesAndReload' }); } catch (_) {}
+        });
+    }
+    return true;
+}
+
+(function fptBootAccountMenu() {
+    if (window !== window.top) return;
+    if (fptInjectAccountMenuItems()) return;
+    const mo = new MutationObserver(() => { if (fptInjectAccountMenuItems()) mo.disconnect(); });
+    mo.observe(document.documentElement, { childList: true, subtree: true });
+    document.addEventListener('DOMContentLoaded', () => fptInjectAccountMenuItems(), { once: true });
+    setTimeout(() => mo.disconnect(), 15000);
+})();
