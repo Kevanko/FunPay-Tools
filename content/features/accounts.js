@@ -390,14 +390,11 @@ function _fptSnapWrongAccount(snap, ownKey, ownName, ownUserId) {
     return !!(u && fpToolsAccounts.some(o => o && o.key && o.key !== ownKey && o.name === u));
 }
 
-// Лечение кросс-контаминации аватара/userId. Корень бага: пер-аккаунтный снимок через
-// своп cookie НЕнадёжен и иногда возвращает данные АКТИВНОГО аккаунта всем подряд →
-// одинаковые аватарки/userId у разных аккаунтов (а ещё своп мог молча сменить активный
-// аккаунт). Поэтому здесь — БЕЗ сети и свопов, только по живой шапке сайта:
-//   1) активный аккаунт (по имени из шапки) берёт аватар и userId прямо из шапки;
-//   2) у любого ДРУГОГО аккаунта, унаследовавшего аватар/userId активного (или просто
-//      дублирующего чужой аватар), чистим поле — дефолт-иконка лучше чужого лица.
-// Пустой аватар неактивного заполнится сам при переключении на него. Идемпотентно и
+// КОСМЕТИЧЕСКОЕ лечение одинаковых аватарок. БЕЗ сети, свопов и без правки ключевых
+// полей аккаунта. Активный аккаунт (по имени из живой шапки) берёт аватар из шапки; если
+// у нескольких записей один и тот же аватар — у неактивных дубликат чистим (дефолт-иконка).
+// userId / golden_key / loginError НЕ трогаем: попытки их «чинить» (снимком или маркируя
+// orphan'ы как «ключ устарел») ломали рабочие аккаунты и меняли тему. Идемпотентно и
 // дёшево → безопасно звать на каждый рендер. reRender — колбэк перерисовки UI.
 async function fptHealSharedAvatars(reRender) {
     if (!_fptAlive()) return;
@@ -415,37 +412,23 @@ async function fptHealSharedAvatars(reRender) {
     if (!active && cu.id) active = accts.find(a => a && String(a.userId) === String(cu.id));
     let changed = false;
 
-    // (1) активный аккаунт — аватар и userId из живой шапки (авторитетно)
-    if (active && liveAv && active.avatar !== liveAv) { active.avatar = liveAv; changed = true; }
-    if (active && cu.id && String(active.userId || '') !== String(cu.id)) { active.userId = String(cu.id); changed = true; }
-    // (2a) userId активного не может принадлежать другому аккаунту → у чужих копий чистим
-    if (cu.id) accts.forEach(a => { if (a && a !== active && String(a.userId || '') === String(cu.id)) { a.userId = ''; changed = true; } });
-    // (2b) дедуп аватара: один и тот же аватар у нескольких аккаунтов → оставляем активному/
-    //      первому, у остальных чистим (два РАЗНЫХ аккаунта не делят одно лицо)
+    // (1) активный аккаунт берёт аватар из ЖИВОЙ шапки; он залогинен ПРЯМО СЕЙЧАС, значит
+    //     его ключ заведомо рабочий — снимаем ошибочный loginError, если он был выставлен.
+    if (active) {
+        if (liveAv && active.avatar !== liveAv) { active.avatar = liveAv; changed = true; }
+        if (active.loginError) { active.loginError = false; changed = true; }
+    }
+    // (2) дедуп аватара: один и тот же аватар у нескольких записей → у активного/первого
+    //     оставляем, у остальных чистим ТОЛЬКО аватар (показываем дефолт-иконку).
+    //     ВАЖНО: userId, golden_key и loginError неактивных аккаунтов НЕ трогаем — попытки
+    //     «лечить» их снимком/эвристикой ломали рабочие аккаунты (ложное «ключ устарел» и
+    //     смена темы из-за пере-ключевания облачной синхронизации). Аватар — косметика.
     const byAv = {};
     accts.forEach(a => { if (a && a.avatar) (byAv[a.avatar] = byAv[a.avatar] || []).push(a); });
     Object.values(byAv).forEach(grp => {
         if (grp.length < 2) return;
         const keep = grp.find(a => a === active) || grp[0];
         grp.forEach(a => { if (a !== keep && a.avatar) { a.avatar = ''; changed = true; } });
-    });
-    // (2c) орфаны: один и тот же golden_key у нескольких записей. Ключ = ровно один аккаунт
-    //      FunPay, отдельный снимок невозможен (вернёт владельца ключа). Гасим снимок-поля
-    //      орфана и помечаем его «требует перевхода» (loginError) — данные восстановятся,
-    //      когда пользователь войдёт в этот аккаунт (получим его собственный ключ). Запись
-    //      НЕ удаляем. _snapTs ставим свежим, чтобы рефрешеры его не трогали.
-    const byKey = {};
-    accts.forEach(a => { if (a && a.key) (byKey[a.key] = byKey[a.key] || []).push(a); });
-    Object.values(byKey).forEach(grp => {
-        if (grp.length < 2) return;
-        const owner = grp.find(a => a === active) || grp[0];
-        grp.forEach(a => {
-            if (a === owner) return;
-            if (a.avatar) { a.avatar = ''; changed = true; }
-            if (a.userId) { a.userId = ''; changed = true; }
-            if (!a.loginError) { a.loginError = true; changed = true; }
-            a._snapTs = Date.now();
-        });
     });
     if (changed) {
         try { await chrome.storage.local.set({ fpToolsAccounts: accts }); } catch (_) {}
