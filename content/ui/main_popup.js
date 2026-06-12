@@ -975,6 +975,29 @@ function createMainPopup() {
                 <div class="fp-tools-page-content" data-page="settings_io">
                     <h3>Настройки профиля</h3>
                     <p class="template-info">У каждого аккаунта свои настройки: авто-ответы, тема и фон, звуки уведомлений, шаблоны. При смене аккаунта они переключаются автоматически, новый аккаунт получает настройки по умолчанию. Ниже можно скопировать настройки с другого аккаунта в текущий.</p>
+
+                    <div class="fpt-cloud-card">
+                        <div class="fpt-cloud-card-head">
+                            <span class="material-symbols-rounded fpt-cloud-card-ic">cloud_sync</span>
+                            <div class="fpt-cloud-card-txt">
+                                <div class="fpt-cloud-card-title">Облачная синхронизация</div>
+                                <div class="fpt-cloud-card-sub">Настройки, тема и ник едут за аккаунтом на все устройства · Cloudflare, бесплатно</div>
+                            </div>
+                            <label class="fpt-switch" title="Включить синхронизацию">
+                                <input type="checkbox" id="fpt-cloud-toggle">
+                                <span class="fpt-switch-track"></span>
+                            </label>
+                        </div>
+                        <div id="fpt-cloud-panel" style="display:none;flex-direction:column;gap:10px;margin-top:14px;">
+                            <p class="fpt-cloud-card-note">Синхронизируются тема (цвета, пресет, оформление ника), авто-ответы, шаблоны, ключевые слова, тумблеры и фото-обои. Видео-обои, кастомные звуки и пароли — нет. Правки между устройствами объединяются по полям.</p>
+                            <div class="fpt-cloud-actions">
+                                <button id="fpt-cloud-push-btn" class="btn" style="flex:1;"><span class="material-symbols-rounded" style="font-size:16px;vertical-align:-3px;margin-right:5px;">cloud_upload</span>Отправить сейчас</button>
+                                <button id="fpt-cloud-pull-btn" class="btn btn-default" style="flex:1;"><span class="material-symbols-rounded" style="font-size:16px;vertical-align:-3px;margin-right:5px;">cloud_download</span>Загрузить из облака</button>
+                            </div>
+                            <p class="template-info" id="fpt-cloud-status" style="margin:2px 0 0;opacity:.85;"></p>
+                        </div>
+                    </div>
+
                     <div class="fpt-eyebrow fpt-blocklabel">Скопировать настройки с другого аккаунта</div>
                     <div class="fpt-profcopy">
                         <select id="fpt-profcopy-src" class="template-input"></select>
@@ -990,20 +1013,6 @@ function createMainPopup() {
                         <input type="file" id="fp-settings-import-input" accept=".fpconfig,.json" style="display:none;">
                     </div>
                     <p class="template-info">Файл сохраняется с расширением <code>.fpconfig</code>. Импорт перезагрузит страницу.</p>
-
-                    <h3 style="margin-top:24px;">Облачная синхронизация <span style="font-size:11px;opacity:.6;font-weight:400;">(Cloudflare, бесплатно)</span></h3>
-                    <p class="template-info">Привязывает настройки к аккаунту FunPay: при входе они подтягиваются автоматически, без кодов. Синхронизируются тема (цвета и пресет), авто-ответы, шаблоны, ключевые слова, приветствие, тумблеры. Обои, кастомные звуки и пароли НЕ загружаются. Правки между устройствами объединяются по полям.</p>
-                    <label style="display:flex;align-items:center;gap:10px;margin-bottom:12px;cursor:pointer;">
-                        <input type="checkbox" id="fpt-cloud-toggle" style="width:16px;height:16px;">
-                        <span>Синхронизировать настройки с аккаунтом</span>
-                    </label>
-                    <div id="fpt-cloud-panel" style="display:none;flex-direction:column;gap:10px;margin-bottom:20px;">
-                        <div style="display:flex;gap:12px;">
-                            <button id="fpt-cloud-push-btn" class="btn" style="flex:1;"><span class="material-symbols-rounded" style="font-size:16px;vertical-align:-3px;margin-right:5px;">cloud_upload</span>Отправить сейчас</button>
-                            <button id="fpt-cloud-pull-btn" class="btn btn-default" style="flex:1;"><span class="material-symbols-rounded" style="font-size:16px;vertical-align:-3px;margin-right:5px;">cloud_download</span>Загрузить из облака</button>
-                        </div>
-                        <p class="template-info" id="fpt-cloud-status" style="margin:2px 0 0;opacity:.85;"></p>
-                    </div>
 
                     <h3 style="margin-top:24px;">Сброс данных</h3>
                     <p class="template-info">Удалить только определённые данные, не затрагивая остальные настройки.</p>

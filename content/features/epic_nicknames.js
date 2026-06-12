@@ -80,6 +80,13 @@
         const ALLOWED = ['glow', 'pulse', 'wave', 'glitch'];
         const raw = Array.isArray(c.an) ? c.an : (c.an ? [c.an] : []);
         out.an = raw.filter(a => ALLOWED.includes(a));
+        // Частицы-оверлей (ov) и их цвет (pc) безопасны: ov выбирает фиксированную
+        // канвас-рутину из белого списка, pc валидируется как hex — в CSS они не
+        // подставляются. Раньше их резали вместе с CSS-полями, из-за чего эффекты
+        // (огонь/снег/искры/молнии/матрица/дым/звёзды/сферы) НЕ рисовались вообще.
+        const OV_ALLOWED = ['none', 'fire', 'snow', 'sparks', 'matrix', 'smoke', 'lightning', 'stars', 'orbs'];
+        if (OV_ALLOWED.includes(c.ov)) out.ov = c.ov;
+        const pc = hex(c.pc); if (pc) out.pc = pc;
         return out;
     }
 
