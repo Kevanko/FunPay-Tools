@@ -344,7 +344,7 @@ async function renderAccountsList() {
             e.stopPropagation();
             if (isActive) {
                 const id = account.userId || (typeof _fptActiveUser === 'function' ? _fptActiveUser().id : '');
-                if (id) window.open(`https://funpay.com/users/${id}/`, '_blank');
+                if (id) window.location.href = `https://funpay.com/users/${id}/`;
             } else if (!switchBtn.disabled) {
                 switchBtn.click();
             }
@@ -558,7 +558,9 @@ function _fptEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
 async function fptRenderAccountSwitcher(menu) {
     if (!menu) return;
     let accts = [];
+    let syncOn = false;
     try { ({ fpToolsAccounts: accts = [] } = await chrome.storage.local.get('fpToolsAccounts')); } catch (_) {}
+    try { ({ fptCloudSyncEnabled: syncOn = false } = await chrome.storage.local.get('fptCloudSyncEnabled')); } catch (_) {}
     menu.querySelector('.fpt-accsw-block')?.remove();
     if (!accts.length) return;
     const curName = document.querySelector('.user-link-name')?.textContent.trim();
@@ -581,20 +583,36 @@ async function fptRenderAccountSwitcher(menu) {
             <span class="fpt-accsw-av fpt-accsw-av-ghost"><span class="material-symbols-rounded">add</span></span>
             <span class="fpt-accsw-info"><span class="fpt-accsw-name">Добавить аккаунт</span><span class="fpt-accsw-bal">войти в новый профиль</span></span>
             <span class="material-symbols-rounded fpt-accsw-go">chevron_right</span>
+        </button>` +
+        // строка синхронизации: видно вкл/выкл, клик переключает
+        `<div class="fpt-accsw-sep"></div>
+        <button type="button" class="fpt-accsw-row fpt-accsw-sync" data-fpt-sync-toggle="1">
+            <span class="fpt-accsw-av fpt-accsw-sync-ic${syncOn ? ' on' : ''}"><span class="material-symbols-rounded">cloud_sync</span></span>
+            <span class="fpt-accsw-info"><span class="fpt-accsw-name">Синхронизация</span><span class="fpt-accsw-bal">${syncOn ? 'настройки едут за аккаунтом' : 'выключена'}</span></span>
+            <span class="fpt-accsw-sync-state ${syncOn ? 'on' : 'off'}">${syncOn ? 'ВКЛ' : 'ВЫКЛ'}</span>
         </button>`;
     menu.insertBefore(li, menu.firstChild);
 
     li.querySelectorAll('.fpt-accsw-row').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             e.preventDefault(); e.stopPropagation();
+            if (btn.dataset.fptSyncToggle) {
+                const newOn = !syncOn;
+                try {
+                    if (typeof window.fptCloudSetSync === 'function') await window.fptCloudSetSync(newOn);
+                    else await chrome.storage.local.set({ fptCloudSyncEnabled: newOn });
+                } catch (_) {}
+                fptRenderAccountSwitcher(menu);   // перерисовать строку с новым состоянием
+                return;
+            }
             if (btn.dataset.accAdd) { fptStartAddNewAccount(); return; }
             const acc = accts[parseInt(btn.dataset.accIdx, 10)];
             if (!acc) return;
-            // Клик по активному аккаунту → открыть его профиль (главная с товарами),
-            // а не «переключаться» вникуда. У активного userId берём из app-data.
+            // Клик по активному аккаунту → открыть его профиль (главная с товарами)
+            // в ТЕКУЩЕЙ вкладке. У активного userId берём из app-data.
             if (acc.name === curName) {
                 const id = acc.userId || (typeof _fptActiveUser === 'function' ? _fptActiveUser().id : '');
-                if (id) window.open(`https://funpay.com/users/${id}/`, '_blank');
+                if (id) window.location.href = `https://funpay.com/users/${id}/`;
                 return;
             }
             li.querySelectorAll('.fpt-accsw-row').forEach(b => b.disabled = true);

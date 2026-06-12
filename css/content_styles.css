@@ -8620,11 +8620,12 @@ textarea.fp-cw-input { line-height:1.4; }
 }
 .fpt-acc-item.active{border-color:var(--fpt-uacc, #5b86d8);background:color-mix(in srgb, var(--fpt-uacc, #5b86d8) 10%, transparent);}
 .fpt-acc-avatar{
-    position:relative;width:44px;height:44px;border-radius:50%;flex-shrink:0;
+    position:relative;width:44px;height:44px;border-radius:50%;flex-shrink:0;cursor:pointer;
     background-size:cover;background-position:center;background-color:#20222e;
     display:flex;align-items:center;justify-content:center;
-    box-shadow:inset 0 0 0 1px #2a2d3f;
+    box-shadow:inset 0 0 0 1px #2a2d3f;transition:box-shadow .15s ease;
 }
+.fpt-acc-avatar:hover{box-shadow:inset 0 0 0 1px #2a2d3f, 0 0 0 2px var(--fpt-uacc-line, rgba(91,134,216,.5));}
 .fpt-acc-avatar .material-symbols-rounded{font-size:24px;color:var(--fpt-text-dim, #9099b8);}
 .fpt-acc-unread{
     position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 5px;
@@ -8648,7 +8649,7 @@ textarea.fp-cw-input { line-height:1.4; }
     transition:background .14s ease;
 }
 .fpt-accsw-row:hover:not(:disabled){background:var(--fpt-uacc-soft, color-mix(in srgb, var(--fpt-uacc, #5b86d8) 14%, transparent));}
-.fpt-accsw-row.active{background:var(--fpt-uacc-soft, color-mix(in srgb, var(--fpt-uacc, #5b86d8) 12%, transparent));cursor:default;}
+.fpt-accsw-row.active{background:var(--fpt-uacc-soft, color-mix(in srgb, var(--fpt-uacc, #5b86d8) 12%, transparent));cursor:pointer;}
 /* при наведении на другой аккаунт снимаем подсветку текущего — чтобы не сливались */
 .fpt-accsw-block:hover .fpt-accsw-row.active:not(:hover){background:transparent;}
 .fpt-accsw-row:disabled{opacity:.6;}
@@ -8665,6 +8666,14 @@ textarea.fp-cw-input { line-height:1.4; }
 .fpt-accsw-cur{font-size:10px;font-weight:600;color:var(--fpt-uacc, #5b86d8);flex-shrink:0;}
 .fpt-accsw-go{font-size:17px;color:var(--fpt-pTxFaint, #8a90a6);flex-shrink:0;}
 .fpt-accsw-row:hover .fpt-accsw-go{color:var(--fpt-uacc, #5b86d8);}
+/* Строка «Синхронизация» в дропдауне профиля: видно ВКЛ/ВЫКЛ, клик переключает */
+.fpt-accsw-sep{height:1px;background:var(--fpt-pLine, rgba(255,255,255,.08));margin:6px 4px;}
+.fpt-accsw-sync-ic .material-symbols-rounded{font-size:16px;color:var(--fpt-pTxDim, #9099b8);}
+.fpt-accsw-sync-ic.on .material-symbols-rounded{color:var(--fpt-uacc, #5b86d8);}
+.fpt-accsw-sync-ic.on{box-shadow:0 0 0 2px var(--fpt-pHeader, #16181f), 0 0 0 3.5px var(--fpt-uacc, #5b86d8);}
+.fpt-accsw-sync-state{font-size:10px;font-weight:800;letter-spacing:.04em;padding:2px 7px;border-radius:6px;flex-shrink:0;}
+.fpt-accsw-sync-state.on{color:#fff;background:var(--fpt-uacc, #5b86d8);}
+.fpt-accsw-sync-state.off{color:var(--fpt-pTxFaint, #8a90a6);background:rgba(140,150,170,.16);}
 /* «призрачный» профиль-заглушка «Добавить аккаунт» под основными */
 .fpt-accsw-add{margin-top:2px;}
 .fpt-accsw-av-ghost{background:transparent !important;border:1.5px dashed var(--fpt-pLine, rgba(255,255,255,.22));box-shadow:none !important;}
