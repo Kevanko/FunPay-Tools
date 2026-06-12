@@ -8685,6 +8685,20 @@ textarea.fp-cw-input { line-height:1.4; }
 .fpt-price-dot.fpt-price-yellow{background:#e0a93a;}
 .fpt-price-dot.fpt-price-red{background:#e05252;}
 .fpt-price-dot.fpt-price-grey{background:#8a93a8;}
+/* кнопка «Проверить цены» над лотами профиля */
+.fpt-price-check-btn{
+    display:inline-flex;align-items:center;gap:6px;margin:0 0 12px;padding:7px 14px;
+    font-size:13px;font-weight:600;cursor:pointer;border-radius:9px;
+    color:var(--fpt-pTx, #f1f3f7);background:var(--fpt-p2, #20242c);
+    border:1px solid var(--fpt-pLine, rgba(255,255,255,.14));
+    transition:background .15s, border-color .15s, transform .05s;
+}
+.fpt-price-check-btn:hover{background:var(--fpt-uacc, #5b86d8);border-color:var(--fpt-uacc, #5b86d8);color:#fff;}
+.fpt-price-check-btn:active{transform:translateY(1px);}
+.fpt-price-check-btn:disabled{opacity:.75;cursor:default;}
+.fpt-price-check-btn .material-symbols-rounded{font-size:18px;line-height:1;}
+.fpt-price-check-btn .fpt-spin{animation:fpt-spin 1s linear infinite;}
+@keyframes fpt-spin{to{transform:rotate(360deg);}}
 .fpt-price-tip{
     position:absolute;z-index:2147483600;width:260px;max-width:82vw;
     background:var(--fpt-p1, #16181d);color:var(--fpt-pTx, #f1f3f7);
