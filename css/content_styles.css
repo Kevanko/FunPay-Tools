@@ -11726,6 +11726,21 @@ body.funpay-redesigned .fpt-home .tgl[data-on="true"]::after {
     outline: 2px solid var(--fpt-uacc, #5b86d8); outline-offset: 2px;
 }
 
+/* ── Индикатор облачной синхронизации: кольцо вокруг аватарки в шапке funpay ──
+   Серое кольцо — синхронизация выкл, акцентное со свечением — вкл. */
+#header .user-link .user-link-photo,
+.navbar-right .user-link .user-link-photo {
+    border-radius: 50%;
+    transition: box-shadow .25s ease;
+}
+.user-link.fpt-sync-off .user-link-photo {
+    box-shadow: 0 0 0 2px rgba(140, 150, 170, .5);
+}
+.user-link.fpt-sync-on .user-link-photo {
+    box-shadow: 0 0 0 2px var(--fpt-uacc, #5b86d8),
+                0 0 9px color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, transparent);
+}
+
 /* Выборочное копирование раздела с другого аккаунта (иконка в углу пункта меню) */
 .fp-tools-popup .fpt-seccopy { position: absolute; top: 14px; right: 16px; z-index: 30; }
 .fp-tools-popup .fpt-seccopy-btn {

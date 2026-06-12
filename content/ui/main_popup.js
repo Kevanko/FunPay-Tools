@@ -268,11 +268,7 @@ function createMainPopup() {
                 <!-- НАЧАЛО ВКЛАДКИ "ЭПИЧЕСКИЕ НИКИ" -->
                 <div class="fp-tools-page-content" data-page="epic_nicks">
                     <h3>Эпический никнейм</h3>
-                    <p class="template-info">Оформите свой ник: градиент, анимация и частицы — бесплатно, без Telegram и оплаты. Меняйте настройки и сразу смотрите предпросмотр.</p>
-                    <div class="support-promo fpt-callout-info" style="margin-bottom:16px;">
-                        <span class="material-symbols-rounded fpt-callout-icon" style="font-size:16px;vertical-align:-3px;">visibility</span>
-                        <span>Оформление видно <b>вам</b> на сайте (хранится в вашем браузере). Чтобы стиль видели все пользователи FP Tools, нужен общий серверный список — это отдельная история и здесь не настраивается.</span>
-                    </div>
+                    <p class="template-info">Оформите свой ник: градиент, анимация и частицы — бесплатно, без Telegram и оплаты. Стиль увидят все пользователи FP Tools. Меняйте настройки и сразу смотрите предпросмотр.</p>
 
                     <div class="fpt-epic-preview-card">
                         <span class="fpt-epic-preview-label eyebrow">Предпросмотр</span>

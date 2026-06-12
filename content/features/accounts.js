@@ -338,6 +338,19 @@ async function renderAccountsList() {
         });
 
         actionsDiv.append(onlineBtn, switchBtn, renameBtn, deleteBtn);
+        // Аватар кликабелен: активный → открыть его профиль (главная с товарами),
+        // неактивный → как «Войти».
+        avatar.style.cursor = 'pointer';
+        avatar.title = isActive ? 'Открыть профиль' : 'Войти в этот аккаунт';
+        avatar.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (isActive) {
+                const id = account.userId || (typeof _fptActiveUser === 'function' ? _fptActiveUser().id : '');
+                if (id) window.open(`https://funpay.com/users/${id}/`, '_blank');
+            } else if (!switchBtn.disabled) {
+                switchBtn.click();
+            }
+        });
         item.append(avatar, info, actionsDiv);
         listContainer.appendChild(item);
     });
@@ -578,7 +591,14 @@ async function fptRenderAccountSwitcher(menu) {
             e.preventDefault(); e.stopPropagation();
             if (btn.dataset.accAdd) { fptStartAddNewAccount(); return; }
             const acc = accts[parseInt(btn.dataset.accIdx, 10)];
-            if (!acc || acc.name === curName) return;
+            if (!acc) return;
+            // Клик по активному аккаунту → открыть его профиль (главная с товарами),
+            // а не «переключаться» вникуда. У активного userId берём из app-data.
+            if (acc.name === curName) {
+                const id = acc.userId || (typeof _fptActiveUser === 'function' ? _fptActiveUser().id : '');
+                if (id) window.open(`https://funpay.com/users/${id}/`, '_blank');
+                return;
+            }
             li.querySelectorAll('.fpt-accsw-row').forEach(b => b.disabled = true);
             await fptSwitchToAccount(acc);
         });

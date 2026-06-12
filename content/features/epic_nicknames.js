@@ -316,6 +316,19 @@
         nodesToProcess.forEach(item => applyStylesToNode(item.node, item.nick, item.text));
     }
 
+    // Снять обёртки эпик-ника (вернуть обычный текст). Нужно при смене стиля/эффекта:
+    // канвас частиц создаётся ОДИН раз при оборачивании и не пересоздаётся, поэтому
+    // без переоборачивания эффект (огонь/молнии/искры…) менялся только после
+    // перезагрузки. renderLoop сам уберёт «осиротевший» канвас из списка.
+    function unwrapNick(nick) {
+        document.querySelectorAll('.fpt-epic-wrap').forEach(w => {
+            const t = w.querySelector('.fpt-epic-text');
+            if (t && t.textContent === nick && w.parentNode) {
+                w.parentNode.replaceChild(document.createTextNode(t.textContent), w);
+            }
+        });
+    }
+
 
     // --- 5. СВОЙ НИК: ЛОКАЛЬНОЕ ОФОРМЛЕНИЕ (бесплатно, без TG/оплаты) ---
     const MY_NICK_KEY = 'fpToolsMyEpicNick'; // { nick, cfg }
@@ -337,6 +350,7 @@
         try {
             const { [MY_NICK_KEY]: saved } = await chrome.storage.local.get(MY_NICK_KEY);
             if (saved && saved.nick && saved.cfg) {
+                unwrapNick(saved.nick);          // пересоздать обёртку → эффект применится сразу
                 registerNickStyle(saved.nick, saved.cfg);
                 scanDOM(document.body);
                 return true;
@@ -452,6 +466,7 @@
             if (!nick) { if (typeof showNotification === 'function') showNotification('Не удалось определить ник.', true); return; }
             const cfg = cfgFromUI();
             await chrome.storage.local.set({ [MY_NICK_KEY]: { nick, cfg } });
+            unwrapNick(nick);                    // пересоздать обёртку → частицы/эффект сразу
             registerNickStyle(nick, cfg);
             scanDOM(document.body);
             // публикуем свой стиль ника в облако — его увидят ВСЕ пользователи расширения
