@@ -294,6 +294,7 @@ function fptCloudInitUI() {
         t.addEventListener('change', async () => {
             const on = t.checked;
             await chrome.storage.local.set({ fptCloudSyncEnabled: on });
+            _fptCloudSyncRing(on);
             const panel = document.getElementById('fpt-cloud-panel'); if (panel) panel.style.display = on ? 'flex' : 'none';
             if (on) {
                 const u = _fptCloudUser();
@@ -340,9 +341,28 @@ function fptCloudInitUI() {
     _fptCloudRefreshUI();
 }
 
+// Визуальный индикатор синхронизации: кольцо вокруг аватарки в шапке funpay
+// (серое — выкл, акцент + лёгкое свечение — вкл). Без текста, вписано в дизайн.
+function _fptCloudSyncRing(on) {
+    let tries = 0;
+    const apply = () => {
+        const link = document.querySelector('#header .user-link, .navbar-right .user-link');
+        if (link) {
+            link.classList.toggle('fpt-sync-on', !!on);
+            link.classList.toggle('fpt-sync-off', !on);
+            link.title = on ? 'Облачная синхронизация включена' : 'Облачная синхронизация выключена';
+            return;
+        }
+        if (tries++ < 25) setTimeout(apply, 300);   // шапка ещё не отрисована — подождём
+    };
+    apply();
+}
+
 // ===================== boot =====================
 try { if (_fptCloudAlive() && chrome.storage && chrome.storage.onChanged) chrome.storage.onChanged.addListener(_fptCloudOnChanged); } catch (_) {}
 try { document.addEventListener('visibilitychange', () => { if (_fptCloudOn && document.visibilityState === 'visible') _fptCloudRun(() => _fptCloudReconcile('focus')); }); } catch (_) {}
+try { chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && changes.fptCloudSyncEnabled) _fptCloudSyncRing(!!changes.fptCloudSyncEnabled.newValue); }); } catch (_) {}
+(async () => { try { _fptCloudSyncRing(await _fptCloudEnabled()); } catch (_) {} })();
 (async () => {
     try {
         const u = _fptCloudUser(); _fptC.uid = u.id || ''; _fptC.name = u.name || '';
