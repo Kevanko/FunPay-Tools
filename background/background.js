@@ -948,12 +948,16 @@ async function runOnlineHeartbeat() {
                     // время запроса (или вернулась активная сессия) — отбрасываем, чтобы
                     // не присвоить чужую аватарку/баланс/непрочитанные активному аккаунту.
                     const u = snap.username;
-                    // принимаем, если совпал userId ИЛИ имя (снимок сделан строго под этим
-                    // ключом — имя-совпадение лечит ранее заражённый чужим userId entry).
-                    const accept = (snap.userId && a.userId && String(snap.userId) === String(a.userId))
-                        || (a.name ? !!(u && u === a.name)
-                                   : !(u && fpToolsAccounts.some(o => o.key && o.key !== a.key && o.name === u)));
-                    if (accept) updates[a.key] = snap;
+                    // Принимаем снимок ТОЛЬКО если его username совпадает с именем аккаунта.
+                    // username — это кто реально залогинен на отданной странице; его не
+                    // подделать заражённым userId. Совпадение по userId УБРАНО: оно
+                    // самоусиливало заразу — entry с чужим userId «подтверждал» чужой снимок,
+                    // когда ключ невалиден и вернулась активная сессия (одинаковые аватарки).
+                    const accept = a.name ? !!(u && u === a.name)
+                                          : !(u && fpToolsAccounts.some(o => o.key && o.key !== a.key && o.name === u));
+                    // Ключуем по ИМЕНИ, а не по golden_key: если две записи делят один ключ
+                    // (повреждённые данные), снимок одной НЕ должен примениться к обеим.
+                    if (accept) updates[a.name || a.key] = snap;
                 }
             } catch (_) {}
             await new Promise(r => setTimeout(r, 500));
@@ -962,7 +966,7 @@ async function runOnlineHeartbeat() {
         if (keys.length) {
             const { fpToolsAccounts: latest = [] } = await chrome.storage.local.get('fpToolsAccounts');
             const merged = latest.map(acc => {
-                const s = acc && updates[acc.key];
+                const s = acc && updates[acc.name || acc.key];
                 if (!s) return acc;
                 return {
                     ...acc,

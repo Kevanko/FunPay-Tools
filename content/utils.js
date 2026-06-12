@@ -1,3 +1,87 @@
+// ── Анализ цен лотов: устойчивая статистика и схожесть (для «Аналитики рынка»
+//    и пер-лотного индикатора цены). Главная задача — отсечь бредовые лоты за 1 ₽ и
+//    за 1 000 000 ₽, иначе средняя/мин/макс ломаются. ──────────────────────────────
+function _fptQuantile(sorted, q) {
+    if (!sorted.length) return 0;
+    const pos = (sorted.length - 1) * q;
+    const base = Math.floor(pos), rest = pos - base;
+    return sorted[base + 1] !== undefined ? sorted[base] + rest * (sorted[base + 1] - sorted[base]) : sorted[base];
+}
+// Возвращает устойчивую статистику цен с отсевом «бредовых» лотов. Два прохода:
+// 1) относительный коридор медиана×[0.4 .. 3] — выкидывает спам за 1 ₽ (его на FunPay
+//    много, и он тянет медиану вниз) и заоблачные 100 000+ ₽; 2) IQR на оставшихся —
+//    тонкая чистка. used — сколько цен осталось; dropped — сколько выбросов убрали.
+function fptRobustPriceStats(prices) {
+    const raw = (prices || []).map(Number).filter(p => isFinite(p) && p > 0).sort((a, b) => a - b);
+    if (!raw.length) return { count: 0, used: 0, dropped: 0, median: 0, mean: 0, min: 0, max: 0, p25: 0, p75: 0, sum: 0 };
+    // Режем ТОЛЬКО заоблачные выбросы сверху (лоты за 100 000+ ₽). Дешёвые лоты за 1 ₽
+    // часто легитимны (гайды) — их НЕ выбрасываем; «справедливую» цену среди дешёвых и
+    // премиум-офферов даёт взвешенная по продажам медиана в fptRecommendedPrice.
+    const median = _fptQuantile(raw, 0.5);
+    const q1 = _fptQuantile(raw, 0.25), q3 = _fptQuantile(raw, 0.75), iqr = q3 - q1;
+    const hi = Math.max(q3 + 3 * iqr, median * 12);
+    let used = raw.filter(p => p <= hi);
+    if (used.length < 3) used = raw.slice();
+    const sum = used.reduce((a, b) => a + b, 0);
+    return {
+        count: raw.length, used: used.length, dropped: raw.length - used.length,
+        median: _fptQuantile(used, 0.5), mean: sum / used.length,
+        min: used[0], max: used[used.length - 1], sum,
+        p25: _fptQuantile(used, 0.25), p75: _fptQuantile(used, 0.75),
+    };
+}
+// Взвешенная медиана: цена, на которой накопленный вес достигает половины суммарного.
+function fptWeightedMedian(items) {
+    const arr = (items || []).filter(x => x && x.w > 0 && isFinite(x.price)).sort((a, b) => a.price - b.price);
+    if (!arr.length) return 0;
+    const total = arr.reduce((s, x) => s + x.w, 0);
+    let acc = 0;
+    for (const x of arr) { acc += x.w; if (acc >= total / 2) return x.price; }
+    return arr[arr.length - 1].price;
+}
+// Значимые слова заголовка (для «схожести»): без эмодзи/мусора и общих связок. Тип
+// товара («гайд», «мод», «просвет», «аккаунт») НЕ выкидываем — это и есть ключ схожести;
+// частые/неинформативные слова (название игры, «прочее») сами получат низкий IDF.
+const _FPT_STOP = new Set(['для', 'или', 'как', 'что', 'это', 'все', 'без', 'про', 'под', 'над', 'при', 'его', 'нас', 'вас', 'the', 'and', 'for', 'with', 'you', 'your']);
+function fptTitleTokens(title) {
+    return (String(title || '').toLowerCase().match(/[a-zа-яё0-9]{3,}/giu) || [])
+        .filter(w => !_FPT_STOP.has(w));
+}
+// Рекомендованная цена для лота. Схожесть — по РЕДКИМ (информативным) словам заголовка
+// (IDF): гайд сравнивается с гайдами, чит — с читами; название игры (общее для всей
+// категории) на отбор не влияет. Среди похожих — ВЗВЕШЕННАЯ медиана: вес оффера = число
+// отзывов продавца (≈ число продаж) × бонус за онлайн, ЛИНЕЙНО — чтобы пара топ-продавцов
+// перевесила толпу безотзывных лотов по 1 ₽ (накрутка сортировки). Дешёвые лоты за 1 ₽
+// (часто легитимные гайды) учитываются наравне; но если ВСЯ категория — демпинг по 1 ₽,
+// рынок помечается dumped (вердикт не показателен). offers: [{price, title, reviews, online}].
+function fptRecommendedPrice(lotTitle, offers) {
+    const all = (offers || []).filter(o => o && isFinite(o.price) && o.price > 0);
+    const finish = (comp) => {
+        const st = fptRobustPriceStats(comp.map(o => o.price));      // отсев только заоблачных сверху
+        const kept = comp.filter(o => o.price <= st.max);
+        let rec = fptWeightedMedian(kept.map(o => ({ price: o.price, w: (o.reviews || 0) * (o.online ? 1.3 : 1) })));
+        if (!rec) rec = st.median;                                  // ни у кого нет отзывов — обычная медиана
+        const spamShare = kept.length ? kept.filter(o => o.price <= 2).length / kept.length : 0;
+        const dumped = rec <= 2.5 && spamShare > 0.6;               // вся категория завалена 1 ₽
+        return { recommended: rec, p25: st.p25, p75: st.p75, comparable: kept.length, total: all.length, dumped };
+    };
+    if (all.length < 4) return finish(all);
+    // df слова по категории → IDF (редкое слово информативнее)
+    const df = {};
+    const offTokens = all.map(o => { const s = new Set(fptTitleTokens(o.title)); s.forEach(w => { df[w] = (df[w] || 0) + 1; }); return s; });
+    const N = all.length;
+    const idf = w => Math.log((N + 1) / ((df[w] || 0) + 1));
+    const lotTok = [...new Set(fptTitleTokens(lotTitle))].map(w => ({ w, i: idf(w) }));
+    const lotW = lotTok.reduce((s, x) => s + x.i, 0);
+    if (!lotW) return finish(all);
+    // оценка схожести = доля IDF-веса слов лота, встретившихся в оффере
+    const scored = all.map((o, k) => ({ o, sim: lotTok.reduce((s, x) => s + (offTokens[k].has(x.w) ? x.i : 0), 0) / lotW }));
+    let comp = scored.filter(s => s.sim >= 0.45).map(s => s.o);
+    if (comp.length < 4) comp = scored.filter(s => s.sim >= 0.25).map(s => s.o);
+    if (comp.length < 4) comp = all;
+    return finish(comp);
+}
+
 // 3.0: Image reference store. Instead of dumping a giant [image:data:...base64...] string
 // into textareas (ugly, "in your face"), we insert a short readable token like {img:ab12cd}
 // and keep the real data URL in chrome.storage under fpToolsImageStore. Senders resolve
