@@ -8674,6 +8674,33 @@ textarea.fp-cw-input { line-height:1.4; }
 .fpt-accsw-sync-state{font-size:10px;font-weight:800;letter-spacing:.04em;padding:2px 7px;border-radius:6px;flex-shrink:0;}
 .fpt-accsw-sync-state.on{color:#fff;background:var(--fpt-uacc, #5b86d8);}
 .fpt-accsw-sync-state.off{color:var(--fpt-pTxFaint, #8a90a6);background:rgba(140,150,170,.16);}
+
+/* ── Пер-лотный индикатор цены на профиле (lot_price_analytics) ── */
+.tc-price .fpt-price-dot{
+    display:inline-block;width:10px;height:10px;border-radius:50%;
+    margin-right:6px;vertical-align:middle;cursor:help;box-shadow:0 0 0 2px rgba(0,0,0,.15);
+}
+.tc-price:has(.fpt-price-dot){cursor:help;}
+.fpt-price-dot.fpt-price-green{background:#3fbf6f;}
+.fpt-price-dot.fpt-price-yellow{background:#e0a93a;}
+.fpt-price-dot.fpt-price-red{background:#e05252;}
+.fpt-price-dot.fpt-price-grey{background:#8a93a8;}
+.fpt-price-tip{
+    position:absolute;z-index:2147483600;width:260px;max-width:82vw;
+    background:var(--fpt-p1, #16181d);color:var(--fpt-pTx, #f1f3f7);
+    border:1px solid var(--fpt-pLine, rgba(255,255,255,.12));border-radius:10px;
+    box-shadow:0 12px 32px var(--fpt-pShadow, rgba(0,0,0,.5));padding:10px 12px;
+    font-size:12px;line-height:1.5;pointer-events:none;
+}
+.fpt-price-tip-head{font-weight:700;margin-bottom:6px;}
+.fpt-price-tip-head.fpt-price-green{color:#3fbf6f;}
+.fpt-price-tip-head.fpt-price-yellow{color:#e0a93a;}
+.fpt-price-tip-head.fpt-price-red{color:#e05252;}
+.fpt-price-tip-head.fpt-price-grey{color:#aab2c6;}
+.fpt-price-tip-row{display:flex;justify-content:space-between;gap:12px;}
+.fpt-price-tip-row span{color:var(--fpt-pTxDim, #9099b8);}
+.fpt-price-tip-row b{font-weight:600;white-space:nowrap;}
+.fpt-price-tip-note{margin-top:6px;color:var(--fpt-pTxDim, #9099b8);font-size:11px;line-height:1.45;}
 /* «призрачный» профиль-заглушка «Добавить аккаунт» под основными */
 .fpt-accsw-add{margin-top:2px;}
 .fpt-accsw-av-ghost{background:transparent !important;border:1.5px dashed var(--fpt-pLine, rgba(255,255,255,.22));box-shadow:none !important;}

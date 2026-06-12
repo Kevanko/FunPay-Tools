@@ -221,37 +221,12 @@ async function renderAccountsList() {
             if (_fptAlive()) await chrome.storage.local.set({ fpToolsAccounts: dd.list });
         }
     } catch (_) {}
-    // одноразовое лечение: у аккаунтов без userId форсим пере-снимок — он заполнит userId
-    // и починит устаревший баланс/аватар (попавший от прошлой кросс-контаминации). После
-    // появления userId следующий дедуп схлопнет настоящие дубли по userId.
-    try {
-        let needHeal = false;
-        // ОДНОРАЗОВО (флаг _healTried): иначе если снимок вернёт имя без userId, render↔refresh
-        // зациклятся — бесконечные куки-свопы и долбёж funpay.com.
-        fpToolsAccounts.forEach(a => { if (a && a.key && !a.userId && !a._healTried) { a._snapTs = 0; a._healTried = true; needHeal = true; } });
-        if (needHeal && _fptAlive()) {
-            await chrome.storage.local.set({ fpToolsAccounts });
-            setTimeout(() => { try { if (typeof maybeAutoRefreshAccounts === 'function') maybeAutoRefreshAccounts(); } catch (_) {} }, 300);
-        }
-    } catch (_) {}
+    // НЕ форсим пере-снимок аккаунтов без userId через своп cookie: именно это перезаражало
+    // только что вычищенные записи (снимок чужого ключа возвращал данные активного). userId
+    // неактивного заполнится сам при переключении на него — из живой шапки (см. heal ниже).
 
-    // одноразовое лечение кросс-контаминации аватара/баланса: если у РАЗНЫХ аккаунтов
-    // (по userId) совпал аватар — это след старого бага с общим golden_key (оба сняли
-    // один профиль). Форсим пере-снимок: каждый под СВОИМ ключом → аватары/балансы
-    // разъедутся. Флаг _avHealTried не даёт зациклиться, если снимок не помог.
-    try {
-        const byAv = {};
-        fpToolsAccounts.forEach(a => { if (a && a.key && a.avatar) (byAv[a.avatar] = byAv[a.avatar] || []).push(a); });
-        let needHeal2 = false;
-        Object.values(byAv).forEach(grp => {
-            const uids = new Set(grp.map(a => a.userId).filter(Boolean));
-            if (grp.length > 1 && uids.size > 1) grp.forEach(a => { if (!a._avHealTried) { a._snapTs = 0; a._avHealTried = true; a.avatar = ''; a.balance = ''; needHeal2 = true; } });
-        });
-        if (needHeal2 && _fptAlive()) {
-            await chrome.storage.local.set({ fpToolsAccounts });
-            setTimeout(() => { try { if (typeof maybeAutoRefreshAccounts === 'function') maybeAutoRefreshAccounts(); } catch (_) {} }, 300);
-        }
-    } catch (_) {}
+    // лечим кросс-контаминацию аватарок/userId (разные аккаунты — один аватар) напрямую
+    fptHealSharedAvatars(renderAccountsList);
 
     const currentUsernameEl = document.querySelector('.user-link-name');
     const currentUsername = currentUsernameEl ? currentUsernameEl.textContent.trim() : null;
@@ -415,6 +390,74 @@ function _fptSnapWrongAccount(snap, ownKey, ownName, ownUserId) {
     return !!(u && fpToolsAccounts.some(o => o && o.key && o.key !== ownKey && o.name === u));
 }
 
+// Лечение кросс-контаминации аватара/userId. Корень бага: пер-аккаунтный снимок через
+// своп cookie НЕнадёжен и иногда возвращает данные АКТИВНОГО аккаунта всем подряд →
+// одинаковые аватарки/userId у разных аккаунтов (а ещё своп мог молча сменить активный
+// аккаунт). Поэтому здесь — БЕЗ сети и свопов, только по живой шапке сайта:
+//   1) активный аккаунт (по имени из шапки) берёт аватар и userId прямо из шапки;
+//   2) у любого ДРУГОГО аккаунта, унаследовавшего аватар/userId активного (или просто
+//      дублирующего чужой аватар), чистим поле — дефолт-иконка лучше чужого лица.
+// Пустой аватар неактивного заполнится сам при переключении на него. Идемпотентно и
+// дёшево → безопасно звать на каждый рендер. reRender — колбэк перерисовки UI.
+async function fptHealSharedAvatars(reRender) {
+    if (!_fptAlive()) return;
+    let accts;
+    try { ({ fpToolsAccounts: accts = [] } = await chrome.storage.local.get('fpToolsAccounts')); } catch (_) { return; }
+    if (!accts.length) return;
+
+    const cu = (typeof _fptActiveUser === 'function') ? _fptActiveUser() : { id: '', name: '' };
+    const curName = document.querySelector('.user-link-name')?.textContent.trim() || cu.name || '';
+    const liveAv = document.querySelector('.user-link-photo img')?.src || '';
+    // Активный аккаунт ищем по ИМЕНИ (надёжно: имя у каждого своё), не по userId — тот
+    // мог быть заражён (две записи с одним userId). Имя из живой шапки авторитетно.
+    let active = null;
+    if (curName) active = accts.find(a => a && a.name === curName);
+    if (!active && cu.id) active = accts.find(a => a && String(a.userId) === String(cu.id));
+    let changed = false;
+
+    // (1) активный аккаунт — аватар и userId из живой шапки (авторитетно)
+    if (active && liveAv && active.avatar !== liveAv) { active.avatar = liveAv; changed = true; }
+    if (active && cu.id && String(active.userId || '') !== String(cu.id)) { active.userId = String(cu.id); changed = true; }
+    // (2a) userId активного не может принадлежать другому аккаунту → у чужих копий чистим
+    if (cu.id) accts.forEach(a => { if (a && a !== active && String(a.userId || '') === String(cu.id)) { a.userId = ''; changed = true; } });
+    // (2b) дедуп аватара: один и тот же аватар у нескольких аккаунтов → оставляем активному/
+    //      первому, у остальных чистим (два РАЗНЫХ аккаунта не делят одно лицо)
+    const byAv = {};
+    accts.forEach(a => { if (a && a.avatar) (byAv[a.avatar] = byAv[a.avatar] || []).push(a); });
+    Object.values(byAv).forEach(grp => {
+        if (grp.length < 2) return;
+        const keep = grp.find(a => a === active) || grp[0];
+        grp.forEach(a => { if (a !== keep && a.avatar) { a.avatar = ''; changed = true; } });
+    });
+    // (2c) орфаны: один и тот же golden_key у нескольких записей. Ключ = ровно один аккаунт
+    //      FunPay, отдельный снимок невозможен (вернёт владельца ключа). Гасим снимок-поля
+    //      орфана и помечаем его «требует перевхода» (loginError) — данные восстановятся,
+    //      когда пользователь войдёт в этот аккаунт (получим его собственный ключ). Запись
+    //      НЕ удаляем. _snapTs ставим свежим, чтобы рефрешеры его не трогали.
+    const byKey = {};
+    accts.forEach(a => { if (a && a.key) (byKey[a.key] = byKey[a.key] || []).push(a); });
+    Object.values(byKey).forEach(grp => {
+        if (grp.length < 2) return;
+        const owner = grp.find(a => a === active) || grp[0];
+        grp.forEach(a => {
+            if (a === owner) return;
+            if (a.avatar) { a.avatar = ''; changed = true; }
+            if (a.userId) { a.userId = ''; changed = true; }
+            if (!a.loginError) { a.loginError = true; changed = true; }
+            a._snapTs = Date.now();
+        });
+    });
+    if (changed) {
+        try { await chrome.storage.local.set({ fpToolsAccounts: accts }); } catch (_) {}
+        if (typeof fpToolsAccounts !== 'undefined') { try { fpToolsAccounts.length = 0; accts.forEach(x => fpToolsAccounts.push(x)); } catch (_) {} }
+        if (typeof reRender === 'function') { try { reRender(); } catch (_) {} }
+    }
+    // Намеренно НЕ до-заполняем аватары неактивных аккаунтов фоновым снимком через своп
+    // cookie: это и был источник заразы и тихого переключения активного аккаунта. Пустой
+    // аватар (дефолт-иконка) безопаснее чужого; он заполнится сам, когда пользователь
+    // переключится на этот аккаунт (тогда аватар берётся из живой шапки) — см. шаг (1).
+}
+
 // Автообновление аватар/баланс/непрочитанных не чаще раза в 55 минут.
 let _fptAccAutoRefreshing = false;
 async function maybeAutoRefreshAccounts() {
@@ -423,6 +466,10 @@ async function maybeAutoRefreshAccounts() {
     const now = Date.now();
     const needsUpdate = fpToolsAccounts.some(a => a.key && (!a._snapTs || (now - a._snapTs) > STALE));
     if (!needsUpdate) return;
+    const liveName = _fptCurName();
+    const liveAv = document.querySelector('.user-link-photo img')?.src || '';
+    const liveUid = (typeof _fptActiveUser === 'function' ? _fptActiveUser().id : '') || '';
+    if (!liveName) return;   // шапка не готова — не можем проверить личность снимка, не рискуем
     _fptAccAutoRefreshing = true;
     try {
         let changed = false;
@@ -430,7 +477,10 @@ async function maybeAutoRefreshAccounts() {
             if (!account.key) continue;
             if (account._snapTs && (now - account._snapTs) <= STALE) continue;
             const snap = await fptFetchAccountSnapshot(account.key);
-            if (snap && !_fptSnapWrongAccount(snap, account.key, account.name, account.userId)) {
+            // анти-зараза: снимок НЕактивного аккаунта, вернувший данные активного (тот же
+            // аватар/userId, что в живой шапке), — это сбой свапа cookie, НЕ принимаем
+            const contaminated = snap && account.name !== liveName && ((liveAv && snap.avatar === liveAv) || (liveUid && String(snap.userId) === String(liveUid)));
+            if (snap && !contaminated && !_fptSnapWrongAccount(snap, account.key, account.name, account.userId)) {
                 if (snap.userId) account.userId = String(snap.userId);   // снимок авторитетен — лечит заражённый userId
                 account.avatar = snap.avatar || account.avatar || '';
                 account.balance = snap.balance || account.balance || '';
@@ -449,10 +499,15 @@ async function maybeAutoRefreshAccounts() {
 // Кнопка ручного обновления данных всех аккаунтов (аватар/баланс/непрочитанные).
 async function fptRefreshAllAccounts() {
     showNotification('Обновляю данные аккаунтов…');
+    const liveName = _fptCurName();
+    const liveAv = document.querySelector('.user-link-photo img')?.src || '';
+    const liveUid = (typeof _fptActiveUser === 'function' ? _fptActiveUser().id : '') || '';
+    if (!liveName) { showNotification('Откройте FunPay в аккаунте, затем обновите.', true); return; }
     for (const account of fpToolsAccounts) {
         if (!account.key) continue;
         const snap = await fptFetchAccountSnapshot(account.key);
-        if (snap && !_fptSnapWrongAccount(snap, account.key, account.name, account.userId)) {
+        const contaminated = snap && account.name !== liveName && ((liveAv && snap.avatar === liveAv) || (liveUid && String(snap.userId) === String(liveUid)));
+        if (snap && !contaminated && !_fptSnapWrongAccount(snap, account.key, account.name, account.userId)) {
             if (snap.userId) account.userId = String(snap.userId);   // снимок авторитетен — лечит заражённый userId
             account.avatar = snap.avatar || account.avatar || '';
             account.balance = snap.balance || account.balance || '';
@@ -605,7 +660,7 @@ async function fptRenderAccountSwitcher(menu) {
         // строка синхронизации: видно вкл/выкл, клик переключает
         `<div class="fpt-accsw-sep"></div>
         <button type="button" class="fpt-accsw-row fpt-accsw-sync" data-fpt-sync-toggle="1">
-            <span class="fpt-accsw-av fpt-accsw-sync-ic${syncOn ? ' on' : ''}"><span class="material-symbols-rounded">cloud_sync</span></span>
+            <span class="fpt-accsw-av fpt-accsw-sync-ic${syncOn ? ' on' : ''}"><span class="material-symbols-rounded">cloud</span></span>
             <span class="fpt-accsw-info"><span class="fpt-accsw-name">Синхронизация</span><span class="fpt-accsw-bal">${syncOn ? 'настройки едут за аккаунтом' : 'выключена'}</span></span>
             <span class="fpt-accsw-sync-state ${syncOn ? 'on' : 'off'}">${syncOn ? 'ВКЛ' : 'ВЫКЛ'}</span>
         </button>`;
@@ -637,6 +692,10 @@ async function fptRenderAccountSwitcher(menu) {
             await fptSwitchToAccount(acc);
         });
     });
+
+    // при клике на профиль (открытии дропдауна) проверяем аватарки, как во вкладке
+    // «Аккаунты»: разные аккаунты с одинаковым аватаром → пере-снять и перерисовать
+    fptHealSharedAvatars(() => fptRenderAccountSwitcher(menu));
 }
 
 // НАСТРОЙКИ профиля (тема/авто-ответы/шаблоны/звуки) — их можно КОПИРОВАТЬ между
@@ -900,8 +959,9 @@ async function fptAccountBoot() {
         accts.push({ name, key, online: true, userId: _bootUid || undefined });   // новый — добавляем сразу
         added = true;
     } else {
-        // обновляем СУЩЕСТВУЮЩИЙ (по userId → имени → ключу), чтобы ротация ключа не плодила дубль
-        const ex = (_bootUid && accts.find(a => a.userId === _bootUid)) || accts.find(a => a.name === name) || accts.find(a => a.key === key);
+        // обновляем СУЩЕСТВУЮЩИЙ. Сопоставляем по ИМЕНИ из живой шапки В ПЕРВУЮ очередь:
+        // userId мог быть заражён (чужая копия), и поиск по нему обновлял бы НЕ ТОТ аккаунт.
+        const ex = accts.find(a => a.name === name) || (_bootUid && accts.find(a => a.userId === _bootUid)) || accts.find(a => a.key === key);
         if (ex) { ex.key = key; ex.loginError = false; ex.online = ex.online !== false; if (_bootUid) ex.userId = ex.userId || _bootUid; }
     }
 

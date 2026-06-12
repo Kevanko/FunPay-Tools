@@ -2,7 +2,7 @@ function getAnalyticsBlockHTML() {
     return `
     <div class="fp-tools-analytics-container">
         <div class="fp-stats-header">
-            <h1>Аналитика рынка</h1>
+            <h1>Аналитика рынка <span id="fpTools-analytics-note" style="font-size:12px;font-weight:400;opacity:.7;"></span></h1>
             <div class="fp-stats-controls">
                 <button type="button" class="btn btn-default" id="fpTools-analytics-refresh">Обновить</button>
                 <button type="button" class="btn btn-default" id="fpTools-analytics-close">Закрыть</button>
@@ -26,7 +26,7 @@ function getAnalyticsBlockHTML() {
             <div class="fp-stat-card">
                 <div class="stat-card-icon"><span class="material-symbols-rounded" style="font-size:30px;">payments</span></div>
                 <div class="stat-card-content">
-                    <div class="stat-card-label">Средняя цена</div>
+                    <div class="stat-card-label">Реком. цена (медиана)</div>
                     <div class="stat-card-value" id="fpTools-analytics-average-price">0 ₽</div>
                 </div>
             </div>
@@ -99,18 +99,19 @@ function runMarketAnalysis() {
         showNotification('Не удалось извлечь цены из лотов.', true);
         return;
     }
-    const sum = prices.reduce((a, b) => a + b, 0);
-    const avg = sum / prices.length;
-    const min = Math.min(...prices);
-    const max = Math.max(...prices);
+    // Устойчивая статистика: отсекаем выбросы (лоты за 1 ₽ и за 100 000+ ₽ ломали
+    // среднюю/мин/макс). Показываем медиану как рекомендованную цену.
+    const st = (typeof fptRobustPriceStats === 'function') ? fptRobustPriceStats(prices)
+        : { median: prices.reduce((a, b) => a + b, 0) / prices.length, min: Math.min(...prices), max: Math.max(...prices), sum: prices.reduce((a, b) => a + b, 0), dropped: 0, used: prices.length };
     { const el = document.getElementById('fpTools-analytics-total-lots'); if (el) el.textContent = lots.length; }
     document.getElementById('fpTools-analytics-unique-sellers').textContent = sellers.size;
     document.getElementById('fpTools-analytics-sellers-with-reviews').textContent = sellersWithReviews;
     document.getElementById('fpTools-analytics-sellers-online').textContent = onlineSellers;
-    document.getElementById('fpTools-analytics-average-price').textContent = `${avg.toFixed(2)} ₽`;
-    document.getElementById('fpTools-analytics-min-price').textContent = `${min.toFixed(2)} ₽`;
-    document.getElementById('fpTools-analytics-max-price').textContent = `${max.toFixed(2)} ₽`;
-    document.getElementById('fpTools-analytics-total-value').textContent = `${sum.toFixed(0)} ₽`;
+    document.getElementById('fpTools-analytics-average-price').textContent = `${st.median.toFixed(2)} ₽`;
+    document.getElementById('fpTools-analytics-min-price').textContent = `${st.min.toFixed(2)} ₽`;
+    document.getElementById('fpTools-analytics-max-price').textContent = `${st.max.toFixed(2)} ₽`;
+    document.getElementById('fpTools-analytics-total-value').textContent = `${st.sum.toFixed(0)} ₽`;
+    { const el = document.getElementById('fpTools-analytics-note'); if (el) el.textContent = st.dropped ? `· по ${st.used} адекватным лотам (исключено выбросов: ${st.dropped})` : `· по ${st.used} лотам`; }
 }
 
 function initializeMarketAnalytics() {

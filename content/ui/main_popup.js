@@ -974,7 +974,7 @@ function createMainPopup() {
 
                     <div class="fpt-cloud-card">
                         <div class="fpt-cloud-card-head">
-                            <span class="material-symbols-rounded fpt-cloud-card-ic">cloud_sync</span>
+                            <span class="material-symbols-rounded fpt-cloud-card-ic">cloud</span>
                             <div class="fpt-cloud-card-txt">
                                 <div class="fpt-cloud-card-title">Облачная синхронизация</div>
                                 <div class="fpt-cloud-card-sub">Настройки, тема и ник едут за аккаунтом на все устройства · Cloudflare, бесплатно</div>
