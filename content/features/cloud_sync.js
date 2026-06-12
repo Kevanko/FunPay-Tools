@@ -286,40 +286,46 @@ async function _fptCloudRefreshUI() {
     const panel = document.getElementById('fpt-cloud-panel'); if (panel) panel.style.display = on ? 'flex' : 'none';
     if (on) { const u = _fptCloudUser(); _fptCloudSay(u.id ? `Аккаунт: ${u.name || '—'} (id ${u.id}) · облачная версия ${_fptC.ver || 0}` : 'Войдите в аккаунт FunPay, чтобы синхронизировать.'); }
 }
+// Включить/выключить синхронизацию из ЛЮБОГО места (тумблер в «Настройках» или
+// строка «Синхронизация» в дропдауне профиля). Возвращает {ok, noUser?}.
+async function fptCloudSetSync(on) {
+    await chrome.storage.local.set({ fptCloudSyncEnabled: on });
+    _fptCloudSyncRing(on);
+    const panel = document.getElementById('fpt-cloud-panel'); if (panel) panel.style.display = on ? 'flex' : 'none';
+    const toggle = document.getElementById('fpt-cloud-toggle'); if (toggle) toggle.checked = on;
+    if (on) {
+        const u = _fptCloudUser();
+        if (!u.id) { _fptCloudSay('Войдите в аккаунт FunPay, чтобы синхронизировать.'); return { ok: false, noUser: true }; }
+        _fptC.uid = u.id; _fptC.name = u.name || '';
+        _fptC.key = await _fptCloudDeriveKey(_fptC.uid);
+        await _fptCloudLoadState();
+        // stamp current config so this device's settings carry real timestamps
+        // (otherwise an empty-timestamp baseline makes every tie go to the cloud).
+        const cur = await _fptCloudCollect(); const now = Date.now();
+        Object.keys(cur).forEach(k => { if (_fptC.fieldTs[k] === undefined) _fptC.fieldTs[k] = now; });
+        await _fptCloudPersist();
+        _fptCloudOn = true; _fptCloudReadyFlag = true;
+        _fptCloudSay('Включаю…');
+        await _fptCloudRun(() => _fptCloudReconcile('focus'));
+        _fptCloudStartInterval();
+        await _fptCloudRefreshUI();
+        _fptCloudSay('Готово ✓ Настройки привязаны к аккаунту и подтягиваются автоматически.');
+        return { ok: true };
+    }
+    _fptCloudOn = false;
+    if (_fptCloudPushTimer) { clearTimeout(_fptCloudPushTimer); _fptCloudPushTimer = null; }
+    if (_fptCloudRetryTimer) { clearTimeout(_fptCloudRetryTimer); _fptCloudRetryTimer = null; }
+    _fptCloudSay('Синхронизация выключена (данные в облаке сохранены).');
+    return { ok: true, off: true };
+}
+if (typeof window !== 'undefined') window.fptCloudSetSync = fptCloudSetSync;
+
 function fptCloudInitUI() {
     const t = document.getElementById('fpt-cloud-toggle');
     if (!t) return;
     if (!t.dataset.wired) {
         t.dataset.wired = '1';
-        t.addEventListener('change', async () => {
-            const on = t.checked;
-            await chrome.storage.local.set({ fptCloudSyncEnabled: on });
-            _fptCloudSyncRing(on);
-            const panel = document.getElementById('fpt-cloud-panel'); if (panel) panel.style.display = on ? 'flex' : 'none';
-            if (on) {
-                const u = _fptCloudUser();
-                if (!u.id) { _fptCloudSay('Войдите в аккаунт FunPay, чтобы синхронизировать.'); return; }
-                _fptC.uid = u.id; _fptC.name = u.name || '';
-                _fptC.key = await _fptCloudDeriveKey(_fptC.uid);
-                await _fptCloudLoadState();
-                // stamp current config so this device's settings carry real timestamps
-                // (otherwise an empty-timestamp baseline makes every tie go to the cloud).
-                const cur = await _fptCloudCollect(); const now = Date.now();
-                Object.keys(cur).forEach(k => { if (_fptC.fieldTs[k] === undefined) _fptC.fieldTs[k] = now; });
-                await _fptCloudPersist();
-                _fptCloudOn = true; _fptCloudReadyFlag = true;
-                _fptCloudSay('Включаю…');
-                await _fptCloudRun(() => _fptCloudReconcile('focus'));
-                _fptCloudStartInterval();
-                await _fptCloudRefreshUI();
-                _fptCloudSay('Готово ✓ Настройки привязаны к аккаунту и подтягиваются автоматически.');
-            } else {
-                _fptCloudOn = false;
-                if (_fptCloudPushTimer) { clearTimeout(_fptCloudPushTimer); _fptCloudPushTimer = null; }
-                if (_fptCloudRetryTimer) { clearTimeout(_fptCloudRetryTimer); _fptCloudRetryTimer = null; }
-                _fptCloudSay('Синхронизация выключена (данные в облаке сохранены).');
-            }
-        });
+        t.addEventListener('change', async () => { await fptCloudSetSync(t.checked); });
         document.getElementById('fpt-cloud-push-btn')?.addEventListener('click', async () => {
             if (!(await _fptCloudEnabled())) { _fptCloudSay('Сначала включите синхронизацию.'); return; }
             _fptCloudSay('Отправляю…');
