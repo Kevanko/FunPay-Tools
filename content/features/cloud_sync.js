@@ -19,7 +19,7 @@ const FPT_CLOUD_KEYS = [
     'autoBumpEnabled', 'autoBumpCooldown', 'fpToolsSmartBumpEnabled',
     'fpToolsLiveStyles', 'enableRedesignedHomepage', 'showSalesStats', 'hideBalance',
     'viewSellersPromo', 'fpToolsDisabledFeatures', 'fpToolsHeaderButtonStyles',
-    'fpToolsShowPaymentType', 'fpToolsShowUnconfirmed'
+    'fpToolsShowPaymentType', 'fpToolsShowUnconfirmed', 'fpToolsMyEpicNick'
 ];
 const FPT_CLOUD_KEYSET = new Set(FPT_CLOUD_KEYS);
 // Локально остаются только видео-обои и крупные бинарники (в облако не влезают:
