@@ -75,11 +75,9 @@ async function fptCheckPendingAdd() {
     // Текущий аккаунт определяем по userId (надёжнее имени: имя может совпасть у
     // разных или смениться), с фолбэком на имя.
     const isMe = a => (uid && a.userId && String(a.userId) === uid) || a.name === name;
-    // Инвариант: один golden_key принадлежит ровно ОДНОМУ аккаунту. Если этот ключ
-    // уже привязан к ДРУГОЙ записи (перепутанное добавление или ротация ключа на
-    // стороне FunPay), снимаем его с неё — иначе у двух аккаунтов один ключ, и
-    // переключение на «не того» владельца ловит «ключ устарел».
-    accts.forEach(a => { if (!isMe(a) && a.key === key) { a.key = ''; a.loginError = true; } });
+    // ВАЖНО: не обнуляем ключ у чужих записей с таким же ключом — пустой ключ
+    // выкидывается дедупом (_fptDedupAccounts), и аккаунт молча удаляется. Дубли
+    // по userId безопасно схлопывает сам дедуп; совпадение ключей лечится перелогином.
     const existing = accts.find(isMe);
     let msg = null;
     if (existing) {
@@ -117,11 +115,11 @@ async function fptCheckSwitchResult() {
         if (acc) {
             acc.loginError = false;                                // вход удался
             // FunPay мог ротировать golden_key при этом входе — обновляем сохранённый
-            // на актуальную куку, чтобы следующее переключение не упёрлось в «устарел»,
-            // и снимаем этот ключ с других записей (один ключ = один аккаунт).
+            // на актуальную куку, чтобы следующее переключение не упёрлось в «устарел».
+            // Ключи других записей НЕ трогаем (обнуление приводило к удалению аккаунта дедупом).
             try {
                 const r = await chrome.runtime.sendMessage({ action: 'getGoldenKey' });
-                if (r && r.success && r.key) { acc.key = r.key; accts.forEach(a => { if (a !== acc && a.key === r.key) { a.key = ''; a.loginError = true; } }); }
+                if (r && r.success && r.key) acc.key = r.key;
             } catch (_) {}
             const cu = (typeof _fptActiveUser === 'function') ? _fptActiveUser() : null;
             if (cu && cu.name === name && cu.id) acc.userId = String(cu.id);
