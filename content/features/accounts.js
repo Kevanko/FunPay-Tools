@@ -77,11 +77,13 @@ async function fptCheckPendingAdd() {
         const wasError = existing.loginError;
         const keyChanged = existing.key !== key;
         existing.key = key; existing.loginError = false; existing.online = existing.online !== false;
+        { const cu = (typeof _fptActiveUser === 'function') ? _fptActiveUser() : null; if (cu && cu.name === name && cu.id) existing.userId = existing.userId || String(cu.id); }
         if (wasError) msg = `Вход в «${name}» восстановлен.`;
         else if (keyChanged) msg = `Аккаунт «${name}» обновлён.`;
         // если ничего не изменилось — молча (просто вернулись в свой аккаунт)
     } else if (!accts.some(a => a.key === key)) {
-        accts.push({ name, key, online: true });
+        const cu = (typeof _fptActiveUser === 'function') ? _fptActiveUser() : null;
+        accts.push({ name, key, online: true, userId: (cu && cu.name === name && cu.id) ? String(cu.id) : undefined });
         msg = `Аккаунт «${name}» добавлен.`;
     }
     try { await chrome.storage.local.set({ fpToolsAccounts: accts, fptPendingAddAccount: null }); } catch (_) {}
@@ -115,19 +117,34 @@ async function fptCheckSwitchResult() {
 // глобальные ключи — после перезагрузки фичи прочитают уже СВОИ настройки.
 async function fptSwitchToAccount(acc) {
     if (!acc || !acc.key) return;
+    // приостановить облачный синк на время свапа: применение чужого профиля пишет
+    // настройки в глобальные ключи, и без этого они ушли бы в облачную запись ТЕКУЩЕГО
+    // аккаунта до перезагрузки (см. cloud_sync.js, баг свапа).
+    try { if (typeof fptCloudSuspendSync === 'function') fptCloudSuspendSync(60000); } catch (_) {}
     const cur = _fptCurName();
+    const before = await chrome.storage.local.get(['fptLastSeen', 'fptSwitchCheck']);
+    let appliedB = false;
     try {
         // применяем чужой профиль ТОЛЬКО если успели сохранить текущий (иначе не рискуем)
         const snapped = cur && cur !== acc.name ? await fptSnapshotProfile(cur) : true;
-        if (snapped) await fptApplyProfile(acc.name);
+        if (snapped) { await fptApplyProfile(acc.name); appliedB = true; }
         // помечаем как «последний виденный», чтобы загрузка не делала свап повторно
         await chrome.storage.local.set({
             fptSwitchCheck: { name: acc.name, ts: Date.now() },
             fptLastSeen: { key: acc.key, name: acc.name }
         });
     } catch (_) {}
-    try { await chrome.runtime.sendMessage({ action: 'setGoldenKey', key: acc.key }); } catch (e) {
-        if (typeof showNotification === 'function') showNotification(`Ошибка переключения: ${e.message}`, true);
+    let res = null;
+    try { res = await chrome.runtime.sendMessage({ action: 'setGoldenKey', key: acc.key }); }
+    catch (e) { if (typeof showNotification === 'function') showNotification(`Ошибка переключения: ${e.message}`, true); }
+    // Успех → setGoldenKey перезагрузит вкладку, и она прочитает уже применённые
+    // настройки B. ПРОВАЛ → куку НЕ сменили: откатываем глобальные ключи и метки к A,
+    // иначе вкладка осталась бы под A с данными/настройками B (и при следующей
+    // загрузке запорола бы профиль B чужими данными).
+    if (!res || res.success === false) {
+        if (appliedB && cur) { try { await fptApplyProfile(cur); } catch (_) {} }
+        try { await chrome.storage.local.set({ fptLastSeen: before.fptLastSeen || null, fptSwitchCheck: before.fptSwitchCheck || null }); } catch (_) {}
+        if (typeof showNotification === 'function') showNotification('Не удалось переключить аккаунт — настройки возвращены.', true);
     }
 }
 
@@ -144,9 +161,60 @@ async function fptFetchAccountSnapshot(key) {
     return null;
 }
 
+// Схлопывание дублей аккаунтов: один и тот же аккаунт мог попасть в список дважды
+// (ротация golden_key при перевходе → новый ключ). Идентичность — userId (после
+// PHPSESSID-фикса снимков он достоверен); только при ОТСУТСТВИИ userId с ОБЕИХ сторон
+// падаем на имя. Два РАЗНЫХ userId НИКОГДА не сливаем — имена у FunPay не уникальны,
+// иначе теряли бы golden_key второго аккаунта. Возвращает { list, changed }.
+function _fptDedupAccounts(accts) {
+    const seen = new Map();
+    const order = [];
+    const idOf = a => a.userId ? ('u:' + a.userId) : ('n:' + (((a.name || '').trim().toLowerCase()) || a.key));
+    for (const a of (accts || [])) {
+        if (!a || !a.key) continue;
+        const id = idOf(a);
+        const prev = seen.get(id);
+        if (!prev) { seen.set(id, { ...a }); order.push(id); continue; }
+        const merged = { ...prev, ...a };
+        merged.name = a.name || prev.name;
+        merged.userId = a.userId || prev.userId;
+        merged.avatar = a.avatar || prev.avatar || '';
+        merged.balance = a.balance || prev.balance || '';
+        merged.online = (prev.online !== false) && (a.online !== false);
+        merged.loginError = !!(prev.loginError && a.loginError);          // здоров, если здоров хоть один
+        merged.key = !a.loginError ? a.key : (!prev.loginError ? prev.key : a.key);
+        merged._snapTs = Math.max(prev._snapTs || 0, a._snapTs || 0);
+        seen.set(id, merged);
+    }
+    const list = order.map(id => seen.get(id));
+    return { list, changed: list.length !== (accts || []).filter(a => a && a.key).length };
+}
+
 async function renderAccountsList() {
     const listContainer = document.getElementById('fpToolsAccountsList');
     if (!listContainer) return;
+
+    // лечим дубли перед отрисовкой (ротация ключа создавала второй entry того же аккаунта)
+    try {
+        const dd = _fptDedupAccounts(fpToolsAccounts);
+        if (dd.changed) {
+            fpToolsAccounts.length = 0; dd.list.forEach(a => fpToolsAccounts.push(a));
+            if (_fptAlive()) await chrome.storage.local.set({ fpToolsAccounts: dd.list });
+        }
+    } catch (_) {}
+    // одноразовое лечение: у аккаунтов без userId форсим пере-снимок — он заполнит userId
+    // и починит устаревший баланс/аватар (попавший от прошлой кросс-контаминации). После
+    // появления userId следующий дедуп схлопнет настоящие дубли по userId.
+    try {
+        let needHeal = false;
+        // ОДНОРАЗОВО (флаг _healTried): иначе если снимок вернёт имя без userId, render↔refresh
+        // зациклятся — бесконечные куки-свопы и долбёж funpay.com.
+        fpToolsAccounts.forEach(a => { if (a && a.key && !a.userId && !a._healTried) { a._snapTs = 0; a._healTried = true; needHeal = true; } });
+        if (needHeal && _fptAlive()) {
+            await chrome.storage.local.set({ fpToolsAccounts });
+            setTimeout(() => { try { if (typeof maybeAutoRefreshAccounts === 'function') maybeAutoRefreshAccounts(); } catch (_) {} }, 300);
+        }
+    } catch (_) {}
 
     const currentUsernameEl = document.querySelector('.user-link-name');
     const currentUsername = currentUsernameEl ? currentUsernameEl.textContent.trim() : null;
@@ -288,8 +356,12 @@ async function fptApplyAccountThemeTints(activeName) {
 
 // Снимок принадлежит ДРУГОМУ сохранённому аккаунту (его имя) → куку подменили во
 // время запроса, данные чужие, присваивать нельзя (защита от дублей аватарок).
-function _fptSnapWrongAccount(snap, ownKey) {
+function _fptSnapWrongAccount(snap, ownKey, ownName, ownUserId) {
     const u = snap && snap.username;
+    // принимаем при совпадении userId ИЛИ имени (снимок сделан строго под ключом
+    // аккаунта; имя-совпадение лечит entry с ранее заражённым чужим userId).
+    if (ownUserId && snap && snap.userId && String(snap.userId) === String(ownUserId)) return false;
+    if (ownName) return !(u && u === ownName);
     return !!(u && fpToolsAccounts.some(o => o && o.key && o.key !== ownKey && o.name === u));
 }
 
@@ -308,7 +380,8 @@ async function maybeAutoRefreshAccounts() {
             if (!account.key) continue;
             if (account._snapTs && (now - account._snapTs) <= STALE) continue;
             const snap = await fptFetchAccountSnapshot(account.key);
-            if (snap && !_fptSnapWrongAccount(snap, account.key)) {
+            if (snap && !_fptSnapWrongAccount(snap, account.key, account.name, account.userId)) {
+                if (snap.userId) account.userId = String(snap.userId);   // снимок авторитетен — лечит заражённый userId
                 account.avatar = snap.avatar || account.avatar || '';
                 account.balance = snap.balance || account.balance || '';
                 account.unread = typeof snap.unread === 'number' ? snap.unread : (account.unread || 0);
@@ -329,7 +402,8 @@ async function fptRefreshAllAccounts() {
     for (const account of fpToolsAccounts) {
         if (!account.key) continue;
         const snap = await fptFetchAccountSnapshot(account.key);
-        if (snap && !_fptSnapWrongAccount(snap, account.key)) {
+        if (snap && !_fptSnapWrongAccount(snap, account.key, account.name, account.userId)) {
+            if (snap.userId) account.userId = String(snap.userId);   // снимок авторитетен — лечит заражённый userId
             account.avatar = snap.avatar || account.avatar || '';
             account.balance = snap.balance || account.balance || '';
             account.unread = typeof snap.unread === 'number' ? snap.unread : (account.unread || 0);
@@ -501,7 +575,8 @@ const FPT_SETTINGS_KEYS = [
     'autoBumpEnabled', 'autoBumpCooldown', 'fpToolsSmartBumpEnabled',
     // оформление и отображение
     'fpToolsLiveStyles', 'enableRedesignedHomepage', 'showSalesStats', 'hideBalance',
-    'viewSellersPromo', 'fpToolsDisabledFeatures'
+    'viewSellersPromo', 'fpToolsDisabledFeatures', 'fpToolsHeaderButtonStyles',
+    'fpToolsShowPaymentType', 'fpToolsShowUnconfirmed'
 ];
 
 // Соответствие «пункт меню (data-page) → его ключи настроек» для ВЫБОРОЧНОГО
@@ -510,10 +585,10 @@ const FPT_SECTION_KEYS = {
     auto_review: ['fpToolsAutoReplies', 'keywords', 'greetingText', 'reviewTemplates', 'reviewTemplateImages'],
     templates: ['fpToolsTemplateSettings'],
     slash_commands: ['fpToolsSlashCommands'],
-    theme: ['fpToolsTheme', 'enableCustomTheme', 'fpToolsLiveStyles', 'enableRedesignedHomepage'],
+    theme: ['fpToolsTheme', 'enableCustomTheme', 'fpToolsLiveStyles', 'enableRedesignedHomepage', 'fpToolsHeaderButtonStyles'],
     effects: ['fpToolsCursorFx', 'fpToolsCustomCursor'],
-    general: ['notificationSound', 'notificationVolume', 'fpToolsCustomSoundData', 'fpToolsCustomSoundMeta', 'showSalesStats', 'hideBalance', 'viewSellersPromo', 'fpToolsDisabledFeatures'],
-    autobump: ['autoBumpEnabled', 'autoBumpCooldown', 'fpToolsSmartBumpEnabled']
+    general: ['notificationSound', 'notificationVolume', 'fpToolsCustomSoundData', 'fpToolsCustomSoundMeta', 'showSalesStats', 'hideBalance', 'viewSellersPromo', 'fpToolsDisabledFeatures', 'fpToolsShowPaymentType', 'fpToolsShowUnconfirmed'],
+    autobump: ['autoBumpEnabled', 'autoBumpCooldown', 'fpToolsSmartBumpEnabled', 'fpToolsSelectiveBumpEnabled', 'fpToolsBumpOnlyAutoDelivery', 'fpToolsSelectedBumpCategories']
 };
 
 // ЛИЧНЫЕ ДАННЫЕ аккаунта — НЕ должны смешиваться между аккаунтами (продажи/графики,
@@ -526,7 +601,10 @@ const FPT_DATA_KEYS = [
     'fpToolsSalesChartPeriod', 'fpToolsAutoDeliveryLots',
     'fpToolsBlacklist', 'fpToolsCustomLabels', 'fpToolsUserStatuses', 'fpToolsUserNotes',
     'fpToolsDeactivatedLots', 'fpToolsPiggyBanks', 'fpToolsPinnedChats', 'fpToolsPinnedLots',
-    'fpToolsMyEpicNick', 'fpToolsSelectedBumpCategories'
+    'fpToolsMyEpicNick', 'fpToolsSelectedBumpCategories',
+    // флаги выборочного авто-поднятия — пер-аккаунтные, иначе глобальные флаги расходились
+    // с пер-аккаунтным списком категорий → активный аккаунт поднимал не тот набор лотов.
+    'fpToolsSelectiveBumpEnabled', 'fpToolsBumpOnlyAutoDelivery'
 ];
 
 // Полный набор «локального» для аккаунта (настройки + данные) — свап при смене.
@@ -721,18 +799,35 @@ async function fptAccountBoot() {
     const prevKey = lastSeen && lastSeen.key;
     const prevName = lastSeen && lastSeen.name;
 
+    // heal: у entry АКТИВНОГО аккаунта ключ должен совпадать с живой кукой. Расхождение
+    // (старый/чужой ключ в entry — например после входа через cookie-редактор) ломало
+    // снимки: баланс/аватар тянулись под ЧУЖИМ ключом. Лечим всегда, даже без свапа.
+    try {
+        const mine = accts.find(a => a && a.name === name);
+        if (mine && mine.key !== key) {
+            mine.key = key; mine.loginError = false;
+            const u0 = (typeof _fptActiveUser === 'function') ? _fptActiveUser() : null;
+            if (u0 && u0.id) mine.userId = String(u0.id);
+            mine._snapTs = 0;                            // форсим свежий снимок под верным ключом
+            await chrome.storage.local.set({ fpToolsAccounts: accts });
+            if (typeof fpToolsAccounts !== 'undefined') { try { fpToolsAccounts.length = 0; accts.forEach(a => fpToolsAccounts.push(a)); } catch (_) {} }
+        }
+    } catch (_) {}
+
     // первый раз — просто фиксируем, без свапа и добавления (не трогаем уже настроенное)
     if (!prevKey) { try { await chrome.storage.local.set({ fptLastSeen: { key, name } }); } catch (_) {} return; }
     if (key === prevKey) return;                         // тот же аккаунт — ничего
 
     // ── произошёл вход в ДРУГОЙ аккаунт ──
     let added = false;
-    if (!accts.some(a => a.key === key) && !accts.some(a => a.name === name)) {
-        accts.push({ name, key, online: true });         // новый — добавляем сразу
+    const _bootUid = (typeof _fptActiveUser === 'function' && _fptActiveUser().id) ? String(_fptActiveUser().id) : '';
+    if (!accts.some(a => a.key === key) && !accts.some(a => a.name === name) && !(_bootUid && accts.some(a => a.userId === _bootUid))) {
+        accts.push({ name, key, online: true, userId: _bootUid || undefined });   // новый — добавляем сразу
         added = true;
     } else {
-        const ex = accts.find(a => a.name === name) || accts.find(a => a.key === key);
-        if (ex) { ex.key = key; ex.loginError = false; ex.online = ex.online !== false; }
+        // обновляем СУЩЕСТВУЮЩИЙ (по userId → имени → ключу), чтобы ротация ключа не плодила дубль
+        const ex = (_bootUid && accts.find(a => a.userId === _bootUid)) || accts.find(a => a.name === name) || accts.find(a => a.key === key);
+        if (ex) { ex.key = key; ex.loginError = false; ex.online = ex.online !== false; if (_bootUid) ex.userId = ex.userId || _bootUid; }
     }
 
     // настройки профиля: текущие глобальные ключи принадлежат ПРЕДЫДУЩЕМУ аккаунту

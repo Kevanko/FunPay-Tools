@@ -331,19 +331,13 @@ function createGameIcon(game) {
     link.setAttribute('aria-label', game.name);
     link.style.animationDelay = `-${(Math.random() * 8).toFixed(2)}s`;
     link.style.animationDuration = `${(Math.random() * 5 + 8).toFixed(2)}s`;
-    const firstLetter = game.name.charAt(0).toUpperCase();
+    const firstLetter = gameLetter(game.name);
     const avatarColor = stringToHslColor(game.name, 70, 60);
-    let domain;
-    if (game.name.toLowerCase() === 'telegram') {
-        domain = 'web.telegram.org';
-    } else {
-        const cleanGameName = game.name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9-]/g, '');
-        domain = `${cleanGameName}.com`;
-    }
-    const iconUrl = `https://www.google.com/s2/favicons?sz=64&domain=${domain}`;
+    const domain = gameDomain(game.name);
+    const iconUrl = domain ? `https://www.google.com/s2/favicons?sz=64&domain=${domain}` : '';
     link.innerHTML = `
         <div class="fp-fallback-icon" style="background-color: ${avatarColor};">${firstLetter}</div>
-        <img class="fp-game-icon" data-src="${iconUrl}" alt="${game.name}" style="display: none;">
+        ${iconUrl ? `<img class="fp-game-icon" data-src="${iconUrl}" alt="${game.name}" style="display: none;">` : ''}
     `;
     return link;
 }
@@ -369,10 +363,21 @@ function hic(name, size) {
     return `<svg class="fpt-ico" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
 }
 
+// null — если из имени не выходит правдоподобного домена (кириллица, цифровые
+// огрызки вроде «'83»): google s2/gstatic отвечают 404 на такие запросы, а
+// релиз требует ноль ошибок в консоли. Без домена — без сетевого запроса.
 function gameDomain(name) {
     if (name.toLowerCase() === 'telegram') return 'web.telegram.org';
     const clean = name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9-]/g, '');
+    if (clean.length < 2 || !/[a-z]/.test(clean) || clean.startsWith('-') || clean.endsWith('-')) return null;
     return `${clean}.com`;
+}
+
+// Первый буквенно-цифровой символ имени для letter-аватара: пунктуация
+// («'83» → апостроф) пропускается, '#' — если подходящих символов нет.
+function gameLetter(name) {
+    const m = String(name || '').match(/[\p{L}\p{N}]/u);
+    return (m ? m[0] : '#').toUpperCase();
 }
 
 // ── Посещения игр: личная статистика для «Недавно» и «Частые» ────────────────
@@ -610,9 +615,10 @@ function createRedesignedUI(allGamesData, yourGamesData, realData) {
         card.dataset.name = game.name;
         card.dataset.url = game.url;
         card.dataset.count = String(visitCount);
-        const letter = escapeHtml((game.name.charAt(0) || 'G').toUpperCase());
+        const letter = escapeHtml(gameLetter(game.name));
         const safeName = escapeHtml(game.name);
-        const iconUrl = `https://www.google.com/s2/favicons?sz=64&domain=${gameDomain(game.name)}`;
+        const domain = gameDomain(game.name);
+        const iconUrl = domain ? `https://www.google.com/s2/favicons?sz=64&domain=${domain}` : '';
         const vis = game.categories.slice(0, 5);
         const catsHTML = vis.map(c => `<a href="${c.url}" class="gcard-cat">${escapeHtml(c.name)}</a>`).join('');
         const hidden = game.categories.length - vis.length;
@@ -621,7 +627,7 @@ function createRedesignedUI(allGamesData, yourGamesData, realData) {
             <div class="gcard-top">
                 <div class="gcard-mark">
                     <span class="gcard-mono mono">${letter}</span>
-                    <img class="gcard-favicon" data-src="${iconUrl}" alt="" style="display:none;">
+                    ${iconUrl ? `<img class="gcard-favicon" data-src="${iconUrl}" alt="" style="display:none;">` : ''}
                 </div>
                 <div class="gcard-titlewrap">
                     <div class="gcard-title">${safeName}</div>
@@ -694,6 +700,12 @@ function setupLazyLoadObserver() {
                         if (fallback) fallback.style.display = 'none';
                         img.style.display = 'block';
                     }
+                };
+                // Сервис отдаёт 404 и для существующих доменов без иконки —
+                // возвращаем letter-аватар и убираем битый <img>.
+                img.onerror = () => {
+                    if (fallback) fallback.style.display = '';
+                    img.remove();
                 };
             }
             observer.unobserve(item);

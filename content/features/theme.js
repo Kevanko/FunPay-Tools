@@ -309,6 +309,7 @@ async function randomizeTheme() {
     const fontsWithDefault = ['Helvetica Neue', ...GOOGLE_FONTS];
 
     const randomTheme = {
+        ...currentTheme,   // патч ПОВЕРХ текущей темы: не теряем sitePreset/accentMode/обои/bgVideo/меню/контур
         bgColor1: randomHex(),
         bgColor2: randomHex(),
         containerBgColor: randomHex(),

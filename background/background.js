@@ -170,7 +170,13 @@ async function runSalesUpdateCycle() {
 // --- НАДЁЖНАЯ ФУНКЦИЯ АУТЕНТИФИКАЦИИ ---
 // 3.0: Upload an image to FunPay and send it to a chat via the runner - all in background.
 // Ported from FP Tools (Account.upload_image + Account.send_image).
+const _FPT_BOT_MARKER = '⁡';
+function _fptMarkOutgoing(text) { const t = (text == null) ? '' : String(text); if (!t) return t; if (t.startsWith('⁡') || t.startsWith('⁤')) return t; return _FPT_BOT_MARKER + t; }
+
 async function sendChatImageInBackground(chatId, dataUrl, chatName) {
+  // под общим замком: фоновый heartbeat не должен подменить golden_key В МОМЕНТ отправки,
+  // иначе фото уйдут под ЧУЖИМ аккаунтом или upload/runner отклонит mismatch.
+  return withCookieLock(async () => {
     const auth = await getAuthDetailsForBackground();
     if (!auth.golden_key || !auth.csrf_token) throw new Error('Нет авторизации для отправки изображения.');
     const cookieStr = auth.phpsessid
@@ -210,16 +216,20 @@ async function sendChatImageInBackground(chatId, dataUrl, chatName) {
     const sendJson = await sendRes.json().catch(() => null);
     if (sendJson?.error) throw new Error(`FunPay runner: ${sendJson.error}`);
     return { fileId };
+  });
 }
 
 // Текст в чат (вынесено, чтобы переиспользовать в батче картинок).
 async function sendChatTextInBackground(chatId, text) {
+  return withCookieLock(async () => {
     const auth = await getAuthDetailsForBackground();
     if (!auth.golden_key || !auth.csrf_token) throw new Error('Нет авторизации.');
     const cookieStr = auth.phpsessid ? `golden_key=${auth.golden_key}; PHPSESSID=${auth.phpsessid}` : `golden_key=${auth.golden_key}`;
+    // маркер исходящего: иначе автоответчик примет текст шаблона за входящее сообщение
+    // покупателя и может ответить сам себе (или прислать ложный Telegram-алерт).
     const payload = {
         objects: JSON.stringify([{ type: 'chat_node', id: chatId, tag: '00000000', data: { node: chatId, last_message: -1, content: '' } }]),
-        request: JSON.stringify({ action: 'chat_message', data: { node: chatId, last_message: -1, content: text } }),
+        request: JSON.stringify({ action: 'chat_message', data: { node: chatId, last_message: -1, content: _fptMarkOutgoing(text) } }),
         csrf_token: auth.csrf_token
     };
     const res = await fetch('https://funpay.com/runner/', {
@@ -231,6 +241,7 @@ async function sendChatTextInBackground(chatId, text) {
     if (json?.error) throw new Error(json.error);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return { ok: true };
+  });
 }
 
 async function getAuthDetailsForBackground() {
@@ -865,8 +876,13 @@ function fptSnapshotForKey(key) {
             });
         };
 
+        // PHPSESSID доминирует над golden_key: без его снятия FunPay отдаёт АКТИВНУЮ
+        // сессию для любого ключа → у всех аккаунтов один баланс/аватар (заражение).
+        let originalSess = null;
+        try { originalSess = await chrome.cookies.get({ url: 'https://funpay.com', name: 'PHPSESSID' }); } catch (_) {}
         try {
-            // 2) Ставим cookie целевого аккаунта.
+            // 2) Снимаем PHPSESSID и ставим cookie целевого аккаунта.
+            try { await chrome.cookies.remove({ url: 'https://funpay.com', name: 'PHPSESSID' }); } catch (_) {}
             await setKey(key);
             // 3) Грузим главную под этим аккаунтом (через общий темп/бэк-офф).
             const resp = await fpFetch('https://funpay.com/', { credentials: 'include', cache: 'no-store' });
@@ -876,10 +892,22 @@ function fptSnapshotForKey(key) {
         } catch (e) {
             return null;
         } finally {
-            // 4) ВСЕГДА возвращаем исходную golden_key (или удаляем, если её не было).
+            // 4) ВСЕГДА возвращаем исходные golden_key и PHPSESSID (свежесозданную
+            //    сессию целевого аккаунта убираем).
             try {
                 if (original && original.value) await setKey(original.value);
                 else await chrome.cookies.remove({ url: 'https://funpay.com', name: 'golden_key' });
+            } catch (_) {}
+            try {
+                await chrome.cookies.remove({ url: 'https://funpay.com', name: 'PHPSESSID' });
+                if (originalSess && originalSess.value) {
+                    await chrome.cookies.set({
+                        url: 'https://funpay.com', name: 'PHPSESSID', value: originalSess.value,
+                        domain: originalSess.domain || '.funpay.com', path: originalSess.path || '/',
+                        secure: originalSess.secure !== false, httpOnly: !!originalSess.httpOnly,
+                        sameSite: originalSess.sameSite || 'lax'
+                    });
+                }
             } catch (_) {}
         }
     };
@@ -915,9 +943,17 @@ async function runOnlineHeartbeat() {
                     // защита от перекрёстного заражения: если снимок принадлежит ДРУГОМУ
                     // аккаунту из списка (его имя), значит куку кто-то подменил во время
                     // запроса — отбрасываем, чтобы не присвоить чужую аватарку/баланс.
+                    // принимаем снимок ТОЛЬКО если он точно принадлежит запрошенному
+                    // аккаунту (username == сохранённое имя). Иначе куку подменили во
+                    // время запроса (или вернулась активная сессия) — отбрасываем, чтобы
+                    // не присвоить чужую аватарку/баланс/непрочитанные активному аккаунту.
                     const u = snap.username;
-                    const belongsToOther = u && fpToolsAccounts.some(o => o.key && o.key !== a.key && o.name === u);
-                    if (!belongsToOther) updates[a.key] = snap;
+                    // принимаем, если совпал userId ИЛИ имя (снимок сделан строго под этим
+                    // ключом — имя-совпадение лечит ранее заражённый чужим userId entry).
+                    const accept = (snap.userId && a.userId && String(snap.userId) === String(a.userId))
+                        || (a.name ? !!(u && u === a.name)
+                                   : !(u && fpToolsAccounts.some(o => o.key && o.key !== a.key && o.name === u)));
+                    if (accept) updates[a.key] = snap;
                 }
             } catch (_) {}
             await new Promise(r => setTimeout(r, 500));
@@ -930,6 +966,9 @@ async function runOnlineHeartbeat() {
                 if (!s) return acc;
                 return {
                     ...acc,
+                    // снимок авторитетен (сделан под ключом аккаунта) — ПЕРЕЗАПИСЫВАЕМ
+                    // userId, чтобы вылечить ранее заражённые чужим userId записи
+                    userId: s.userId ? String(s.userId) : acc.userId,
                     avatar: s.avatar || acc.avatar,
                     balance: s.balance || acc.balance,
                     unread: typeof s.unread === 'number' ? s.unread : acc.unread,
@@ -946,12 +985,75 @@ async function runOnlineHeartbeat() {
 }
 
 
+// ===================== Cloud settings sync (Cloudflare Worker + D1) =====================
+// gzip + the network call live here in the SW (host_permissions covers *.workers.dev).
+// Never receives credentials — only the copyable settings subset from the content script.
+const FPT_CLOUD_ENDPOINT = 'https://fpt-sync.vidalifete.workers.dev';
+
+async function _fptGzipB64(str) {
+    const stream = new Blob([str]).stream().pipeThrough(new CompressionStream('gzip'));
+    const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+    let bin = '';
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+}
+async function _fptGunzipB64(b64) {
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return new TextDecoder().decode(await new Response(stream).arrayBuffer());
+}
+async function fptCloudPush(id, settings, updatedAt, baseVersion) {
+    if (!id) return { ok: false, error: 'no_id' };
+    const bundle = await _fptGzipB64(JSON.stringify(settings || {}));
+    const res = await fetch(`${FPT_CLOUD_ENDPOINT}/s/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bundle, updated_at: updatedAt || Date.now(), baseVersion: baseVersion || 0 })
+    });
+    let j = {}; try { j = await res.json(); } catch (_) {}
+    // on 409 the server returns the CURRENT bundle — decode it so the client can field-merge
+    if (res.status === 409 && typeof j.bundle === 'string') {
+        try { j.settings = JSON.parse(await _fptGunzipB64(j.bundle)); } catch (_) {}
+    }
+    return { ok: res.ok, status: res.status, ...j };
+}
+async function fptCloudPull(id) {
+    if (!id) return { ok: false, error: 'no_id' };
+    const res = await fetch(`${FPT_CLOUD_ENDPOINT}/s/${encodeURIComponent(id)}`);
+    if (res.status === 404) return { ok: true, exists: false };
+    if (!res.ok) return { ok: false, status: res.status };
+    const j = await res.json();
+    let settings = {};
+    try { settings = JSON.parse(await _fptGunzipB64(j.bundle)); } catch (_) { return { ok: false, error: 'decode' }; }
+    return { ok: true, exists: true, settings, updated_at: j.updated_at, version: j.version };
+}
+
 // --- Главный обработчик сообщений ---
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // 3.0: offscreen keepalive ping - receiving it resets the worker idle timer.
     if (request && request.target === 'background' && request.action === 'fptEngineKeepalive') {
         onKeepalivePing();
         sendResponse({ ok: true });
+        return true;
+    }
+    // Cloud settings sync: gzip + network in the SW; content sends only settings (no creds).
+    if (request.action === 'fptCloudPush') {
+        (async () => { try { sendResponse(await fptCloudPush(request.id, request.settings, request.updatedAt, request.baseVersion)); } catch (e) { sendResponse({ ok: false, error: e.message }); } })();
+        return true;
+    }
+    if (request.action === 'fptCloudPull') {
+        (async () => { try { sendResponse(await fptCloudPull(request.id)); } catch (e) { sendResponse({ ok: false, error: e.message }); } })();
+        return true;
+    }
+    // Общий реестр кастомных ников (видны всем пользователям расширения).
+    if (request.action === 'fptNickFetchAll') {
+        (async () => { try { const r = await fetch(`${FPT_CLOUD_ENDPOINT}/nicks`); const j = await r.json().catch(() => ({})); sendResponse({ ok: r.ok, map: (j && typeof j === 'object') ? j : {} }); } catch (e) { sendResponse({ ok: false, map: {} }); } })();
+        return true;
+    }
+    if (request.action === 'fptNickPublish') {
+        (async () => { try { const r = await fetch(`${FPT_CLOUD_ENDPOINT}/nick/${encodeURIComponent(request.id)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nick: request.nick || '', style: request.style || '' }) }); sendResponse({ ok: r.ok }); } catch (e) { sendResponse({ ok: false }); } })();
         return true;
     }
     // Relay parse requests from content scripts to the offscreen document

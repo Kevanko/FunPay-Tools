@@ -38,28 +38,25 @@ async function checkAndRestoreLots() {
             const isActive = !lotEl.closest('.offer')?.classList.contains('deactivated') &&
                              !lotEl.style.opacity?.includes('0.5');
 
-            if (deliveryConfig) {
-                const productCount = deliveryConfig.productCount ?? Infinity;
-
-                
-                if (fpToolsAutoDisableEnabled && productCount === 0 && isActive &&
+            // productCount НИГДЕ не заполняется реальным остатком склада. Раньше он по
+            // умолчанию был 0 → авто-деактивация убивала лоты С ТОВАРОМ, а авто-восста-
+            // новление (undefined→Infinity>0) и глобальная ветка ре-активировали лоты,
+            // отключённые вручную/FunPay. Пока нет реального учёта (stockCheckedAt) обе
+            // productCount-ветки СПЯТ, а опасная глобальная «восстановить все» убрана.
+            const hasRealStock = deliveryConfig &&
+                Number.isFinite(deliveryConfig.stockCheckedAt) &&
+                Number.isFinite(deliveryConfig.productCount);
+            if (deliveryConfig && hasRealStock && deliveryConfig.enabled !== false) {
+                if (fpToolsAutoDisableEnabled && deliveryConfig.productCount <= 0 && isActive &&
                     deliveryConfig.autoDisableEnabled !== false) {
                     await toggleLotActive(lot.id, lot.nodeId, false, d['csrf-token']);
                     showNotification(`Лот "${lot.title}" деактивирован: товары закончились`, false);
-                    console.log(`FP Tools AutoDisable: деактивирован лот ${lot.id}`);
                 }
-
-                
-                if (fpToolsAutoRestoreEnabled && productCount > 0 && !isActive &&
+                if (fpToolsAutoRestoreEnabled && deliveryConfig.productCount > 0 && !isActive &&
                     deliveryConfig.autoRestoreEnabled !== false) {
                     await toggleLotActive(lot.id, lot.nodeId, true, d['csrf-token']);
                     showNotification(`Лот "${lot.title}" восстановлен: товары пополнены`, false);
-                    console.log(`FP Tools AutoRestore: восстановлен лот ${lot.id}`);
                 }
-            } else if (fpToolsAutoRestoreEnabled && !isActive) {
-                
-                await toggleLotActive(lot.id, lot.nodeId, true, d['csrf-token']);
-                console.log(`FP Tools AutoRestore: глобальное восстановление лота ${lot.id}`);
             }
         }
     } catch (e) {
@@ -98,8 +95,16 @@ async function toggleLotActive(offerId, nodeId, active, csrfToken) {
     }
 }
 
+let _fptRestoreInFlight = false, _fptRestoreTimer = null;
 chrome.runtime.onMessage.addListener((request) => {
     if (request.action === 'fpToolsCheckRestoreLots') {
-        setTimeout(checkAndRestoreLots, 5000); 
+        // защита от двойного запуска: коалесцируем повторные сообщения и не запускаем,
+        // пока предыдущий проход не завершился (иначе ×2 offerSave-POST на лот → rate-limit).
+        clearTimeout(_fptRestoreTimer);
+        _fptRestoreTimer = setTimeout(() => {
+            if (_fptRestoreInFlight) return;
+            _fptRestoreInFlight = true;
+            Promise.resolve(checkAndRestoreLots()).finally(() => { _fptRestoreInFlight = false; });
+        }, 5000);
     }
 });

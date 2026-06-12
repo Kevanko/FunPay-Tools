@@ -27,8 +27,8 @@ const DEFAULT_TEMPLATE_DISPLAY = {
 };
 
 const DEFAULT_STANDARD_TEMPLATES = {
-    greeting: { enabled: true, label: 'Приветствие', color: '#C026D3', text: '{welcome}, {buyername}! Чем могу помочь?' },
-    completed: { enabled: true, label: 'Заказ выполнен', color: '#C026D3', text: 'Заказ выполнен. Пожалуйста, зайдите в раздел «Покупки», выберите его в списке и нажмите кнопку «Подтвердить выполнение заказа».' },
+    greeting: { enabled: true, label: 'Приветствие', color: '#5b86d8', text: '{welcome}, {buyername}! Чем могу помочь?' },
+    completed: { enabled: true, label: 'Заказ выполнен', color: '#5b86d8', text: 'Заказ выполнен. Пожалуйста, зайдите в раздел «Покупки», выберите его в списке и нажмите кнопку «Подтвердить выполнение заказа».' },
     review: { enabled: true, label: 'Попросить отзыв', color: '#FF6B6B', text: 'Спасибо за покупку! Буду очень благодарен, если вы оставите отзыв о сделке.' },
     thanks: { enabled: true, label: 'Спасибо за заказ', color: '#FF6B6B', text: 'Спасибо за заказ, {buyername}! Обращайтесь еще. {date}' }
 };
@@ -134,7 +134,7 @@ async function replaceTemplateVariables(template) {
     return result;
 }
 
-async function applyTemplateToInput(chatInput, templateContent, images, sendOrder) {
+async function applyTemplateToInput(chatInput, templateContent, images, sendOrder, immediate = true) {
     if (!chatInput || templateContent === undefined) return { handledInBackground: false };
 
     let processedText = await replaceTemplateVariables(templateContent);
@@ -145,6 +145,19 @@ async function applyTemplateToInput(chatInput, templateContent, images, sendOrde
     // order (text→image OR image→text) so nothing is dumped into the visible input
     // and FunPay's submit isn't triggered.
     if (imgs.length > 0) {
+        // «Отправлять сразу» выключено → НЕ шлём покупателю фоном; только готовим текст в
+        // поле, чтобы продавец проверил/отправил вручную. (Картинки в текстовое поле не
+        // вставить — предупреждаем.) Иначе шаблон с картинкой уходил мимо этой настройки.
+        if (!immediate) {
+            window.__fptProgrammaticInput = true;
+            chatInput.value = (processedText || '').trim();
+            chatInput.focus();
+            chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+            try { chatInput.selectionStart = chatInput.selectionEnd = chatInput.value.length; } catch (_) {}
+            window.__fptProgrammaticInput = false;
+            showNotification('Текст шаблона вставлен. Картинки не отправляются при выключенном «Отправлять сразу».', false);
+            return { handledInBackground: false };
+        }
         const nodeInput = document.querySelector('input[name="node"]');
         let chatId = nodeInput && nodeInput.value ? nodeInput.value : null;
         if (!chatId) { const dn = document.querySelector('[data-node]'); if (dn) chatId = dn.getAttribute('data-node'); }
@@ -265,7 +278,7 @@ async function useTemplate(templateConfig) {
     const chatInput = document.querySelector('.chat-form-input .form-control');
     if (!chatInput) return;
 
-    const applyResult = await applyTemplateToInput(chatInput, templateConfig.text, imgs, templateConfig.sendOrder);
+    const applyResult = await applyTemplateToInput(chatInput, templateConfig.text, imgs, templateConfig.sendOrder, sendTemplatesImmediately);
 
     if (!sendTemplatesImmediately) return;
     if (applyResult && applyResult.handledInBackground) return;
@@ -406,6 +419,25 @@ function fillTemplateContainer(container) {
     });
 }
 
+// На странице заказа, где текущий пользователь — ПОКУПАТЕЛЬ, продавцовые быстрые
+// шаблоны («Заказ выполнен», «Попросить отзыв»…) бессмысленны и опасны при случайном
+// клике. Роль надёжно отдаёт ШАПКА сайта: на /orders/<id>/ сервер помечает активным
+// пункт «Покупки» (href → /orders/) для покупателя и «Продажи» (href → /orders/trade)
+// для продавца (проверено в живом DOM; тем же сигналом пользуется FunPayAPI).
+// Прячем ТОЛЬКО при явном «Покупки»-сигнале: нет навбара / другая разметка →
+// показываем кнопки как раньше (ложное скрытие у продавца хуже лишних кнопок).
+function isBuyerOrderPage() {
+    const m = window.location.pathname.match(/^\/orders\/([^/]+)\/?$/);
+    if (!m || m[1] === 'trade') return false;
+    const activeLink = document.querySelector('ul.nav.navbar-nav.navbar-right.logged li.active > a[href]');
+    if (!activeLink) return false;
+    try {
+        return new URL(activeLink.getAttribute('href'), window.location.origin).pathname === '/orders/';
+    } catch (_) {
+        return false;
+    }
+}
+
 async function addChatTemplateButtons() {
     await loadTemplateSettings();
     const chatInput = document.querySelector('.chat-form-input .form-control');
@@ -430,6 +462,9 @@ async function addChatTemplateButtons() {
 
     // Master switch: templates fully off → leave the chat untouched.
     if (templateSettings.enabled === false) return;
+
+    // Заказ, где мы — покупатель: кнопки продавца не рисуем (ни одну из раскладок).
+    if (isBuyerOrderPage()) return;
 
     const position = templateSettings.buttonPosition;
 

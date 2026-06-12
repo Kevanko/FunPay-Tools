@@ -39,7 +39,9 @@ async function getRates(baseCurrency) {
 }
 
 // Функция для обновления расчета
+let _fptConvToken = 0;
 async function updateCurrencyConversion() {
+    const myToken = ++_fptConvToken;   // только ПОСЛЕДНИЙ вызов вправе записать результат
     const amountFromInput = document.getElementById('currencyAmountFrom');
     const amountToInput = document.getElementById('currencyAmountTo');
     const selectFrom = document.getElementById('currencySelectFrom');
@@ -61,6 +63,7 @@ async function updateCurrencyConversion() {
     }
 
     const rates = await getRates(fromCurrency);
+    if (myToken !== _fptConvToken) return;   // пока ждали сеть, пользователь сменил валюту/сумму — не перезаписываем
 
     if (!rates) {
         errorDisplay.textContent = `Не удалось загрузить курсы для ${fromCurrency}. Попробуйте позже.`;

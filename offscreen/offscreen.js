@@ -1012,6 +1012,7 @@ function parseAccountSnapshot(html) {
     const nameEl = doc.querySelector('.user-link-name');
     if (!out.username && nameEl) out.username = nameEl.textContent.trim();
     out.loggedIn = !!out.username;
+    out.userId = userId ? String(userId) : null;   // истинная идентичность аккаунта (для guard/дедупа)
 
     // аватар: .user-link-photo background-image или img
     const photo = doc.querySelector('.user-link-photo, .avatar-photo');
@@ -1032,6 +1033,9 @@ function parseAccountSnapshot(html) {
         const m = raw.match(/[\d][\d\s.,]*\s*[₽$€]/);
         out.balance = m ? m[0].replace(/\s+/g, ' ').trim() : '';
     }
+    // FunPay прячет бейдж при нулевом балансе: залогинен и бейджа нет → баланс 0
+    // (иначе старое значение никогда не затиралось и показывало чужие/устаревшие суммы).
+    if (!out.balance && out.loggedIn) out.balance = '0 ₽';
 
     // непрочитанные сообщения: бейдж на иконке чата
     const unreadEl = doc.querySelector('.menu-icon-chat .badge, .badge-chat, .menu-item-chat .badge, .chat-counter');

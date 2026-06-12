@@ -5,9 +5,14 @@ const FP_CONFIG_VERSION  = 1;
 const FP_CONFIG_MAGIC    = 'FPTCONFIG';
 
 // Keys to export/import (excludes session data, pinned lots handled separately)
+// ВАЖНО: только РЕАЛЬНЫЕ ключи storage. Раньше тут были несуществующие
+// 'fpToolsCustomTheme'/'fpToolsTemplates'/'fpToolsNotes'/'fpToolsHeaderPosition'/
+// 'headerPositionSelect'/'sendTemplatesImmediately'/'templatePos' → тема, шаблоны и
+// заметки молча НЕ экспортировались/НЕ импортировались. Позиция шапки и настройки
+// шаблонов лежат ВНУТРИ fpToolsTheme / fpToolsTemplateSettings и едут вместе с ними.
 const EXPORT_KEYS = [
     'fpToolsAutoReplies',
-    'fpToolsCustomTheme',
+    'fpToolsTheme',
     'enableCustomTheme',
     'enableRedesignedHomepage',
     'showSalesStats',
@@ -20,19 +25,15 @@ const EXPORT_KEYS = [
     'fpToolsSelectiveBumpEnabled',
     'fpToolsSelectedBumpCategories',
     'fpToolsBumpOnlyAutoDelivery',
-    'fpToolsTemplates',
+    'fpToolsTemplateSettings',
     'fpToolsCursorFx',
     'fpToolsCustomCursor',
-    'sendTemplatesImmediately',
-    'templatePos',
     'fpToolsPiggyBanks',
-    'fpToolsNotes',
+    'fpToolsUserNotes',
     'fpToolsPinnedLots',
     'fpToolsIdentifierEnabled',
-    'fpToolsHeaderPosition',
     'fpToolsPopupPosition',
     'fpToolsPopupSize',
-    'headerPositionSelect',
 ];
 
 async function exportSettings() {

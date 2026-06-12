@@ -227,6 +227,7 @@ ${qaText}
   "titles": ["Лот \"X\" - конкретное новое название вместо старого", "..."],
   "pricing": ["Лот \"X\" - конкретное ценовое действие", "..."],
   "visibility": ["Конкретное действие по поднятию/фото/описанию с названием лота", "..."],
+  "service": ["Конкретное улучшение клиентского сервиса: время выдачи в описании, скорость ответов, гарантии", "..."],
   "summary": "1-2 предложения: главная слабая точка продавца и один главный приоритет"
 }`;
 
@@ -245,7 +246,7 @@ ${qaText}
     const recs = robustParseObject(res.data);
     if (recs) return recs;
     // Fallback: wrap raw text as summary
-    return { summary: res.data.slice(0, 500), critical: [], titles: [], pricing: [], visibility: [], automation: [] };
+    return { summary: res.data.slice(0, 500), critical: [], titles: [], pricing: [], visibility: [], service: [] };
 }
 
 // ── UI helpers ───────────────────────────────────────────────────────────────
@@ -282,7 +283,7 @@ function auditRenderQuestion(index) {
     container.innerHTML = '';
 
     const qText = document.createElement('div');
-    qText.style.cssText = 'font-size:14px;color:#eceef6;margin-bottom:16px;line-height:1.5;font-weight:500;';
+    qText.style.cssText = 'font-size:14px;color:var(--fpt-pTx, #eceef6);margin-bottom:16px;line-height:1.5;font-weight:500;';
     qText.textContent = q.q;
     container.appendChild(qText);
 
@@ -295,13 +296,11 @@ function auditRenderQuestion(index) {
             const btn = document.createElement('button');
             btn.textContent = opt;
             btn.dataset.val = opt;
-            btn.className = 'fp-audit-opt';
-            btn.style.cssText = `flex:1;padding:12px;border:2px solid #22253a;border-radius:8px;background:#1a1c2e;color:#d8dae8;cursor:pointer;font-size:14px;font-family:inherit;transition:all .15s;`;
+            btn.className = 'fp-audit-opt fpt-chip'; // цвета/рамка — из общего класса .fpt-chip
+            btn.style.cssText = `flex:1;justify-content:center;padding:12px;font-size:14px;font-family:inherit;`;
             btn.addEventListener('click', () => {
-                wrap.querySelectorAll('.fp-audit-opt').forEach(b => {
-                    b.style.borderColor = '#22253a'; b.style.background = '#1a1c2e'; b.style.color = '#d8dae8';
-                });
-                btn.style.borderColor = '#5b86d8'; btn.style.background = '#2A1830'; btn.style.color = '#E9A8FF';
+                wrap.querySelectorAll('.fp-audit-opt').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
                 btn.dataset.selected = '1';
             });
             wrap.appendChild(btn);
@@ -320,13 +319,11 @@ function auditRenderQuestion(index) {
             const btn = document.createElement('button');
             btn.textContent = opt;
             btn.dataset.val = opt;
-            btn.className = 'fp-audit-opt';
-            btn.style.cssText = `padding:10px 14px;border:2px solid #22253a;border-radius:8px;background:#1a1c2e;color:#d8dae8;cursor:pointer;font-size:13px;text-align:left;font-family:inherit;transition:all .15s;`;
+            btn.className = 'fp-audit-opt fpt-chip'; // цвета/рамка — из общего класса .fpt-chip
+            btn.style.cssText = `padding:10px 14px;font-size:13px;text-align:left;font-family:inherit;`;
             btn.addEventListener('click', () => {
-                wrap.querySelectorAll('.fp-audit-opt').forEach(b => {
-                    b.style.borderColor = '#22253a'; b.style.background = '#1a1c2e'; b.style.color = '#d8dae8';
-                });
-                btn.style.borderColor = '#5b86d8'; btn.style.background = '#2A1830'; btn.style.color = '#E9A8FF';
+                wrap.querySelectorAll('.fp-audit-opt').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
                 btn.dataset.selected = '1';
             });
             wrap.appendChild(btn);
@@ -347,28 +344,28 @@ function auditRenderQuestion(index) {
             star.textContent = '★';
             star.dataset.val = String(i);
             star.title = labels[i];
-            star.style.cssText = `background:none;border:none;font-size:28px;cursor:pointer;color:#2a2d44;transition:color .1s;padding:0 2px;`;
+            star.style.cssText = `background:none;border:none;font-size:28px;cursor:pointer;color:var(--fpt-pTxFaint, #2a2d44);transition:color .1s;padding:0 2px;`;
             star.addEventListener('click', () => {
                 selectedRating = i;
                 wrap.querySelectorAll('button').forEach((s, idx) => {
-                    s.style.color = idx < i ? '#FFD700' : '#2a2d44';
+                    s.style.color = idx < i ? '#FFD700' : 'var(--fpt-pTxFaint, #2a2d44)';
                 });
             });
             star.addEventListener('mouseenter', () => {
                 const v = parseInt(star.dataset.val);
                 wrap.querySelectorAll('button').forEach((s, idx) => {
-                    s.style.color = idx < v ? '#FFD700' : '#2a2d44';
+                    s.style.color = idx < v ? '#FFD700' : 'var(--fpt-pTxFaint, #2a2d44)';
                 });
             });
             star.addEventListener('mouseleave', () => {
                 wrap.querySelectorAll('button').forEach((s, idx) => {
-                    s.style.color = idx < selectedRating ? '#FFD700' : '#2a2d44';
+                    s.style.color = idx < selectedRating ? '#FFD700' : 'var(--fpt-pTxFaint, #2a2d44)';
                 });
             });
             wrap.appendChild(star);
         }
         const labelEl = document.createElement('span');
-        labelEl.style.cssText = 'font-size:12px;color:#5a5f7a;margin-left:6px;';
+        labelEl.style.cssText = 'font-size:12px;color:var(--fpt-pTxFaint, #5a5f7a);margin-left:6px;';
         wrap.appendChild(labelEl);
         getValue = () => selectedRating ? `${selectedRating}/5 - ${labels[selectedRating]}` : '';
         container.appendChild(wrap);
@@ -377,9 +374,9 @@ function auditRenderQuestion(index) {
         // text (default)
         const ta = document.createElement('textarea');
         ta.placeholder = 'Ваш ответ...';
-        ta.style.cssText = `width:100%;height:80px;background:#0e0f16;border:1px solid #22253a;border-radius:8px;padding:10px;color:#d8dae8;font-size:13px;resize:vertical;outline:none;font-family:inherit;box-sizing:border-box;`;
-        ta.addEventListener('focus', () => ta.style.borderColor = '#5b86d8');
-        ta.addEventListener('blur',  () => ta.style.borderColor = '#22253a');
+        ta.style.cssText = `width:100%;height:80px;background:var(--fpt-pInput, #0e0f16);border:1px solid var(--fpt-pLine, #22253a);border-radius:8px;padding:10px;color:var(--fpt-pTx, #d8dae8);font-size:13px;resize:vertical;outline:none;font-family:inherit;box-sizing:border-box;`;
+        ta.addEventListener('focus', () => ta.style.borderColor = 'var(--fpt-uacc, #5b86d8)');
+        ta.addEventListener('blur',  () => ta.style.borderColor = 'var(--fpt-pLine, #22253a)');
         getValue = () => ta.value.trim();
         container.appendChild(ta);
         setTimeout(() => ta.focus(), 50);
@@ -415,20 +412,20 @@ function auditShowResults(recs) {
         if (!items?.length) return '';
         return `<div style="margin-bottom:16px;">
             <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:${color};margin-bottom:8px;">${title}</div>
-            ${items.map(it => `<div style="background:#0e0f16;border-left:3px solid ${color};border-radius:0 6px 6px 0;padding:8px 12px;margin-bottom:6px;font-size:13px;color:#d8dae8;line-height:1.4;">${it}</div>`).join('')}
+            ${items.map(it => `<div style="background:var(--fpt-p1, #0e0f16);border-left:3px solid ${color};border-radius:0 6px 6px 0;padding:8px 12px;margin-bottom:6px;font-size:13px;color:var(--fpt-pTx, #d8dae8);line-height:1.4;">${it}</div>`).join('')}
         </div>`;
     };
 
     el.innerHTML = `
-        <div style="background:#1a1c2e;border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px;color:#c0c4d8;line-height:1.5;">
-            <strong style="color:#eceef6;">Резюме:</strong><br>${recs.summary || ''}
+        <div style="background:var(--fpt-p2, #1a1c2e);border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px;color:var(--fpt-pTxDim, #c0c4d8);line-height:1.5;">
+            <strong style="color:var(--fpt-pTx, #eceef6);">Резюме:</strong><br>${recs.summary || ''}
         </div>
         ${section('<span class="material-symbols-rounded" style="font-size:13px;vertical-align:-2px;">warning</span> Критично - исправить первым делом', recs.critical, '#e05252')}
         ${section('<span class="material-symbols-rounded" style="font-size:13px;vertical-align:-2px;">edit_note</span> Названия и описания', recs.titles, '#FF6B6B')}
         ${section('<span class="material-symbols-rounded" style="font-size:13px;vertical-align:-2px;">payments</span> Цены', recs.pricing, '#ff9800')}
-        ${section('<span class="material-symbols-rounded" style="font-size:13px;vertical-align:-2px;">search</span> Видимость в поиске', recs.visibility, '#5b86d8')}
+        ${section('<span class="material-symbols-rounded" style="font-size:13px;vertical-align:-2px;">search</span> Видимость в поиске', recs.visibility, 'var(--fpt-uacc, #5b86d8)')}
         ${section('<span class="material-symbols-rounded" style="font-size:13px;vertical-align:-2px;">chat</span> Клиентский сервис', recs.service, '#4caf82')}
-        <button onclick="document.getElementById('fp-audit-start-btn').click()" style="margin-top:10px;background:#1e2030;border:1px solid #22253a;border-radius:6px;padding:8px 16px;color:#9099b8;cursor:pointer;font-size:13px;font-family:inherit;">Начать заново</button>
+        <button onclick="document.getElementById('fp-audit-start-btn').click()" style="margin-top:10px;background:var(--fpt-p2, #1e2030);border:1px solid var(--fpt-pLine, #22253a);border-radius:6px;padding:8px 16px;color:var(--fpt-pTxDim, #9099b8);cursor:pointer;font-size:13px;font-family:inherit;">Начать заново</button>
     `;
 }
 

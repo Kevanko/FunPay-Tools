@@ -228,6 +228,16 @@
         const top = entries.slice(0, 8);
         top.forEach((e, i) => {
             const frac = e.value / total;
+            const col = STATUS_COLORS[e.label] || PALETTE[i % PALETTE.length];
+            const valStr = fmtVal ? fmtVal(e.value) : String(e.value);
+            const ttVal = `${valStr} (${Math.round(frac * 100)}%)`;
+            const legItem = `<div class="fp-sm-leg"><span class="fp-sm-dot" style="background:${col}"></span><span class="fp-sm-leg-label">${esc(e.label)}</span><span class="fp-sm-leg-val">${Math.round(frac * 100)}%</span></div>`;
+            // 100%-сегмент: SVG-дуга с совпадающими концами не рисуется (пустое кольцо) —
+            // рисуем полное кольцо штрихом-окружностью.
+            if (frac >= 0.9999) {
+                paths += `<circle class="fp-sm-seg" cx="${cx}" cy="${cy}" r="${(r + rin) / 2}" fill="none" stroke="${col}" stroke-width="${r - rin}" data-label="${esc(e.label)}" data-val="${esc(ttVal)}" tabindex="0"></circle>`;
+                legend += legItem; acc += frac; return;
+            }
             const a0 = acc * 2 * Math.PI - Math.PI / 2;
             acc += frac;
             const a1 = acc * 2 * Math.PI - Math.PI / 2;
@@ -236,11 +246,8 @@
             const x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
             const xi1 = cx + rin * Math.cos(a1), yi1 = cy + rin * Math.sin(a1);
             const xi0 = cx + rin * Math.cos(a0), yi0 = cy + rin * Math.sin(a0);
-            const col = STATUS_COLORS[e.label] || PALETTE[i % PALETTE.length];
-            const valStr = fmtVal ? fmtVal(e.value) : String(e.value);
-            const ttVal = `${valStr} (${Math.round(frac * 100)}%)`;
             paths += `<path class="fp-sm-seg" d="M${x0},${y0} A${r},${r} 0 ${large} 1 ${x1},${y1} L${xi1},${yi1} A${rin},${rin} 0 ${large} 0 ${xi0},${yi0} Z" fill="${col}" data-label="${esc(e.label)}" data-val="${esc(ttVal)}" tabindex="0"></path>`;
-            legend += `<div class="fp-sm-leg"><span class="fp-sm-dot" style="background:${col}"></span><span class="fp-sm-leg-label">${esc(e.label)}</span><span class="fp-sm-leg-val">${Math.round(frac * 100)}%</span></div>`;
+            legend += legItem;
         });
         return `
         <div class="fp-sm-card">
@@ -256,12 +263,15 @@
         const catEntries = Object.entries(agg.byCategory).map(([k, v]) => ({ label: k, value: v })).sort((a, b) => b.value - a.value);
         const statusLabels = { closed: 'Закрыто', paid: 'Оплачено', refunded: 'Возврат' };
         const statusEntries = Object.entries(agg.byStatus).filter(([, v]) => v > 0).map(([k, v]) => ({ label: statusLabels[k] || k, value: v }));
-        const curEntries = Object.entries(agg.byCurrency).map(([k, v]) => ({ label: k, value: v })).sort((a, b) => b.value - a.value);
+        // Разные валюты НЕЛЬЗЯ складывать как одно число — приводим к рублёвому эквиваленту
+        // (теми же приблизит. курсами, что и aggregate), иначе total и проценты бессмысленны.
+        const SM_RATES = { RUB: 0.011, USD: 1, EUR: 1.08 };
+        const curEntries = Object.entries(agg.byCurrency).map(([k, v]) => ({ label: k, value: Math.round(v * (SM_RATES[k] || 0) / SM_RATES.RUB) })).sort((a, b) => b.value - a.value);
 
         return `<div class="fp-sm-grid">
             ${donut('Заказы по категориям', catEntries)}
             ${donut('Заказы по статусам', statusEntries)}
-            ${donut('Выручка по валютам', curEntries, (v) => Math.round(v).toLocaleString('ru-RU'))}
+            ${donut('Выручка по валютам (≈ ₽)', curEntries, (v) => Math.round(v).toLocaleString('ru-RU') + ' ₽')}
         </div>`;
     }
 
@@ -557,8 +567,24 @@
                 triggerSalesUpdateOnce(); // подтянем данные и перерисуемся по storage.onChanged
                 return;
             }
-            view.innerHTML = `<div class="fp-sm-card">${emptyHTML('Нет данных за период «' + range.label + '» (с учётом фильтров).')}</div>`;
+            // За период пусто, но заказы в хранилище есть — даём очевидный выход:
+            // кнопка переключает штатный селектор периода на «всё время».
+            const periodSel = document.getElementById('fpTools-stats-period');
+            const allTimeBtn = (periodSel && periodSel.value !== 'all')
+                ? `<div style="text-align:center;padding-bottom:14px;">
+                       <button type="button" class="fp-sm-back" id="fp-sm-show-alltime"><span class="material-symbols-rounded">history</span> Показать за всё время (всего заказов: ${totalStored})</button>
+                   </div>`
+                : '';
+            view.innerHTML = `<div class="fp-sm-card">${emptyHTML('Нет данных за период «' + range.label + '» (с учётом фильтров).')}${allTimeBtn}</div>`;
             if (cards) cards.style.display = 'none';
+            const showAll = document.getElementById('fp-sm-show-alltime');
+            if (showAll) showAll.addEventListener('click', () => {
+                if (!periodSel) return;
+                periodSel.value = 'all';
+                // штатный механизм: change-событие пересчитает карточки
+                // (ui_enhancements, там же сохранение периода) и перерисует режим.
+                periodSel.dispatchEvent(new Event('change', { bubbles: true }));
+            });
             return;
         }
         const agg = aggregate(orders);

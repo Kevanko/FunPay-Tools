@@ -41,26 +41,45 @@ function closeCloneWizard() {
 }
 
 function cloneSurfaceColors() {
+    // Сначала переменные темы FP Tools (заданы на :root при включённой кастомной теме),
+    // затем — проба реальных поверхностей страницы; тёмные литералы — крайний случай.
+    const rootCs = getComputedStyle(document.documentElement);
+    const themeVar = (name) => (rootCs.getPropertyValue(name) || '').trim();
+    let bg = themeVar('--fpt-p2'), color = themeVar('--fpt-pTx');
     const pick = (sel) => document.querySelector(sel);
     const candidates = [pick('.content-account'), pick('.content'), pick('.container'), document.body].filter(Boolean);
-    let bg = '', color = '';
     for (const el of candidates) {
+        if (bg && color) break;
         const cs = getComputedStyle(el);
         if (!color) color = cs.color;
-        const b = cs.backgroundColor;
-        if (b && b !== 'rgba(0, 0, 0, 0)' && b !== 'transparent') { bg = b; break; }
+        if (!bg) {
+            const b = cs.backgroundColor;
+            if (b && b !== 'rgba(0, 0, 0, 0)' && b !== 'transparent') bg = b;
+        }
     }
     if (!bg) bg = getComputedStyle(document.body).backgroundColor || '#1e1e1e';
     if (!color) color = getComputedStyle(document.body).color || '#222';
-    let accent = '';
-    const btn = document.querySelector('.btn-primary');
-    if (btn) {
-        const bc = getComputedStyle(btn).backgroundColor;
-        if (bc && bc !== 'rgba(0, 0, 0, 0)' && bc !== 'transparent') accent = bc;
+    let accent = themeVar('--fpt-uacc');
+    if (!accent) {
+        const btn = document.querySelector('.btn-primary');
+        if (btn) {
+            const bc = getComputedStyle(btn).backgroundColor;
+            if (bc && bc !== 'rgba(0, 0, 0, 0)' && bc !== 'transparent') accent = bc;
+        }
     }
     if (!accent) accent = '#1b75bb';
-    const rgb = bg.match(/\d+/g);
-    const lum = rgb ? (0.299 * +rgb[0] + 0.587 * +rgb[1] + 0.114 * +rgb[2]) : 30;
+    // Фон может прийти как hex (переменная темы) или rgb()/rgba() (computed style).
+    let rgb = null;
+    const hex = bg.match(/^#([0-9a-f]{3}|[0-9a-f]{6})\b/i);
+    if (hex) {
+        let h = hex[1];
+        if (h.length === 3) h = h.replace(/./g, '$&$&');
+        rgb = [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16));
+    } else {
+        const m = bg.match(/\d+/g);
+        if (m) rgb = m.slice(0, 3).map(Number);
+    }
+    const lum = rgb ? (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) : 30;
     const isLight = lum > 140;
     return { bg, color, accent, isLight };
 }
@@ -69,16 +88,17 @@ function applyWizardTheme(rootId) {
     const root = document.getElementById(rootId);
     if (!root) return;
     const { bg, color, accent, isLight } = cloneSurfaceColors();
-    const border = isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.12)';
-    const subtle = isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)';
-    const muted = isLight ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.55)';
+    // Линии/тонкие заливки/приглушённый текст — токены темы; литералы — фолбэк при выключенной кастомной теме.
+    const border = `var(--fpt-pLine, ${isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.12)'})`;
+    const subtle = `var(--fpt-p3, ${isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'})`;
+    const muted = `var(--fpt-pTxDim, ${isLight ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.55)'})`;
     
     if (!document.getElementById('fp-wizard-shared-css')) {
         const s = document.createElement('style');
         s.id = 'fp-wizard-shared-css';
         s.textContent = `
             .fp-wizard-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(3px); z-index:10010; justify-content:center; align-items:center; font-family:inherit; }
-            .fp-wizard-container { width:92%; max-width:960px; max-height:90vh; display:flex; flex-direction:column; background:var(--cw-bg); color:var(--cw-color); border:1px solid var(--cw-border); border-radius:14px; box-shadow:0 12px 48px rgba(0,0,0,0.45); overflow:hidden; animation:fpCwPopIn 0.24s cubic-bezier(0.26,0.53,0.74,1.3); }
+            .fp-wizard-container { width:92%; max-width:960px; max-height:90vh; display:flex; flex-direction:column; background:var(--cw-bg); color:var(--cw-color); border:1px solid var(--cw-border); border-radius:14px; box-shadow:0 12px 48px var(--fpt-pShadow, rgba(0,0,0,0.45)); overflow:hidden; animation:fpCwPopIn 0.24s cubic-bezier(0.26,0.53,0.74,1.3); }
         `;
         document.head.appendChild(s);
     }
@@ -89,7 +109,7 @@ function applyWizardTheme(rootId) {
     root.style.setProperty('--cw-border', border);
     root.style.setProperty('--cw-subtle', subtle);
     root.style.setProperty('--cw-muted', muted);
-    root.style.setProperty('--cw-field-bg', isLight ? '#fff' : 'rgba(255,255,255,0.04)');
+    root.style.setProperty('--cw-field-bg', `var(--fpt-pInput, ${isLight ? '#fff' : 'rgba(255,255,255,0.04)'})`);
 }
 
 async function openCloneWizard(offerId) {
@@ -431,7 +451,7 @@ function ensureImportWizardModal() {
             .fp-iw-list-item-title { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
             .fp-iw-list-item-meta { font-size:11px; color:var(--cw-muted); display:flex; justify-content:space-between; }
             .fp-iw-list-item.active { background: color-mix(in srgb, var(--cw-accent) 15%, transparent); border-color: var(--cw-accent); }
-            .fp-iw-search-wrap { padding:15px; border-bottom:1px solid var(--cw-border); background:rgba(0,0,0,0.1); }
+            .fp-iw-search-wrap { padding:15px; border-bottom:1px solid var(--cw-border); background:var(--cw-subtle); }
             .fp-iw-pane { animation: fpCwPopIn 0.15s ease-out; }
             .fp-iw-btn-paste { padding:10px 24px; font-size:14px; }
         `;

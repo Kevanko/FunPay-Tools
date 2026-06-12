@@ -192,10 +192,10 @@
             right: '18px',
             zIndex: '2147483647',
             padding: '10px 14px',
-            border: '1px solid rgba(192, 38, 211, 0.45)',
+            border: '1px solid var(--fpt-uacc-line, rgba(91, 134, 216, 0.45))',
             borderRadius: '8px',
-            background: 'rgba(16, 16, 24, 0.92)',
-            color: '#e9a8ff',
+            background: 'var(--fpt-p2, rgba(16, 16, 24, 0.92))',
+            color: 'var(--fpt-uacc, #7da4e8)',
             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.28)',
             fontWeight: '700',
             cursor: 'pointer'
@@ -497,7 +497,6 @@
         initializeBlacklist();
         initializePaymentTypeBadges();
         initializeUnconfirmedBalanceDisplay();
-        initializeSalesFilters();
         // Apply saved FP Tools button colour/size at load (panel itself builds with popup).
         if (typeof applyHeaderButtonStylesEarly === 'function') applyHeaderButtonStylesEarly();
         // order_page_enhancements.js, lot_context_menu.js, auto_restore_lots.js self-initialize
@@ -523,10 +522,8 @@
                 }
                 return true;
             }
-            if (request.action === 'fpToolsCheckRestoreLots') {
-                setTimeout(checkAndRestoreLots, 5000);
-                return true;
-            }
+            // fpToolsCheckRestoreLots обрабатывается в auto_restore_lots.js (с in-flight guard);
+            // дублирующий обработчик здесь убран, чтобы не запускать проход дважды.
             if (request.action === 'updateAnnouncementsBadge') {
                 updateAnnouncementsBadgeUI(request.unreadCount);
                 return true;
@@ -574,7 +571,7 @@
                     if (!orderEl || orderEl.querySelector('.fp-type-badge')) return;
                     const badge = document.createElement('span');
                     badge.className = 'fp-type-badge';
-                    badge.style.cssText = `display:inline-block;font-size:10px;font-weight:700;border-radius:3px;padding:1px 5px;margin-left:6px;vertical-align:middle;background:${isDeal ? 'rgba(76,175,130,0.15)' : 'rgba(192,38,211,0.15)'};color:${isDeal ? '#4caf82' : '#E9A8FF'};border:1px solid ${isDeal ? 'rgba(76,175,130,0.3)' : 'rgba(192,38,211,0.3)'};`;
+                    badge.style.cssText = `display:inline-block;font-size:10px;font-weight:700;border-radius:3px;padding:1px 5px;margin-left:6px;vertical-align:middle;background:${isDeal ? 'rgba(76,175,130,0.15)' : 'var(--fpt-uacc-soft, rgba(91,134,216,0.15))'};color:${isDeal ? '#4caf82' : 'var(--fpt-uacc, #7da4e8)'};border:1px solid ${isDeal ? 'rgba(76,175,130,0.3)' : 'var(--fpt-uacc-line, rgba(91,134,216,0.3))'};`;
                     badge.textContent = isDeal ? 'Сделка' : 'Обычный';
                     orderEl.appendChild(badge);
                 });
@@ -618,65 +615,9 @@
         });
     }
 
-    // ── 2.9: Sales period filter ──────────────────────────────────────────────
-    function initializeSalesFilters() {
-        const salesSection = document.querySelector('.sales-statistics, #fp-tools-sales-block');
-        if (!salesSection) return;
-        if (document.getElementById('fp-sales-filter-bar')) return;
-
-        const filterBar = document.createElement('div');
-        filterBar.id = 'fp-sales-filter-bar';
-        filterBar.style.cssText = `
-            display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;
-        `;
-
-        const periods = [
-            { label: 'Сегодня',    days: 1   },
-            { label: 'Неделя',     days: 7   },
-            { label: 'Месяц',      days: 30  },
-            { label: '3 месяца',   days: 90  },
-            { label: 'Всё время',  days: 9999 }
-        ];
-
-        periods.forEach((p, i) => {
-            const btn = document.createElement('button');
-            btn.className = 'btn btn-default';
-            btn.style.cssText = 'padding:4px 10px;font-size:11px;font-weight:600;';
-            btn.textContent = p.label;
-            if (i === 2) { // Default: month
-                btn.style.background = '#2A1830';
-                btn.style.color = '#E9A8FF';
-                btn.style.borderColor = '#363a5a';
-            }
-            btn.addEventListener('click', () => {
-                filterBar.querySelectorAll('button').forEach(b => {
-                    b.style.background = '';
-                    b.style.color = '';
-                    b.style.borderColor = '';
-                });
-                btn.style.background = '#2A1830';
-                btn.style.color = '#E9A8FF';
-                btn.style.borderColor = '#363a5a';
-                applySalesPeriodFilter(p.days);
-            });
-            filterBar.appendChild(btn);
-        });
-
-        salesSection.insertBefore(filterBar, salesSection.firstChild);
-    }
-
-    function applySalesPeriodFilter(days) {
-        chrome.storage.local.get('fpToolsSalesData', ({ fpToolsSalesData }) => {
-            if (!fpToolsSalesData) return;
-            const cutoff = days >= 9999 ? 0 : Date.now() - days * 24 * 60 * 60 * 1000;
-            const filtered = Object.values(fpToolsSalesData).filter(o => o.orderDate >= cutoff);
-            const total = filtered.reduce((s, o) => s + (o.price || 0), 0);
-            const countEl = document.getElementById('fp-sales-count');
-            const totalEl = document.getElementById('fp-sales-total');
-            if (countEl) countEl.textContent = filtered.length;
-            if (totalEl) totalEl.textContent = `${Math.round(total).toLocaleString('ru-RU')} ₽`;
-        });
-    }
+    // ── 2.9: Sales period filter — УДАЛЁН: дублировал штатный селектор периода
+    //      панели «Статистика продаж» (#fpTools-stats-period, ui_enhancements.js)
+    //      и никогда не отрисовывался (.sales-statistics не существует на странице).
 
     // ── 2.9: Reset buttons in settings_io page ────────────────────────────────
     // Helper: visually confirm a reset button action
