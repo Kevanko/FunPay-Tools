@@ -22,10 +22,18 @@ const FPT_CLOUD_KEYS = [
     'fpToolsShowPaymentType', 'fpToolsShowUnconfirmed'
 ];
 const FPT_CLOUD_KEYSET = new Set(FPT_CLOUD_KEYS);
-const FPT_CLOUD_THEME_STRIP = ['bgImage', 'bgVideo', 'bgData', 'bgVideoData'];   // wallpaper stays local
-const FPT_CLOUD_VISUAL = ['fpToolsTheme', 'enableCustomTheme', 'fpToolsLiveStyles', 'enableRedesignedHomepage', 'fpToolsCursorFx', 'hideBalance', 'showSalesStats', 'viewSellersPromo', 'fpToolsDisabledFeatures', 'fpToolsHeaderButtonStyles'];
-const FPT_CLOUD_DEBOUNCE_MS = 8000;
-const FPT_CLOUD_INTERVAL_MS = 60000;
+// Локально остаются только видео-обои и крупные бинарники (в облако не влезают:
+// бандл ограничен 256 КБ). Фото-обои (bgImage) синхронизируются — они пережимаются
+// при загрузке (theme.js) под лимит; легаси-фото сверх лимита не пройдёт пуш (413,
+// обрабатывается в _fptCloudPushCAS) и просто останется локальным.
+const FPT_CLOUD_THEME_STRIP = ['bgVideo', 'bgData', 'bgVideoData'];
+// Ключи, эффект которых применяется только при (пере)загрузке страницы — для них
+// показываем подсказку «обновите страницу». Тема/обои применяются ВЖИВУЮ через
+// theme.js (storage.onChanged), поэтому при их смене с другого устройства ни
+// перезагрузка, ни подсказка не нужны — перекрашивается само.
+const FPT_CLOUD_RELOAD_KEYS = ['enableRedesignedHomepage', 'fpToolsDisabledFeatures'];
+const FPT_CLOUD_DEBOUNCE_MS = 1500;     // быстрый пуш изменений (раньше 8000)
+const FPT_CLOUD_INTERVAL_MS = 20000;    // частый pull, пока вкладка видима (раньше 60000)
 const FPT_CLOUD_RETRY_MS = 20000;
 const FPT_CLOUD_SALT = 'fpt-sync-v1';
 
@@ -107,10 +115,12 @@ function _fptCloudMergeFieldTs(into, incoming) {
     Object.keys(incoming || {}).forEach(k => { out[k] = Math.max(out[k] || 0, incoming[k] || 0); });
     return out;
 }
-function _fptCloudVisualDiff(a, b) { return FPT_CLOUD_VISUAL.some(k => _fptCloudStable(a && a[k]) !== _fptCloudStable(b && b[k])); }
-function _fptCloudNotifyVisual() { try { if (typeof showNotification === 'function') showNotification('Настройки обновлены с другого устройства — обновите страницу, чтобы применить тему.', false); } catch (_) {} }
+function _fptCloudReloadDiff(a, b) { return FPT_CLOUD_RELOAD_KEYS.some(k => _fptCloudStable(a && a[k]) !== _fptCloudStable(b && b[k])); }
+function _fptCloudNotifyVisual() { try { if (typeof showNotification === 'function') showNotification('Настройки обновлены с другого устройства — обновите страницу, чтобы применить.', false); } catch (_) {} }
 function _fptCloudNotifyTooLarge() { try { if (typeof showNotification === 'function') showNotification('Слишком много данных для облака — синхронизация настроек этого аккаунта приостановлена.', true); } catch (_) {} }
-function _fptCloudNotifyIfVisual(before, after) { if (_fptCloudVisualDiff(before, after)) _fptCloudNotifyVisual(); }
+// Подсказку про перезагрузку показываем только если поменялись ключи, которым она
+// реально нужна; тему/обои theme.js применяет вживую.
+function _fptCloudNotifyIfReload(before, after) { if (_fptCloudReloadDiff(before, after)) _fptCloudNotifyVisual(); }
 
 // apply merged settings to this device: set survivors, remove tombstoned keys, preserve local
 // wallpaper, and record exactly what we wrote so onChanged can tell our writes from user edits.
@@ -181,7 +191,7 @@ async function _fptCloudPushCAS() {
             const cloudVer = (typeof r.version === 'number') ? r.version : 0;
             const merged = _fptCloudMerge(localS, _fptC.fieldTs, cloud.s, cloud.t);
             const changed = _fptCloudCanonHash(merged.s) !== _fptCloudCanonHash(localS) || merged.del.some(k => Object.prototype.hasOwnProperty.call(localS, k));
-            if (changed) { _fptCloudNotifyIfVisual(localS, merged.s); await _fptCloudApply(merged.s, merged.del); }
+            if (changed) { _fptCloudNotifyIfReload(localS, merged.s); await _fptCloudApply(merged.s, merged.del); }
             _fptC.fieldTs = _fptCloudMergeFieldTs(_fptC.fieldTs, merged.t);
             _fptC.ver = cloudVer; baseVersion = cloudVer; await _fptCloudPersist();
             continue;
@@ -215,8 +225,11 @@ async function _fptCloudReconcile(trigger) {
                 if (pushUp) { _fptC.lastHash = ''; await _fptCloudPersist(); await _fptCloudPushCAS(); }
                 else { _fptC.lastHash = afterHash; await _fptCloudPersist(); }
                 _fptCloudReadyFlag = true;
-                if (changedLocal && trigger === 'load') { setTimeout(() => { try { location.reload(); } catch (_) {} }, 400); return; }
-                if (changedLocal && (trigger === 'focus' || trigger === 'interval') && _fptCloudVisualDiff(localS, merged.s)) _fptCloudNotifyVisual();
+                // Тему/обои _fptCloudApply уже записал в storage → theme.js применил
+                // их вживую. Перезагружаем/подсказываем ТОЛЬКО ради структурных
+                // ключей (редизайн-главная, отключённые функции).
+                if (changedLocal && trigger === 'load' && _fptCloudReloadDiff(localS, merged.s)) { setTimeout(() => { try { location.reload(); } catch (_) {} }, 400); return; }
+                if (changedLocal && (trigger === 'focus' || trigger === 'interval') && _fptCloudReloadDiff(localS, merged.s)) _fptCloudNotifyVisual();
                 return;
             }
 

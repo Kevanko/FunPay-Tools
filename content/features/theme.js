@@ -2,6 +2,52 @@ let bottomBarObserver = null;
 const BOTTOM_BAR_STYLE_ID = 'fp-tools-bottom-bar-style';
 const THEME_OVERRIDE_STYLE_ID = 'fp-tools-theme-override';
 
+// Фото-обои пережимаем под этот предел dataURL, чтобы они влезали в облачный
+// бандл (256 КБ на ВСЕ настройки) и синхронизировались между устройствами.
+// Для фона потеря качества незаметна (картинка под вуалью/блюром).
+const FPT_BG_IMAGE_MAX = 140 * 1024;
+
+function fptFileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = e => resolve(e.target.result);
+        r.onerror = () => reject(new Error('read failed'));
+        r.readAsDataURL(file);
+    });
+}
+
+// Ресайз + JPEG-пережатие фото в dataURL не больше maxBytes. Идём по лесенке
+// «разрешение × качество» от лучшего к худшему и берём первый влезающий вариант;
+// если не влез ни один — возвращаем самый маленький (его подстрахует 413 в облаке).
+function fptCompressImageToDataUrl(file, maxBytes) {
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+            try {
+                URL.revokeObjectURL(url);
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const ladder = [[1920, 0.82], [1920, 0.7], [1600, 0.72], [1440, 0.66], [1280, 0.6], [1080, 0.54], [960, 0.48], [820, 0.44], [680, 0.42]];
+                let smallest = null;
+                for (const [maxDim, q] of ladder) {
+                    const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+                    canvas.width = Math.max(1, Math.round(img.width * scale));
+                    canvas.height = Math.max(1, Math.round(img.height * scale));
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    const out = canvas.toDataURL('image/jpeg', q);
+                    if (out.length <= maxBytes) { resolve(out); return; }
+                    if (!smallest || out.length < smallest.length) smallest = out;
+                }
+                resolve(smallest);
+            } catch (e) { reject(e); }
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('img load failed')); };
+        img.src = url;
+    });
+}
+
 function applyDropupClassForBottomBar() {
     const dropdowns = document.querySelectorAll('#header .navbar-nav > li.dropdown');
     dropdowns.forEach(dd => {
@@ -580,27 +626,30 @@ function setupThemeCustomizationHandlers() {
                  const file = event.target.files[0];
                  if (!file) return;
                  const isVideo = file.type.startsWith('video/');
-                 // chrome.storage.local ограничен ~10 МБ — видео сверх лимита не сохранится
+                 // chrome.storage.local ограничен ~10 МБ — видео сверх лимита не сохранится.
+                 // Видео остаётся ЛОКАЛЬНЫМ (в облако не влезает) — между устройствами не синкается.
                  if (isVideo && file.size > 7 * 1024 * 1024) {
                      showNotification('Видео слишком большое (максимум 7 МБ). Сожмите ролик или используйте GIF.', true);
                      event.target.value = '';
                      return;
                  }
-                 const reader = new FileReader();
-                 reader.onload = async (readEvent) => {
+                 applyAll = false;
+                 try {
                      if (isVideo) {
-                         newSettings.bgVideo = readEvent.target.result;
+                         newSettings.bgVideo = await fptFileToDataUrl(file);
                          newSettings.bgImage = null;
                      } else {
-                         newSettings.bgImage = readEvent.target.result;
+                         // Фото пережимаем под лимит облака → синхронизируется между устройствами.
+                         newSettings.bgImage = await fptCompressImageToDataUrl(file, FPT_BG_IMAGE_MAX);
                          newSettings.bgVideo = null;
                      }
                      await chrome.storage.local.set({ fpToolsTheme: newSettings });
                      applyCustomTheme();
                      updateThemePreview();
-                 };
-                 reader.readAsDataURL(file);
-                 applyAll = false;
+                 } catch (_) {
+                     showNotification('Не удалось обработать изображение.', true);
+                 }
+                 event.target.value = '';
             } else {
                 if (id === 'enableCircleCustomization') {
                     document.getElementById('circleCustomizationControls').style.display = event.target.checked ? 'block' : 'none';
