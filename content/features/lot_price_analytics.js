@@ -13,10 +13,12 @@
 
     const CACHE_TTL = 30 * 60 * 1000;
     const THROTTLE_MS = 700;
+    const PREWARM_MS = 8 * 60 * 1000;   // не чаще раза в 8 мин прогреваем кэш своего профиля
     const _mem = {};                 // catId -> { ts, offers }
     const _queue = [];
     let _pumping = false;
     let _tipEl = null;
+    let _memHydrated = false;
 
     function _catId(href) { const m = String(href || '').match(/\/lots\/(\d+)/); return m ? m[1] : href; }
 
@@ -148,30 +150,117 @@
         document.addEventListener('scroll', _hideTip, true);
     }
 
-    function _analyzeSection(sec) {
-        const href = sec.querySelector('a[href*="/lots/"]')?.href;
-        if (!href) return;
-        _enqueue(async () => {
-            const offers = await _getOffers(href);
-            if (!offers || !offers.length) return;
-            sec.querySelectorAll('a.tc-item').forEach(lot => {
-                const title = (lot.querySelector('.tc-desc-text')?.textContent || '').trim();
-                const rec = (typeof fptRecommendedPrice === 'function') ? fptRecommendedPrice(title, offers) : null;
-                if (rec && rec.recommended) _colorLot(lot, rec);
-            });
+    function _secHref(sec) { return sec.querySelector('a[href*="/lots/"]')?.href || ''; }
+    function _cachedOffers(href) { const e = _mem[_catId(href)]; return (e && e.offers && Date.now() - e.ts < CACHE_TTL) ? e.offers : null; }
+
+    function _colorSection(sec, offers) {
+        if (!offers || !offers.length) return;
+        sec.querySelectorAll('a.tc-item').forEach(lot => {
+            const title = (lot.querySelector('.tc-desc-text')?.textContent || '').trim();
+            const rec = (typeof fptRecommendedPrice === 'function') ? fptRecommendedPrice(title, offers) : null;
+            if (rec && rec.recommended) _colorLot(lot, rec);
         });
+    }
+    // Мгновенно из кэша (без сети), если категория уже прогрета. Вернёт false, если нет.
+    function _analyzeInstant(sec) {
+        const offers = _cachedOffers(_secHref(sec));
+        if (!offers) return false;
+        _colorSection(sec, offers);
+        return true;
+    }
+    // Ленивая/принудительная отрисовка: тянем категорию (кэш или сеть) через очередь.
+    function _analyzeSection(sec) {
+        const href = _secHref(sec); if (!href) return;
+        _enqueue(async () => { _colorSection(sec, await _getOffers(href)); });
+    }
+
+    // Поднимаем storage-кэш в память один раз — чтобы точки рисовались сразу при загрузке.
+    async function _hydrateMem() {
+        if (_memHydrated) return; _memHydrated = true;
+        try {
+            const { fptLotAnalyticsCache: c = {} } = await chrome.storage.local.get('fptLotAnalyticsCache');
+            const now = Date.now();
+            for (const [id, e] of Object.entries(c)) if (e && e.offers && now - e.ts < CACHE_TTL) _mem[id] = e;
+        } catch (_) {}
+    }
+
+    function _catHrefsFromDoc(doc) {
+        const out = [];
+        doc.querySelectorAll('.offer a[href*="/lots/"]').forEach(a => {
+            const h = a.getAttribute('href'); if (!h) return;
+            try { out.push(new URL(h, 'https://funpay.com').href); } catch (_) {}
+        });
+        return [...new Set(out)];
+    }
+
+    // Фоновый прогрев категорий СВОЕГО профиля (по ссылке в шапке) — чтобы на своей
+    // странице точки появлялись моментально. Срабатывает на ЛЮБОЙ странице FunPay,
+    // но не чаще раза в 8 минут; уже закэшированные категории не перезапрашивает.
+    async function _prewarmOwn() {
+        try {
+            const own = document.querySelector('.user-link')?.href || '';
+            if (!/\/users\/\d+\//.test(own)) return;
+            const { fptLotAnalyticsPrewarmTs: ts = 0 } = await chrome.storage.local.get('fptLotAnalyticsPrewarmTs');
+            if (Date.now() - ts < PREWARM_MS) return;
+            await chrome.storage.local.set({ fptLotAnalyticsPrewarmTs: Date.now() });
+            await _hydrateMem();
+            const onOwn = /^\/users\/\d+\//.test(location.pathname) &&
+                location.href.split('#')[0].replace(/\/$/, '') === own.replace(/\/$/, '');
+            let hrefs;
+            if (onOwn) {
+                hrefs = [...new Set([...document.querySelectorAll('.offer a[href*="/lots/"]')].map(a => a.href))];
+            } else {
+                const res = await fetch(own, { credentials: 'include' });
+                if (!res.ok) return;
+                hrefs = _catHrefsFromDoc(new DOMParser().parseFromString(await res.text(), 'text/html'));
+            }
+            hrefs.filter(h => !_cachedOffers(h)).forEach(h => _enqueue(async () => { await _getOffers(h); }));
+        } catch (_) {}
+    }
+
+    // Кнопка «Проверить цены» рядом с лотами: принудительно тянет ВСЕ категории сразу.
+    function _injectCheckButton(sections) {
+        if (document.getElementById('fpt-price-check-btn')) return;
+        const first = sections[0]; if (!first || !first.parentElement) return;
+        const btn = document.createElement('button');
+        btn.id = 'fpt-price-check-btn';
+        btn.type = 'button';
+        btn.className = 'fpt-price-check-btn';
+        const label = '<span class="material-symbols-rounded">price_check</span> Проверить цены';
+        btn.innerHTML = label;
+        btn.addEventListener('click', () => {
+            if (btn.disabled) return;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="material-symbols-rounded fpt-spin">progress_activity</span> Проверяю…';
+            sections.forEach(sec => _analyzeSection(sec));
+            const t = setInterval(() => {
+                if (!_queue.length && !_pumping) {
+                    clearInterval(t);
+                    btn.disabled = false;
+                    btn.innerHTML = '<span class="material-symbols-rounded">check</span> Готово';
+                    setTimeout(() => { btn.innerHTML = label; }, 2200);
+                }
+            }, 400);
+        });
+        first.parentElement.insertBefore(btn, first);
     }
 
     async function init() {
-        if (!/^\/users\/\d+\//.test(location.pathname)) return;
         try { const { fptLotAnalyticsEnabled = true } = await chrome.storage.local.get('fptLotAnalyticsEnabled'); if (fptLotAnalyticsEnabled === false) return; } catch (_) {}
+        _prewarmOwn();                                   // фоновый прогрев своего профиля (любая страница)
+        if (!/^\/users\/\d+\//.test(location.pathname)) return;
         const sections = document.querySelectorAll('.offer');
         if (!sections.length) return;
         _wireTooltip();
+        _injectCheckButton(sections);
+        await _hydrateMem();                             // кэш в память → мгновенная отрисовка
         const io = new IntersectionObserver(entries => {
             entries.forEach(e => { if (e.isIntersecting) { io.unobserve(e.target); _analyzeSection(e.target); } });
         }, { rootMargin: '250px' });
-        sections.forEach(s => io.observe(s));
+        sections.forEach(s => {
+            if (_analyzeInstant(s)) return;              // уже в кэше — нарисовали сразу, без сети
+            io.observe(s);                               // нет — ленивая дозагрузка при прокрутке
+        });
     }
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
