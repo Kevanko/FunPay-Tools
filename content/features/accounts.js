@@ -70,20 +70,30 @@ async function fptCheckPendingAdd() {
     if (!key) return;
     let accts = [];
     try { ({ fpToolsAccounts: accts = [] } = await chrome.storage.local.get('fpToolsAccounts')); } catch (_) { return; }
-    const existing = accts.find(a => a.name === name);
+    const cu = (typeof _fptActiveUser === 'function') ? _fptActiveUser() : null;
+    const uid = (cu && cu.name === name && cu.id) ? String(cu.id) : null;
+    // Текущий аккаунт определяем по userId (надёжнее имени: имя может совпасть у
+    // разных или смениться), с фолбэком на имя.
+    const isMe = a => (uid && a.userId && String(a.userId) === uid) || a.name === name;
+    // Инвариант: один golden_key принадлежит ровно ОДНОМУ аккаунту. Если этот ключ
+    // уже привязан к ДРУГОЙ записи (перепутанное добавление или ротация ключа на
+    // стороне FunPay), снимаем его с неё — иначе у двух аккаунтов один ключ, и
+    // переключение на «не того» владельца ловит «ключ устарел».
+    accts.forEach(a => { if (!isMe(a) && a.key === key) { a.key = ''; a.loginError = true; } });
+    const existing = accts.find(isMe);
     let msg = null;
     if (existing) {
-        // вошли в уже сохранённый аккаунт (передумали / забыли пароль и т.п.)
+        // вошли в уже сохранённый аккаунт (передумали / забыли пароль / ротация ключа)
         const wasError = existing.loginError;
         const keyChanged = existing.key !== key;
         existing.key = key; existing.loginError = false; existing.online = existing.online !== false;
-        { const cu = (typeof _fptActiveUser === 'function') ? _fptActiveUser() : null; if (cu && cu.name === name && cu.id) existing.userId = existing.userId || String(cu.id); }
+        existing.name = name;                          // имя могло смениться
+        if (uid) existing.userId = uid;
         if (wasError) msg = `Вход в «${name}» восстановлен.`;
         else if (keyChanged) msg = `Аккаунт «${name}» обновлён.`;
         // если ничего не изменилось — молча (просто вернулись в свой аккаунт)
-    } else if (!accts.some(a => a.key === key)) {
-        const cu = (typeof _fptActiveUser === 'function') ? _fptActiveUser() : null;
-        accts.push({ name, key, online: true, userId: (cu && cu.name === name && cu.id) ? String(cu.id) : undefined });
+    } else {
+        accts.push({ name, key, online: true, userId: uid || undefined });
         msg = `Аккаунт «${name}» добавлен.`;
     }
     try { await chrome.storage.local.set({ fpToolsAccounts: accts, fptPendingAddAccount: null }); } catch (_) {}
@@ -104,7 +114,18 @@ async function fptCheckSwitchResult() {
     try { ({ fpToolsAccounts: accts = [] } = await chrome.storage.local.get('fpToolsAccounts')); } catch (_) { return; }
     const acc = accts.find(a => a.name === mark.name);
     if (name === mark.name) {
-        if (acc && acc.loginError) { acc.loginError = false; }     // вход удался
+        if (acc) {
+            acc.loginError = false;                                // вход удался
+            // FunPay мог ротировать golden_key при этом входе — обновляем сохранённый
+            // на актуальную куку, чтобы следующее переключение не упёрлось в «устарел»,
+            // и снимаем этот ключ с других записей (один ключ = один аккаунт).
+            try {
+                const r = await chrome.runtime.sendMessage({ action: 'getGoldenKey' });
+                if (r && r.success && r.key) { acc.key = r.key; accts.forEach(a => { if (a !== acc && a.key === r.key) { a.key = ''; a.loginError = true; } }); }
+            } catch (_) {}
+            const cu = (typeof _fptActiveUser === 'function') ? _fptActiveUser() : null;
+            if (cu && cu.name === name && cu.id) acc.userId = String(cu.id);
+        }
     } else {
         if (acc) acc.loginError = true;                            // вход не удался — ключ устарел
         if (typeof showNotification === 'function') showNotification(`Не удалось войти в «${mark.name}» — ключ устарел. Нажмите «Перевойти».`, true);
