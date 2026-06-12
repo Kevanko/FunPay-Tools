@@ -235,6 +235,24 @@ async function renderAccountsList() {
         }
     } catch (_) {}
 
+    // одноразовое лечение кросс-контаминации аватара/баланса: если у РАЗНЫХ аккаунтов
+    // (по userId) совпал аватар — это след старого бага с общим golden_key (оба сняли
+    // один профиль). Форсим пере-снимок: каждый под СВОИМ ключом → аватары/балансы
+    // разъедутся. Флаг _avHealTried не даёт зациклиться, если снимок не помог.
+    try {
+        const byAv = {};
+        fpToolsAccounts.forEach(a => { if (a && a.key && a.avatar) (byAv[a.avatar] = byAv[a.avatar] || []).push(a); });
+        let needHeal2 = false;
+        Object.values(byAv).forEach(grp => {
+            const uids = new Set(grp.map(a => a.userId).filter(Boolean));
+            if (grp.length > 1 && uids.size > 1) grp.forEach(a => { if (!a._avHealTried) { a._snapTs = 0; a._avHealTried = true; a.avatar = ''; a.balance = ''; needHeal2 = true; } });
+        });
+        if (needHeal2 && _fptAlive()) {
+            await chrome.storage.local.set({ fpToolsAccounts });
+            setTimeout(() => { try { if (typeof maybeAutoRefreshAccounts === 'function') maybeAutoRefreshAccounts(); } catch (_) {} }, 300);
+        }
+    } catch (_) {}
+
     const currentUsernameEl = document.querySelector('.user-link-name');
     const currentUsername = currentUsernameEl ? currentUsernameEl.textContent.trim() : null;
 
