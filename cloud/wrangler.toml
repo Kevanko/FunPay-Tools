@@ -1,0 +1,10 @@
+name = "fpt-sync"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+# Free-tier D1 only. No R2, no KV, no paid bindings.
+# Fill database_id after: wrangler d1 create fpt-sync
+[[d1_databases]]
+binding = "DB"
+database_name = "fpt-sync"
+database_id = "72ece7aa-bf0b-4c49-815c-17311ff8d830"

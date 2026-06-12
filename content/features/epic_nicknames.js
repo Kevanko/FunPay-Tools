@@ -35,21 +35,22 @@
             return;
         }
 
+        let serverMap = {}, cloudMap = {};
         try {
-            const response = await new Promise(resolve => {
-                chrome.runtime.sendMessage({ action: 'fetchDonaters' }, resolve);
-            });
+            const response = await new Promise(resolve => chrome.runtime.sendMessage({ action: 'fetchDonaters' }, resolve));
+            if (response && response.success && typeof response.data === 'object') serverMap = response.data;
+        } catch (e) { console.error('FPT Epic Nicks: Error fetching data', e); }
+        // кастомные ники, опубликованные пользователями расширения — видны всем
+        try {
+            const r = await new Promise(resolve => chrome.runtime.sendMessage({ action: 'fptNickFetchAll' }, resolve));
+            if (r && r.ok && r.map && typeof r.map === 'object') cloudMap = r.map;
+        } catch (_) {}
 
-            if (response && response.success && typeof response.data === 'object') {
-                donatersMap = response.data;
-                await chrome.storage.local.set({
-                    [CACHE_KEY]: donatersMap,
-                    [CACHE_TIME_KEY]: now
-                });
-            }
-        } catch (e) {
-            console.error('FPT Epic Nicks: Error fetching data', e);
-            donatersMap = cache[CACHE_KEY] || {}; // Fallback
+        if (Object.keys(serverMap).length || Object.keys(cloudMap).length) {
+            donatersMap = { ...cloudMap, ...serverMap };   // официальные донатеры приоритетнее; облако только ДОБАВЛЯЕТ новые ники (нельзя переопределить чужой)
+            await chrome.storage.local.set({ [CACHE_KEY]: donatersMap, [CACHE_TIME_KEY]: now });
+        } else {
+            donatersMap = cache[CACHE_KEY] || {};          // fallback на кэш
         }
     }
 
@@ -63,6 +64,23 @@
     function hexToRgbObj(hex) {
         let r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
         return {r,g,b};
+    }
+
+    // Жёсткая валидация стиля ника ПЕРЕД вставкой в <style>. Реестр ников публичный и
+    // открыт на запись — без этого через c1/ang/spd/scl можно было инъектировать
+    // произвольный глобальный CSS всем пользователям расширения.
+    function _fptSanitizeNickCfg(c) {
+        if (!c || typeof c !== 'object') return null;
+        const hex = v => (typeof v === 'string' && /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(v)) ? v : null;
+        const num = (v, lo, hi, d) => { let n = Number(v); if (!isFinite(n)) n = d; return Math.min(hi, Math.max(lo, n)); };
+        const c1 = hex(c.c1), c2 = hex(c.c2);
+        if (!c1 || !c2) return null;
+        const out = { c1, c2, ang: num(c.ang, 0, 360, 90), spd: num(c.spd, 0.1, 60, 3), scl: num(c.scl, 10, 1000, 100) };
+        const c3 = hex(c.c3); if (c3) out.c3 = c3;
+        const ALLOWED = ['glow', 'pulse', 'wave', 'glitch'];
+        const raw = Array.isArray(c.an) ? c.an : (c.an ? [c.an] : []);
+        out.an = raw.filter(a => ALLOWED.includes(a));
+        return out;
     }
 
     function injectGlobalCSS() {
@@ -90,7 +108,8 @@
         for (const [nick, key] of Object.entries(donatersMap)) {
             if (!key || !key.startsWith('FPT-STYLE-')) continue;
             try {
-                const cfg = JSON.parse(atob(key.split('FPT-STYLE-')[1]));
+                const cfg = _fptSanitizeNickCfg(JSON.parse(atob(key.split('FPT-STYLE-')[1])));
+                if (!cfg) continue;   // невалидные значения → не применяем (защита от CSS-инъекции)
                 parsedConfigs[nick] = cfg;
                 
                 const clsName = `fpt-nick-${hashStr(nick)}`;
@@ -428,7 +447,12 @@
             await chrome.storage.local.set({ [MY_NICK_KEY]: { nick, cfg } });
             registerNickStyle(nick, cfg);
             scanDOM(document.body);
-            if (typeof showNotification === 'function') showNotification('Оформление ника применено!');
+            // публикуем свой стиль ника в облако — его увидят ВСЕ пользователи расширения
+            try {
+                const u = (typeof _fptActiveUser === 'function') ? _fptActiveUser() : null;
+                if (u && u.id && donatersMap[nick]) chrome.runtime.sendMessage({ action: 'fptNickPublish', id: 'u_' + u.id, nick, style: donatersMap[nick] });
+            } catch (_) {}
+            if (typeof showNotification === 'function') showNotification('Оформление ника применено! Его увидят все пользователи расширения.');
         });
 
         // убрать
@@ -436,6 +460,8 @@
             const { [MY_NICK_KEY]: saved } = await chrome.storage.local.get(MY_NICK_KEY);
             await chrome.storage.local.remove(MY_NICK_KEY);
             if (saved && saved.nick) { delete donatersMap[saved.nick]; delete parsedConfigs[saved.nick]; injectGlobalCSS(); }
+            // снимаем публикацию из облака
+            try { const u = (typeof _fptActiveUser === 'function') ? _fptActiveUser() : null; if (u && u.id) chrome.runtime.sendMessage({ action: 'fptNickPublish', id: 'u_' + u.id, nick: '', style: '' }); } catch (_) {}
             // снять обёртки на странице
             document.querySelectorAll('.fpt-epic-wrap').forEach(w => {
                 if ((w.querySelector('.fpt-epic-text')?.textContent || '') === (saved && saved.nick)) {

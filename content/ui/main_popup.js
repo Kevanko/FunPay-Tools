@@ -54,15 +54,15 @@ function createMainPopup() {
         s.id = 'fp-popup-extra-styles';
         s.textContent = `
             .fp-tools-site-link{color:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:11px;transition:all .25s ease;position:relative;}
-            .fp-tools-site-link::after{content:'';position:absolute;left:0;bottom:-2px;width:0;height:2px;background:linear-gradient(90deg,#5b86d8,#8ea7df);transition:width .3s ease;border-radius:2px;}
-            .fp-tools-site-link:hover{background:linear-gradient(90deg,#5b86d8,#8ea7df,#5b86d8);background-size:200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:fp-shimmer 1.2s linear infinite;}
+            .fp-tools-site-link::after{content:'';position:absolute;left:0;bottom:-2px;width:0;height:2px;background:linear-gradient(90deg,var(--fpt-uacc,#5b86d8),color-mix(in srgb,var(--fpt-uacc,#5b86d8) 60%,#fff));transition:width .3s ease;border-radius:2px;}
+            .fp-tools-site-link:hover{background:linear-gradient(90deg,var(--fpt-uacc,#5b86d8),color-mix(in srgb,var(--fpt-uacc,#5b86d8) 60%,#fff),var(--fpt-uacc,#5b86d8));background-size:200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:fp-shimmer 1.2s linear infinite;}
             .fp-tools-site-link:hover::after{width:100%;}
             @keyframes fp-shimmer{0%{background-position:0%}100%{background-position:200%}}
             .fp-wallpaper-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px;}
-            .fp-wallpaper-card:hover{box-shadow:0 0 0 2px #5b86d8,0 4px 16px rgba(91,134,216,.3);}
+            .fp-wallpaper-card:hover{box-shadow:0 0 0 2px var(--fpt-uacc,#5b86d8),0 4px 16px var(--fpt-uacc-line,rgba(91,134,216,.3));}
             .fp-wallpaper-card img{pointer-events:none;}
-            .fp-site-footer-link{display:inline-flex;align-items:center;gap:6px;padding:6px 16px;border:1px solid rgba(91,134,216,.35);border-radius:20px;color:#7fa1df;text-decoration:none;font-size:12px;font-weight:600;letter-spacing:.5px;transition:all .2s;}
-            .fp-site-footer-link:hover{background:rgba(91,134,216,.12);border-color:#5b86d8;color:#a9bde6;transform:translateY(-1px);box-shadow:0 4px 12px rgba(91,134,216,.2);}
+            .fp-site-footer-link{display:inline-flex;align-items:center;gap:6px;padding:6px 16px;border:1px solid var(--fpt-uacc-line,rgba(91,134,216,.35));border-radius:20px;color:var(--fpt-uacc,#7fa1df);text-decoration:none;font-size:12px;font-weight:600;letter-spacing:.5px;transition:all .2s;}
+            .fp-site-footer-link:hover{background:var(--fpt-uacc-soft,rgba(91,134,216,.12));border-color:var(--fpt-uacc,#5b86d8);color:var(--fpt-uacc,#a9bde6);transform:translateY(-1px);box-shadow:0 4px 12px var(--fpt-uacc-soft,rgba(91,134,216,.2));}
             .fp-nav-divider{padding:10px 16px 3px!important;font-size:10px!important;font-weight:700!important;color:var(--fpt-text-faint, #3a3d52)!important;text-transform:uppercase;letter-spacing:1px;cursor:default!important;pointer-events:none;margin-top:10px!important;}
             .fp-nav-divider:first-child{margin-top:0!important;}
             .fp-nav-divider:hover{background:none!important;}
@@ -190,7 +190,7 @@ function createMainPopup() {
                         <div id="fptCustomSoundEditor" style="display:none;margin-top:8px;">
                             <div id="fptWaveWrap" style="position:relative;height:64px;background:var(--fpt-bg-deep, #070810);border:1px solid var(--fpt-line-strong, #22253a);border-radius:8px;overflow:hidden;user-select:none;cursor:pointer;">
                                 <canvas id="fptWaveCanvas" style="position:absolute;inset:0;width:100%;height:100%;"></canvas>
-                                <div id="fptWaveSel" style="position:absolute;top:0;bottom:0;background:rgba(91,134,216,0.18);border-left:2px solid #5b86d8;border-right:2px solid #5b86d8;box-sizing:border-box;"></div>
+                                <div id="fptWaveSel" style="position:absolute;top:0;bottom:0;background:var(--fpt-uacc-soft,rgba(91,134,216,0.18));border-left:2px solid var(--fpt-uacc,#5b86d8);border-right:2px solid var(--fpt-uacc,#5b86d8);box-sizing:border-box;"></div>
                                 <div id="fptWavePlayhead" style="position:absolute;top:0;bottom:0;width:2px;background:#d2a85e;display:none;"></div>
                                 <div id="fptWaveSelHandleL" style="position:absolute;top:0;bottom:0;width:8px;margin-left:-4px;cursor:ew-resize;"></div>
                                 <div id="fptWaveSelHandleR" style="position:absolute;top:0;bottom:0;width:8px;margin-left:-4px;cursor:ew-resize;"></div>
@@ -514,10 +514,10 @@ function createMainPopup() {
                         <div class="fpt-appx-block">
                             <div class="fpt-appx-cap">Заливка</div>
                             <div class="fpt-seg fpt-seg-fill" data-fpt-opt="fill">
-                                <button type="button" data-val="solid" title="Сплошная"><span class="fpt-fill-prev" style="background:#5b86d8;"></span><span class="fpt-fill-name">Сплошная</span></button>
-                                <button type="button" data-val="soft" title="Мягкая"><span class="fpt-fill-prev" style="background:rgba(91,134,216,.22);"></span><span class="fpt-fill-name">Мягкая</span></button>
-                                <button type="button" data-val="outline" title="Контур"><span class="fpt-fill-prev" style="background:transparent;border:2px solid #5b86d8;"></span><span class="fpt-fill-name">Контур</span></button>
-                                <button type="button" data-val="ghost" title="Призрачная"><span class="fpt-fill-prev" style="background:transparent;border:1px dashed #5b86d8;"></span><span class="fpt-fill-name">Призрак</span></button>
+                                <button type="button" data-val="solid" title="Сплошная"><span class="fpt-fill-prev" style="background:var(--fpt-uacc,#5b86d8);"></span><span class="fpt-fill-name">Сплошная</span></button>
+                                <button type="button" data-val="soft" title="Мягкая"><span class="fpt-fill-prev" style="background:var(--fpt-uacc-soft,rgba(91,134,216,.22));"></span><span class="fpt-fill-name">Мягкая</span></button>
+                                <button type="button" data-val="outline" title="Контур"><span class="fpt-fill-prev" style="background:transparent;border:2px solid var(--fpt-uacc,#5b86d8);"></span><span class="fpt-fill-name">Контур</span></button>
+                                <button type="button" data-val="ghost" title="Призрачная"><span class="fpt-fill-prev" style="background:transparent;border:1px dashed var(--fpt-uacc,#5b86d8);"></span><span class="fpt-fill-name">Призрак</span></button>
                             </div>
                         </div>
 
@@ -554,7 +554,7 @@ function createMainPopup() {
                                 <button type="button" data-val="flow" title="Авто-сетка (по ширине)">Авто-сетка</button>
                                 <button type="button" data-val="list" title="Список (в столбик)">Список</button>
                             </div>
-                            <div class="fpt-align-hint" style="display:block;color:#6b7194;">«Авто-сетка» умно раскладывает кнопки по ширине панели, как на скрине.</div>
+                            <div class="fpt-align-hint" style="display:block;color:var(--fpt-text-faint, #6b7194);">«Авто-сетка» умно раскладывает кнопки по ширине панели, как на скрине.</div>
                         </div>
 
                         <div class="fpt-appx-block">
@@ -736,7 +736,7 @@ function createMainPopup() {
                     <p class="template-info">Измените название, описание или сообщение покупателю сразу у нескольких лотов.</p>
                     <button id="fp-bulk-edit-btn" class="btn btn-default" style="width:auto;padding:8px 16px;"><span class="material-symbols-rounded" style="font-size:16px;vertical-align:-3px;margin-right:5px;">edit</span>Массово изменить лоты</button>
 
-                    <a href="#" id="convert-cardinal-lots-btn" style="display: block; text-align: center; margin-top: 25px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 13px; color: #a0a0a0; text-decoration: underline;">Конвертер лотов из внешнего формата</a>
+                    <a href="#" id="convert-cardinal-lots-btn" style="display: block; text-align: center; margin-top: 25px; padding-top: 15px; border-top: 1px solid var(--fpt-line, rgba(255,255,255,0.1)); font-size: 13px; color: var(--fpt-text-dim, #a0a0a0); text-decoration: underline;">Конвертер лотов из внешнего формата</a>
 
                     <h4 style="margin-top: 30px;">Незавершённые импорты</h4>
                     <div id="lot-io-pending-imports-list">
@@ -789,7 +789,7 @@ function createMainPopup() {
                     <div class="fpt-eyebrow fpt-blocklabel">Свои обои</div>
                     <div class="template-container">
                         <label>Фото или видео-обои:</label>
-                        <div id="bg-image-preview" style="width:100%; height:60px; background-color: var(--fpt-surface-2, rgba(0,0,0,0.2)); border:1px solid rgba(255,255,255,0.1); border-radius:8px; margin-bottom:10px; background-size:cover; background-position:center; display:flex; align-items:center; justify-content:center; color: #888; font-size:12px;">Нет файла</div>
+                        <div id="bg-image-preview" style="width:100%; height:60px; background-color: var(--fpt-surface-2, rgba(0,0,0,0.2)); border:1px solid var(--fpt-line, rgba(255,255,255,0.1)); border-radius:8px; margin-bottom:10px; background-size:cover; background-position:center; display:flex; align-items:center; justify-content:center; color: var(--fpt-text-faint, #888); font-size:12px;">Нет файла</div>
                         <button id="uploadBgImageBtn" class="btn" title="Фото, GIF или видео до 7 МБ (mp4/webm)">Загрузить</button>
                         <button id="removeBgImageBtn" class="btn btn-default" style="margin-left: 10px;">Удалить</button>
                         <input type="file" id="bgImageInput" accept="image/*,image/gif,video/mp4,video/webm" style="display: none;">
@@ -924,7 +924,7 @@ function createMainPopup() {
 
                     <div class="fpt-eyebrow fpt-blocklabel" style="margin-top:22px;">Свой курсор</div>
                     <div class="checkbox-label-inline"><input type="checkbox" id="customCursorEnabled"><label for="customCursorEnabled" style="margin-bottom:0;"><span>Включить своё изображение курсора</span></label></div>
-                    <div id="customCursorControls" style="display: none;"><div class="template-container"><label>Изображение курсора:</label><div id="cursor-image-preview" style="width:64px; height:64px; background-color: var(--fpt-surface-2, rgba(0,0,0,0.2)); border:1px solid rgba(255,255,255,0.1); border-radius:8px; margin-bottom:10px; background-size:contain; background-position:center; background-repeat: no-repeat; display:flex; align-items:center; justify-content:center; color: #888; font-size:12px;">Нет</div><button id="uploadCursorImageBtn" class="btn">Загрузить</button><button id="removeCursorImageBtn" class="btn btn-default" style="margin-left: 10px;">Удалить</button><input type="file" id="cursorImageInput" accept="image/*" style="display: none;"></div><div class="checkbox-label-inline"><input type="checkbox" id="hideSystemCursor" checked><label for="hideSystemCursor" style="margin-bottom:0;"><span>Скрыть системный курсор</span></label></div><div class="template-container"><div class="range-label"><label for="customCursorSize">Размер:</label><span id="customCursorSizeValue">32px</span></div><input type="range" id="customCursorSize" min="16" max="128" step="1" value="32"></div><div class="template-container"><div class="range-label"><label for="customCursorOpacity">Прозрачность:</label><span id="customCursorOpacityValue">100%</span></div><input type="range" id="customCursorOpacity" min="0" max="100" step="1" value="100"></div></div>
+                    <div id="customCursorControls" style="display: none;"><div class="template-container"><label>Изображение курсора:</label><div id="cursor-image-preview" style="width:64px; height:64px; background-color: var(--fpt-surface-2, rgba(0,0,0,0.2)); border:1px solid var(--fpt-line, rgba(255,255,255,0.1)); border-radius:8px; margin-bottom:10px; background-size:contain; background-position:center; background-repeat: no-repeat; display:flex; align-items:center; justify-content:center; color: var(--fpt-text-faint, #888); font-size:12px;">Нет</div><button id="uploadCursorImageBtn" class="btn">Загрузить</button><button id="removeCursorImageBtn" class="btn btn-default" style="margin-left: 10px;">Удалить</button><input type="file" id="cursorImageInput" accept="image/*" style="display: none;"></div><div class="checkbox-label-inline"><input type="checkbox" id="hideSystemCursor" checked><label for="hideSystemCursor" style="margin-bottom:0;"><span>Скрыть системный курсор</span></label></div><div class="template-container"><div class="range-label"><label for="customCursorSize">Размер:</label><span id="customCursorSizeValue">32px</span></div><input type="range" id="customCursorSize" min="16" max="128" step="1" value="32"></div><div class="template-container"><div class="range-label"><label for="customCursorOpacity">Прозрачность:</label><span id="customCursorOpacityValue">100%</span></div><input type="range" id="customCursorOpacity" min="0" max="100" step="1" value="100"></div></div>
                 </div>
                 <div class="fp-tools-page-content" data-page="overview">
                     <div class="overview-container"><h3 style="border:none">Видео-обзор функций</h3><p class="template-info">Посмотрите короткий кинематографический ролик, демонстрирующий все возможности FP Tools в действии. Откройте для себя инструменты, о которых вы могли не знать!</p><div class="overview-promo-art"></div><button id="start-overview-tour-btn" class="btn"><span class="material-symbols-rounded" style="font-size:18px;vertical-align:-4px;margin-right:6px;">play_arrow</span>Начать обзор</button></div>
@@ -954,7 +954,7 @@ function createMainPopup() {
                             <span id="fp-audit-skip" style="font-size:11px;color:var(--fpt-text-faint, #3a3d52);cursor:pointer;" onclick="document.getElementById('fp-audit-next-btn')?.click()">Пропустить →</span>
                         </div>
                         <div style="height:4px;background:var(--fpt-line, #1e2030);border-radius:2px;margin-bottom:16px;overflow:hidden;">
-                            <div id="fp-audit-progress-bar" style="height:100%;background:#5b86d8;width:0;transition:width .3s;border-radius:2px;"></div>
+                            <div id="fp-audit-progress-bar" style="height:100%;background:var(--fpt-uacc, #5b86d8);width:0;transition:width .3s;border-radius:2px;"></div>
                         </div>
                         <div id="fp-audit-q-container" style="min-height:120px;"></div>
                         <div style="display:flex;gap:8px;margin-top:16px;">
@@ -991,6 +991,20 @@ function createMainPopup() {
                     </div>
                     <p class="template-info">Файл сохраняется с расширением <code>.fpconfig</code>. Импорт перезагрузит страницу.</p>
 
+                    <h3 style="margin-top:24px;">Облачная синхронизация <span style="font-size:11px;opacity:.6;font-weight:400;">(Cloudflare, бесплатно)</span></h3>
+                    <p class="template-info">Привязывает настройки к аккаунту FunPay: при входе они подтягиваются автоматически, без кодов. Синхронизируются тема (цвета и пресет), авто-ответы, шаблоны, ключевые слова, приветствие, тумблеры. Обои, кастомные звуки и пароли НЕ загружаются. Правки между устройствами объединяются по полям.</p>
+                    <label style="display:flex;align-items:center;gap:10px;margin-bottom:12px;cursor:pointer;">
+                        <input type="checkbox" id="fpt-cloud-toggle" style="width:16px;height:16px;">
+                        <span>Синхронизировать настройки с аккаунтом</span>
+                    </label>
+                    <div id="fpt-cloud-panel" style="display:none;flex-direction:column;gap:10px;margin-bottom:20px;">
+                        <div style="display:flex;gap:12px;">
+                            <button id="fpt-cloud-push-btn" class="btn" style="flex:1;"><span class="material-symbols-rounded" style="font-size:16px;vertical-align:-3px;margin-right:5px;">cloud_upload</span>Отправить сейчас</button>
+                            <button id="fpt-cloud-pull-btn" class="btn btn-default" style="flex:1;"><span class="material-symbols-rounded" style="font-size:16px;vertical-align:-3px;margin-right:5px;">cloud_download</span>Загрузить из облака</button>
+                        </div>
+                        <p class="template-info" id="fpt-cloud-status" style="margin:2px 0 0;opacity:.85;"></p>
+                    </div>
+
                     <h3 style="margin-top:24px;">Сброс данных</h3>
                     <p class="template-info">Удалить только определённые данные, не затрагивая остальные настройки.</p>
                     <div style="display:flex;flex-direction:column;gap:8px;">
@@ -999,17 +1013,17 @@ function createMainPopup() {
                         <button id="fp-reset-greeted-btn" class="btn btn-default" style="width:auto;padding:8px 14px;">Сбросить список поприветствованных чатов</button>
                         <button id="fp-reset-april-btn" class="btn btn-default" style="width:auto;padding:8px 14px;">Сбросить счётчик даты</button>
                     </div>
-                    <div style="margin-top:24px;text-align:center;border-top:1px solid rgba(255,255,255,0.06);padding-top:16px;">
+                    <div style="margin-top:24px;text-align:center;border-top:1px solid var(--fpt-line, rgba(255,255,255,0.06));padding-top:16px;">
                         <a href="https://funpay.tools" target="_blank" class="fp-site-footer-link"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:-2px;margin-right:4px;">link</span>funpay.tools</a>
                     </div>
                 </div>
 
                 <div class="fp-tools-page-content" data-page="blacklist">
                     <h3>Чёрный список покупателей</h3>
-                    <p class="template-info">Добавьте ненадёжных покупателей. Вы сможете заблокировать на них автоматизаию и уведомления.</p>
+                    <p class="template-info">Добавьте ненадёжных покупателей — для них отключатся автоматизация и уведомления.</p>
                     <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;">
-                        <input type="text" id="fp-bl-name-input" placeholder="Имя пользователя FunPay" style="background:var(--fpt-bg-deep, #0e0f16);border:1px solid var(--fpt-line-strong, #22253a);border-radius:6px;padding:8px;color:#d8dae8;font-size:13px;outline:none;">
-                        <input type="text" id="fp-bl-note-input" placeholder="Причина (необязательно)" style="background:var(--fpt-bg-deep, #0e0f16);border:1px solid var(--fpt-line-strong, #22253a);border-radius:6px;padding:8px;color:#d8dae8;font-size:13px;outline:none;">
+                        <input type="text" id="fp-bl-name-input" placeholder="Имя пользователя FunPay" style="background:var(--fpt-bg-deep, #0e0f16);border:1px solid var(--fpt-line-strong, #22253a);border-radius:6px;padding:8px;color:var(--fpt-text, #d8dae8);font-size:13px;outline:none;">
+                        <input type="text" id="fp-bl-note-input" placeholder="Причина (необязательно)" style="background:var(--fpt-bg-deep, #0e0f16);border:1px solid var(--fpt-line-strong, #22253a);border-radius:6px;padding:8px;color:var(--fpt-text, #d8dae8);font-size:13px;outline:none;">
                         <button id="fp-bl-add-btn" class="btn btn-default">+ Добавить в ЧС</button>
                     </div>
                     <div id="fp-bl-list"></div>
@@ -1042,27 +1056,27 @@ function createMainPopup() {
                     <style>
                         #fp-tickets-list::-webkit-scrollbar{width:4px}
                         #fp-tickets-list::-webkit-scrollbar-track{background:transparent}
-                        #fp-tickets-list::-webkit-scrollbar-thumb{background:#2a2d44;border-radius:4px}
+                        #fp-tickets-list::-webkit-scrollbar-thumb{background:var(--fpt-surface-3, #2a2d44);border-radius:4px}
                         #fp-ticket-confirm-text::-webkit-scrollbar{width:4px}
-                        #fp-ticket-confirm-text::-webkit-scrollbar-thumb{background:#2a2d44;border-radius:4px}
+                        #fp-ticket-confirm-text::-webkit-scrollbar-thumb{background:var(--fpt-surface-3, #2a2d44);border-radius:4px}
                         #fp-ticket-age-hours::-webkit-inner-spin-button,#fp-ticket-age-hours::-webkit-outer-spin-button,
                         #fp-ticket-max-orders::-webkit-inner-spin-button,#fp-ticket-max-orders::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
                         #fp-ticket-age-hours,#fp-ticket-max-orders{-moz-appearance:textfield}
                         .fp-tkt-card{background:var(--fpt-surface, #0d0e18);border:1px solid var(--fpt-surface-2, #1a1c2e);border-radius:8px;padding:10px 12px;cursor:pointer;transition:border-color .15s,background .15s;}
-                        .fp-tkt-card:hover{border-color:#5b86d8;background:#11162a;}
+                        .fp-tkt-card:hover{border-color:var(--fpt-uacc, #5b86d8);background:var(--fpt-surface-2, #11162a);}
                         .fp-tkt-status{display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.3px;}
                         #fp-new-ticket-fields::-webkit-scrollbar{width:4px}
                         #fp-new-ticket-fields::-webkit-scrollbar-track{background:transparent}
-                        #fp-new-ticket-fields::-webkit-scrollbar-thumb{background:#2a2d44;border-radius:4px}
-                        .fp-field-input{width:100%;background:var(--fpt-surface, #0d0e18);border:1px solid var(--fpt-surface-2, #1a1c2e);border-radius:6px;color:#d8dae8;padding:7px 10px;font-size:13px;box-sizing:border-box;outline:none;transition:border-color .15s;}
-                        .fp-field-input:focus{border-color:#5b86d8;}
-                        .fp-field-input option{background:var(--fpt-surface, #0d0e18);color:#d8dae8;}
+                        #fp-new-ticket-fields::-webkit-scrollbar-thumb{background:var(--fpt-surface-3, #2a2d44);border-radius:4px}
+                        .fp-field-input{width:100%;background:var(--fpt-surface, #0d0e18);border:1px solid var(--fpt-surface-2, #1a1c2e);border-radius:6px;color:var(--fpt-text, #d8dae8);padding:7px 10px;font-size:13px;box-sizing:border-box;outline:none;transition:border-color .15s;}
+                        .fp-field-input:focus{border-color:var(--fpt-uacc, #5b86d8);}
+                        .fp-field-input option{background:var(--fpt-surface, #0d0e18);color:var(--fpt-text, #d8dae8);}
                     </style>
 
                     <!-- Header -->
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
                         <h3 style="margin:0;font-size:15px;">Техподдержка FunPay</h3>
-                        <button id="fp-ticket-refresh-btn" title="Обновить" style="background:none;border:none;color:var(--fpt-text-faint, #5a5f7a);cursor:pointer;font-size:16px;padding:2px 6px;transition:color .15s;" onmouseover="this.style.color='#d8dae8'" onmouseout="this.style.color='var(--fpt-text-faint, #5a5f7a)'">↻</button>
+                        <button id="fp-ticket-refresh-btn" title="Обновить" style="background:none;border:none;color:var(--fpt-text-faint, #5a5f7a);cursor:pointer;font-size:16px;padding:2px 6px;transition:color .15s;" onmouseover="this.style.color='var(--fpt-text, #d8dae8)'" onmouseout="this.style.color='var(--fpt-text-faint, #5a5f7a)'">↻</button>
                     </div>
 
                     <!-- Auto ticket block -->
@@ -1070,11 +1084,11 @@ function createMainPopup() {
                         <div style="font-weight:600;font-size:13px;margin-bottom:5px;color:var(--fpt-text);"><span class="material-symbols-rounded" style="font-size:15px;vertical-align:-3px;margin-right:5px;color:var(--fpt-uacc,#5b86d8);">mail</span>Подтверждение заказов</div>
                         <p style="font-size:12px;color:var(--fpt-text-muted,#6a7090);margin:0 0 10px;line-height:1.5;">FunPay не всегда подтверждает заказы автоматически. Кнопка ниже соберёт все ваши неподтверждённые заказы и отправит заявку в ТП с просьбой их подтвердить — вручную делать не надо.</p>
                         <div style="display:flex;gap:10px;margin-bottom:10px;">
-                            <label style="font-size:11px;color:#6a7090;display:flex;flex-direction:column;gap:3px;flex:1;">
+                            <label style="font-size:11px;color:var(--fpt-text-dim, #6a7090);display:flex;flex-direction:column;gap:3px;flex:1;">
                                 Возраст заказа (ч)
                                 <input type="number" id="fp-ticket-age-hours" min="1" max="168" value="24" class="fp-field-input" style="padding:5px 8px;font-size:12px;">
                             </label>
-                            <label style="font-size:11px;color:#6a7090;display:flex;flex-direction:column;gap:3px;flex:1;">
+                            <label style="font-size:11px;color:var(--fpt-text-dim, #6a7090);display:flex;flex-direction:column;gap:3px;flex:1;">
                                 Заказов в заявке (макс)
                                 <input type="number" id="fp-ticket-max-orders" min="1" max="20" value="5" class="fp-field-input" style="padding:5px 8px;font-size:12px;">
                             </label>
@@ -1097,52 +1111,52 @@ function createMainPopup() {
                     <div id="fp-tickets-loading" style="text-align:center;color:var(--fpt-text-faint, #3a3d52);font-size:12px;padding:14px 0;">Загрузка...</div>
 
                     <!-- Ticket detail panel -->
-                    <div id="fp-ticket-detail-panel" style="display:none;position:absolute;inset:0;background:#111318;z-index:20;box-sizing:border-box;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+                    <div id="fp-ticket-detail-panel" style="display:none;position:absolute;inset:0;background:var(--fpt-bg, #111318);z-index:20;box-sizing:border-box;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
                         <style>
                             #fp-tdm::-webkit-scrollbar{width:3px}
-                            #fp-tdm::-webkit-scrollbar-thumb{background:#2a2d3a;border-radius:3px}
-                            #fp-tri{outline:none;caret-color:#5b86d8;background:#23243a !important;border:none !important;box-shadow:none !important;border-radius:0 !important;padding:0 !important;margin:0 !important;}
+                            #fp-tdm::-webkit-scrollbar-thumb{background:var(--fpt-surface-3, #2a2d3a);border-radius:3px}
+                            #fp-tri{outline:none;caret-color:var(--fpt-uacc, #5b86d8);background:var(--fpt-surface-2, #23243a) !important;border:none !important;box-shadow:none !important;border-radius:0 !important;padding:0 !important;margin:0 !important;}
                             #fp-tri::-webkit-scrollbar{width:2px}
-                            #fp-tri::-webkit-scrollbar-thumb{background:#2a2d3a;}
+                            #fp-tri::-webkit-scrollbar-thumb{background:var(--fpt-surface-3, #2a2d3a);}
                             .fp-msg-img{max-width:100%;border-radius:8px;margin-top:4px;display:block;cursor:pointer;}
                         </style>
                         <!-- Top bar -->
-                        <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#1a1b22;flex-shrink:0;border-bottom:1px solid #0d0e14;">
-                            <button id="fp-ticket-detail-back" style="all:unset;position:relative;overflow:hidden;color:#5b86d8;cursor:pointer;font-size:22px;line-height:1;padding:2px 6px 2px 0;flex-shrink:0;">&#8249;</button>
-                            <div id="fp-tkt-av" style="width:32px;height:32px;border-radius:50%;background:#23243a;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#5b86d8;overflow:hidden;"></div>
+                        <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--fpt-bg-deep, #1a1b22);flex-shrink:0;border-bottom:1px solid var(--fpt-line, #0d0e14);">
+                            <button id="fp-ticket-detail-back" style="all:unset;position:relative;overflow:hidden;color:var(--fpt-uacc, #5b86d8);cursor:pointer;font-size:22px;line-height:1;padding:2px 6px 2px 0;flex-shrink:0;">&#8249;</button>
+                            <div id="fp-tkt-av" style="width:32px;height:32px;border-radius:50%;background:var(--fpt-surface-2, #23243a);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--fpt-uacc, #5b86d8);overflow:hidden;"></div>
                             <div style="flex:1;min-width:0;">
-                                <div id="fp-ticket-detail-title" style="font-size:14px;font-weight:600;color:#e8eaf0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;"></div>
+                                <div id="fp-ticket-detail-title" style="font-size:14px;font-weight:600;color:var(--fpt-text, #e8eaf0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;"></div>
                                 <div id="fp-ticket-detail-status" style="font-size:11px;margin-top:1px;line-height:1;"></div>
                             </div>
                         </div>
                         <!-- Messages -->
-                        <div id="fp-tdm" style="flex:1;overflow-y:auto;padding:10px 10px 6px;display:flex;flex-direction:column;gap:3px;background:#111318;"></div>
+                        <div id="fp-tdm" style="flex:1;overflow-y:auto;padding:10px 10px 6px;display:flex;flex-direction:column;gap:3px;background:var(--fpt-bg, #111318);"></div>
                         <!-- Attach preview -->
-                        <div id="fp-tapr" style="display:none;flex-shrink:0;padding:6px 12px 0;background:#1a1b22;">
+                        <div id="fp-tapr" style="display:none;flex-shrink:0;padding:6px 12px 0;background:var(--fpt-bg-deep, #1a1b22);">
                             <div style="position:relative;display:inline-block;">
-                                <img id="fp-tath" style="height:48px;border-radius:6px;border:1px solid #2a2d3a;display:block;" src="" alt="">
-                                <button id="fp-tarm" style="all:unset;position:absolute;top:-5px;right:-5px;background:#2a2d3a;border-radius:50%;width:16px;height:16px;color:var(--fpt-text-dim, #9099b8);font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">&#x2715;</button>
+                                <img id="fp-tath" style="height:48px;border-radius:6px;border:1px solid var(--fpt-line-strong, #2a2d3a);display:block;" src="" alt="">
+                                <button id="fp-tarm" style="all:unset;position:absolute;top:-5px;right:-5px;background:var(--fpt-surface-3, #2a2d3a);border-radius:50%;width:16px;height:16px;color:var(--fpt-text-dim, #9099b8);font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">&#x2715;</button>
                             </div>
                         </div>
                         <!-- Input bar -->
-                        <div id="fp-tria" style="display:none;flex-shrink:0;align-items:flex-end;gap:6px;padding:6px 10px 8px;background:#111318;">
-                            <label id="fp-attach-lbl" style="all:unset;display:flex;align-items:center;justify-content:center;width:34px;height:34px;cursor:pointer;color:#4a4f6a;flex-shrink:0;" title="Прикрепить">
+                        <div id="fp-tria" style="display:none;flex-shrink:0;align-items:flex-end;gap:6px;padding:6px 10px 8px;background:var(--fpt-bg, #111318);">
+                            <label id="fp-attach-lbl" style="all:unset;display:flex;align-items:center;justify-content:center;width:34px;height:34px;cursor:pointer;color:var(--fpt-text-faint, #4a4f6a);flex-shrink:0;" title="Прикрепить">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
                                 <input type="file" id="fp-ticket-attach-input" accept="image/*" style="display:none;">
                             </label>
-                            <div style="flex:1;background:#23243a;border-radius:20px;padding:7px 14px;display:flex;align-items:flex-end;min-height:36px;box-sizing:border-box;">
-                                <textarea id="fp-tri" placeholder="Сообщение..." style="all:unset;-webkit-appearance:none;appearance:none;width:100%;color:#e8eaf0;font-size:13px;line-height:1.45;height:20px;max-height:90px;overflow-y:hidden;font-family:inherit;display:block;resize:none;background:#23243a !important;" rows="1"></textarea>
+                            <div style="flex:1;background:var(--fpt-surface-2, #23243a);border-radius:20px;padding:7px 14px;display:flex;align-items:flex-end;min-height:36px;box-sizing:border-box;">
+                                <textarea id="fp-tri" placeholder="Сообщение..." style="all:unset;-webkit-appearance:none;appearance:none;width:100%;color:var(--fpt-text, #e8eaf0);font-size:13px;line-height:1.45;height:20px;max-height:90px;overflow-y:hidden;font-family:inherit;display:block;resize:none;background:var(--fpt-surface-2, #23243a) !important;" rows="1"></textarea>
                             </div>
-                            <button id="fp-ticket-reply-btn" style="all:unset;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:#5b86d8;cursor:pointer;flex-shrink:0;">
+                            <button id="fp-ticket-reply-btn" style="all:unset;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:var(--fpt-uacc, #5b86d8);cursor:pointer;flex-shrink:0;">
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="#fff" style="margin-left:2px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
                             </button>
                         </div>
                     </div>
                     <!-- Confirm overlay -->
-                    <div id="fp-ticket-confirm-overlay" style="display:none;position:absolute;inset:0;background:rgba(5,6,12,0.96);z-index:10;border-radius:8px;padding:18px;box-sizing:border-box;flex-direction:column;gap:10px;">
+                    <div id="fp-ticket-confirm-overlay" style="display:none;position:absolute;inset:0;background:var(--fpt-bg, rgba(5,6,12,0.96));z-index:10;border-radius:8px;padding:18px;box-sizing:border-box;flex-direction:column;gap:10px;">
                         <div style="font-weight:600;font-size:14px;">Проверьте заявку перед отправкой</div>
-                        <div style="font-size:11px;color:#6a7090;">Именно это будет отправлено в техподдержку FunPay:</div>
-                        <div id="fp-ticket-confirm-text" style="background:var(--fpt-surface, #0d0e18);border:1px solid var(--fpt-surface-2, #1a1c2e);border-radius:6px;padding:10px;font-size:12px;color:#c8cadc;white-space:pre-wrap;flex:1;overflow-y:auto;min-height:80px;max-height:180px;line-height:1.5;"></div>
+                        <div style="font-size:11px;color:var(--fpt-text-dim, #6a7090);">Именно это будет отправлено в техподдержку FunPay:</div>
+                        <div id="fp-ticket-confirm-text" style="background:var(--fpt-surface, #0d0e18);border:1px solid var(--fpt-surface-2, #1a1c2e);border-radius:6px;padding:10px;font-size:12px;color:var(--fpt-text-dim, #c8cadc);white-space:pre-wrap;flex:1;overflow-y:auto;min-height:80px;max-height:180px;line-height:1.5;"></div>
                         <div style="display:flex;gap:8px;margin-top:2px;">
                             <button id="fp-ticket-confirm-yes" class="btn" style="flex:1;font-size:13px;">Отправить</button>
                             <button id="fp-ticket-confirm-no" class="btn btn-default" style="flex:1;font-size:13px;">Отмена</button>
@@ -1150,13 +1164,13 @@ function createMainPopup() {
                     </div>
 
                     <!-- New ticket panel (slides in from bottom) -->
-                    <div id="fp-new-ticket-panel" style="display:none;position:absolute;inset:0;background:#0a0b14;z-index:20;border-radius:0;box-sizing:border-box;flex-direction:column;overflow:hidden;">
+                    <div id="fp-new-ticket-panel" style="display:none;position:absolute;inset:0;background:var(--fpt-bg, #0a0b14);z-index:20;border-radius:0;box-sizing:border-box;flex-direction:column;overflow:hidden;">
                         <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px 8px;border-bottom:1px solid var(--fpt-surface-2, #1a1c2e);flex-shrink:0;">
                             <span style="font-weight:600;font-size:14px;">Новая заявка</span>
-                            <button id="fp-new-ticket-close" style="background:none;border:none;color:var(--fpt-text-faint, #5a5f7a);cursor:pointer;font-size:18px;padding:0 4px;line-height:1;" onmouseover="this.style.color='#d8dae8'" onmouseout="this.style.color='var(--fpt-text-faint, #5a5f7a)'">✕</button>
+                            <button id="fp-new-ticket-close" style="background:none;border:none;color:var(--fpt-text-faint, #5a5f7a);cursor:pointer;font-size:18px;padding:0 4px;line-height:1;" onmouseover="this.style.color='var(--fpt-text, #d8dae8)'" onmouseout="this.style.color='var(--fpt-text-faint, #5a5f7a)'">✕</button>
                         </div>
                         <div id="fp-new-ticket-fields" style="display:flex;flex-direction:column;gap:6px;flex:1;overflow-y:auto;padding:10px 14px;"></div>
-                        <div style="flex-shrink:0;padding:8px 14px 12px;border-top:1px solid var(--fpt-surface-2, #1a1c2e);background:#0a0b14;">
+                        <div style="flex-shrink:0;padding:8px 14px 12px;border-top:1px solid var(--fpt-surface-2, #1a1c2e);background:var(--fpt-bg, #0a0b14);">
                             <button id="fp-new-ticket-submit" class="btn" style="width:100%;font-size:13px;">Далее →</button>
                         </div>
                     </div>
@@ -1223,7 +1237,7 @@ function setupPopupNavigation() {
             if (typeof fptInjectSectionCopy === 'function') fptInjectSectionCopy(pageId);
             if (pageId === 'epic_nicks') { if (typeof setupEpicEditor === 'function') setupEpicEditor(); }
             if (pageId === 'currency_calc') initializeCurrencyCalculator();
-            if (pageId === 'settings_io') { if (typeof fptSetupProfileSettingsUI === 'function') fptSetupProfileSettingsUI(); }
+            if (pageId === 'settings_io') { if (typeof fptSetupProfileSettingsUI === 'function') fptSetupProfileSettingsUI(); if (typeof fptCloudInitUI === 'function') fptCloudInitUI(); }
             if (pageId === 'notes') { if (typeof initializeNotes === 'function') initializeNotes(); }
             if (pageId === 'global_chat') { if (typeof initializeGlobalChat === 'function') initializeGlobalChat(); }
             if (pageId === 'templates') { if (typeof setupTemplateSettingsHandlers === 'function') setupTemplateSettingsHandlers(); }

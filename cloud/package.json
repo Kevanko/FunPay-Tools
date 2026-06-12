@@ -1,0 +1,13 @@
+{
+  "name": "fpt-sync",
+  "private": true,
+  "version": "1.0.0",
+  "description": "FunPay Tools cloud settings sync — Cloudflare Worker + D1",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "schema": "wrangler d1 execute fpt-sync --remote --file=./schema.sql"
+  },
+  "devDependencies": {
+    "wrangler": "^4.100.0"
+  }
+}

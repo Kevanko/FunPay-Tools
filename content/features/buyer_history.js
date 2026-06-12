@@ -168,10 +168,10 @@ function stopRealtimeTranslation() {
     s.textContent = `
         .fp-trans-divider {
             margin: 5px 0 4px;
-            border-top: 1px solid rgba(255,255,255,0.08);
+            border-top: 1px solid var(--fpt-pLine, rgba(255,255,255,0.08));
         }
         .fp-trans-text {
-            color: rgba(200,202,220,0.55);
+            color: var(--fpt-pTxDim, rgba(200,202,220,0.55));
             font-size: 0.92em;
             line-height: 1.4;
             word-break: break-word;

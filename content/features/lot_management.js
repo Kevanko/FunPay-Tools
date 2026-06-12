@@ -406,7 +406,7 @@ function setupActionProcessing() {
     }
 
     function updateLog(message, isError = false) {
-        $logElement.text(message).css('color', isError ? '#ff6b6b' : '#ccc');
+        $logElement.text(message).css('color', isError ? '#ff6b6b' : 'var(--fpt-pTxDim, #ccc)');
     }
 
     function toggleActions(disabled) {
@@ -791,7 +791,7 @@ async function reactivateLot(offerId, nodeId, button) {
             $(button).closest('.fp-reactivate-item').fadeOut(300, function() { 
                 $(this).remove();
                 if ($('.fp-reactivate-list').children().length === 0) {
-                    $('.fp-reactivate-list').html('<li style="text-align:center; color:#888;">Нет отключенных лотов (которые вы отключали через выбор лотов от расширения).</li>');
+                    $('.fp-reactivate-list').html('<li style="text-align:center; color:var(--fpt-pTxDim, #888);">Нет отключенных лотов (которые вы отключали через выбор лотов от расширения).</li>');
                 }
             });
             if (typeof showNotification === 'function') showNotification('Лот включен!', false);
@@ -965,7 +965,7 @@ async function showReactivationPopup() {
     list.empty();
     
     if (fpToolsDeactivatedLots.length === 0) {
-        list.html('<li style="text-align:center; color:#888;">Нет отключенных лотов. (которые вы отключали через выбор лотов от расширения)</li>');
+        list.html('<li style="text-align:center; color:var(--fpt-pTxDim, #888);">Нет отключенных лотов. (которые вы отключали через выбор лотов от расширения)</li>');
     } else {
         fpToolsDeactivatedLots.sort((a, b) => b.deactivatedAt - a.deactivatedAt).forEach(lot => {
             const date = new Date(lot.deactivatedAt).toLocaleString();

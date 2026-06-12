@@ -16,6 +16,9 @@ function initializeBlacklist() {
 
     if (!addBtn) return;
 
+    let _blSaveChain = Promise.resolve();   // сериализация записей: быстрые переключения не теряются
+    const _blEsc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
     async function render() {
         const { fpToolsBlacklist = [] } = await chrome.storage.local.get('fpToolsBlacklist');
         if (!listEl) return;
@@ -32,38 +35,42 @@ function initializeBlacklist() {
                     ${entry.note ? `<span style="color:#7a7f9a; font-weight:normal; font-size:11px; margin-left:6px;">(${entry.note})</span>` : ''}
                 </span>
                 <label title="Блокировать авто-выдачу" style="display:flex;align-items:center;gap:4px;font-size:11px;color:#5a5f7a;cursor:pointer;">
-                    <input type="checkbox" class="fp-bl-delivery" data-idx="${i}" ${entry.blockDelivery ? 'checked' : ''} style="accent-color:#e05252;"> Выдача
+                    <input type="checkbox" class="fp-bl-delivery" data-username="${_blEsc(entry.username)}" ${entry.blockDelivery ? 'checked' : ''} style="accent-color:#e05252;"> Выдача
                 </label>
                 <label title="Блокировать авто-ответы" style="display:flex;align-items:center;gap:4px;font-size:11px;color:#5a5f7a;cursor:pointer;">
-                    <input type="checkbox" class="fp-bl-response" data-idx="${i}" ${entry.blockResponse ? 'checked' : ''} style="accent-color:#e05252;"> Ответы
+                    <input type="checkbox" class="fp-bl-response" data-username="${_blEsc(entry.username)}" ${entry.blockResponse ? 'checked' : ''} style="accent-color:#e05252;"> Ответы
                 </label>
-                <label title="Блокировать уведомления" style="display:flex;align-items:center;gap:4px;font-size:11px;color:#5a5f7a;cursor:pointer;">
-                    <input type="checkbox" class="fp-bl-notif" data-idx="${i}" ${entry.blockNotification ? 'checked' : ''} style="accent-color:#e05252;"> Уведом.
-                </label>
-                <button class="btn btn-default fp-bl-remove" data-idx="${i}" style="padding:3px 8px;font-size:11px;flex-shrink:0;">✕</button>
+                <button class="btn btn-default fp-bl-remove" data-username="${_blEsc(entry.username)}" style="padding:3px 8px;font-size:11px;flex-shrink:0;">✕</button>
             </div>
         `).join('');
 
-        listEl.querySelectorAll('.fp-bl-delivery, .fp-bl-response, .fp-bl-notif').forEach(cb => {
-            cb.addEventListener('change', async () => {
-                const { fpToolsBlacklist: bl = [] } = await chrome.storage.local.get('fpToolsBlacklist');
-                const idx = parseInt(cb.dataset.idx, 10);
-                if (!bl[idx]) return;
-                if (cb.classList.contains('fp-bl-delivery'))  bl[idx].blockDelivery     = cb.checked;
-                if (cb.classList.contains('fp-bl-response'))  bl[idx].blockResponse     = cb.checked;
-                if (cb.classList.contains('fp-bl-notif'))     bl[idx].blockNotification = cb.checked;
-                await chrome.storage.local.set({ fpToolsBlacklist: bl });
+        listEl.querySelectorAll('.fp-bl-delivery, .fp-bl-response').forEach(cb => {
+            cb.addEventListener('change', () => {
+                const uname = cb.dataset.username;
+                const which = cb.classList.contains('fp-bl-delivery') ? 'blockDelivery' : 'blockResponse';
+                const val = cb.checked;
+                // по username (массив мог сдвинуться) и сериализованно — иначе быстрые
+                // переключения читали один устаревший снимок и теряли часть изменений.
+                _blSaveChain = _blSaveChain.then(async () => {
+                    const { fpToolsBlacklist: bl = [] } = await chrome.storage.local.get('fpToolsBlacklist');
+                    const ent = bl.find(e => e && e.username === uname);
+                    if (!ent) return;
+                    ent[which] = val;
+                    await chrome.storage.local.set({ fpToolsBlacklist: bl });
+                }).catch(() => {});
             });
         });
 
         listEl.querySelectorAll('.fp-bl-remove').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const { fpToolsBlacklist: bl = [] } = await chrome.storage.local.get('fpToolsBlacklist');
-                const idx = parseInt(btn.dataset.idx, 10);
-                bl.splice(idx, 1);
-                await chrome.storage.local.set({ fpToolsBlacklist: bl });
-                await render();
-                showNotification('Удалено из чёрного списка');
+            btn.addEventListener('click', () => {
+                const uname = btn.dataset.username;
+                _blSaveChain = _blSaveChain.then(async () => {
+                    const { fpToolsBlacklist: bl = [] } = await chrome.storage.local.get('fpToolsBlacklist');
+                    const next = bl.filter(e => !(e && e.username === uname));
+                    await chrome.storage.local.set({ fpToolsBlacklist: next });
+                    await render();
+                    showNotification('Удалено из чёрного списка');
+                }).catch(() => {});
             });
         });
     }

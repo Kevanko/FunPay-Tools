@@ -1,3 +1,5 @@
+function _fpAdEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
 function initAutoDeliveryUI() {
     const page = document.querySelector('.fp-tools-page-content[data-page="auto_delivery"]');
     if (!page || page.dataset.initialized) return;
@@ -54,25 +56,25 @@ function renderDeliveryLots(lots, config, container) {
     Object.entries(byCategory).forEach(([cat, catLots]) => {
         const catEl = document.createElement('div');
         catEl.style.cssText = 'margin-bottom:16px;';
-        catEl.innerHTML = `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#4a4f68;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #1e2030;">${cat}</div>`;
+        catEl.innerHTML = `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--fpt-text-faint, #4a4f68);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--fpt-line, #1e2030);">${_fpAdEsc(cat)}</div>`;
 
         catLots.forEach(lot => {
             const lotConfig = config[String(lot.id)] || {};
             const item = document.createElement('div');
             item.style.cssText = `
-                background:#0e0f16;border:1px solid #1e2030;border-radius:8px;
+                background:var(--fpt-bg-deep, #0e0f16);border:1px solid var(--fpt-line, #1e2030);border-radius:8px;
                 padding:12px;margin-bottom:8px;
             `;
 
             item.innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                    <span style="font-size:13px;font-weight:600;color:#d8dae8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%;">${lot.title}</span>
+                    <span style="font-size:13px;font-weight:600;color:var(--fpt-text, #d8dae8);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%;">${_fpAdEsc(lot.title)}</span>
                     <div style="display:flex;gap:6px;align-items:center;">
-                        <span class="fp-ad-product-count" data-lot-id="${lot.id}" style="font-size:11px;color:#5a5f7a;">
+                        <span class="fp-ad-product-count" data-lot-id="${lot.id}" style="font-size:11px;color:var(--fpt-text-faint, #5a5f7a);">
                             ${lotConfig.productCount !== undefined ? `${lotConfig.productCount} шт.` : ''}
                         </span>
-                        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#5a5f7a;cursor:pointer;">
-                            <input type="checkbox" class="fp-ad-enabled" data-lot-id="${lot.id}" ${lotConfig.enabled ? 'checked' : ''} style="accent-color:#C026D3;">
+                        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--fpt-text-faint, #5a5f7a);cursor:pointer;">
+                            <input type="checkbox" class="fp-ad-enabled" data-lot-id="${lot.id}" ${lotConfig.enabled ? 'checked' : ''} style="accent-color:var(--fpt-accent, #5b86d8);">
                             Авто-выдача
                         </label>
                     </div>
@@ -91,14 +93,14 @@ function renderDeliveryLots(lots, config, container) {
                     <div class="fp-ad-template-area" data-lot-id="${lot.id}" style="display:${lotConfig.mode === 'template' ? 'block' : 'none'};">
                         <textarea class="template-input fp-ad-template-text" data-lot-id="${lot.id}"
                             placeholder="Текст выдачи. Переменные: {buyername}, {orderid}, {orderlink}, $sleep=3&#10;Для нескольких товаров используйте $sleep=2 между ними."
-                            style="height:80px;">${lotConfig.text || ''}</textarea>
+                            style="height:80px;">${_fpAdEsc(lotConfig.text || '')}</textarea>
                     </div>
                     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
-                        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#5a5f7a;cursor:pointer;">
+                        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--fpt-text-faint, #5a5f7a);cursor:pointer;">
                             <input type="checkbox" class="fp-ad-auto-restore" data-lot-id="${lot.id}" ${lotConfig.autoRestoreEnabled !== false ? 'checked' : ''} style="accent-color:#4caf82;">
                             Авто-восстановление
                         </label>
-                        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#5a5f7a;cursor:pointer;">
+                        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--fpt-text-faint, #5a5f7a);cursor:pointer;">
                             <input type="checkbox" class="fp-ad-auto-disable" data-lot-id="${lot.id}" ${lotConfig.autoDisableEnabled !== false ? 'checked' : ''} style="accent-color:#e05252;">
                             Авто-деактивация при пустом складе
                         </label>
@@ -145,7 +147,14 @@ function renderDeliveryLots(lots, config, container) {
     });
 }
 
-async function autoSaveDeliveryLot(lotId, container) {
+let _fpAdSaveChain = Promise.resolve();
+function autoSaveDeliveryLot(lotId, container) {
+    // Сериализуем сохранения: два быстрых переключения чекбоксов не должны прочитать
+    // один и тот же устаревший снимок и потерять настройки другого лота.
+    _fpAdSaveChain = _fpAdSaveChain.then(() => _fpAdDoSave(lotId, container)).catch(() => {});
+    return _fpAdSaveChain;
+}
+async function _fpAdDoSave(lotId, container) {
     const { fpToolsAutoDeliveryLots = {} } = await chrome.storage.local.get('fpToolsAutoDeliveryLots');
 
     const enabledEl = container.querySelector(`.fp-ad-enabled[data-lot-id="${lotId}"]`);
@@ -154,14 +163,18 @@ async function autoSaveDeliveryLot(lotId, container) {
     const restoreEl = container.querySelector(`.fp-ad-auto-restore[data-lot-id="${lotId}"]`);
     const disableEl = container.querySelector(`.fp-ad-auto-disable[data-lot-id="${lotId}"]`);
 
+    const prev = fpToolsAutoDeliveryLots[String(lotId)] || {};
     fpToolsAutoDeliveryLots[String(lotId)] = {
-        enabled:           enabledEl?.checked ?? false,
-        mode:              modeEl?.value || 'secrets',
-        text:              textEl?.value || '',
+        enabled:            enabledEl?.checked ?? false,
+        mode:               modeEl?.value || 'secrets',
+        text:               textEl?.value || '',
         autoRestoreEnabled: restoreEl?.checked !== false,
         autoDisableEnabled: disableEl?.checked !== false,
-        productCount:      fpToolsAutoDeliveryLots[String(lotId)]?.productCount ?? 0,
-        updatedAt:         Date.now()
+        // НЕ пишем фантомный productCount:0 — реального учёта склада нет, а 0 раньше
+        // приводил к авто-деактивации лотов С ТОВАРОМ. Сохраняем только реальное значение.
+        ...(prev.productCount !== undefined ? { productCount: prev.productCount } : {}),
+        ...(prev.stockCheckedAt !== undefined ? { stockCheckedAt: prev.stockCheckedAt } : {}),
+        updatedAt:          Date.now()
     };
 
     await chrome.storage.local.set({ fpToolsAutoDeliveryLots });

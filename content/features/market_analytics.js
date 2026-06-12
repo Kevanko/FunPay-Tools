@@ -70,24 +70,30 @@ function runMarketAnalysis() {
         return;
     }
     const prices = [];
-    const sellers = new Set();
-    let sellersWithReviews = 0;
-    let onlineSellers = 0;
+    const sellers = new Map(); // ключ — продавец (href или имя), значение — { hasReviews, isOnline }
     lots.forEach(lot => {
         const price = parseFloat(lot.querySelector('.tc-price')?.dataset.s);
         if (!isNaN(price)) {
             prices.push(price);
         }
-        const sellerName = lot.querySelector('.media-user-name span')?.textContent.trim();
-        if (sellerName) {
-            sellers.add(sellerName);
+        const sellerEl = lot.querySelector('.media-user-name span');
+        const sellerKey = sellerEl?.dataset.href || sellerEl?.textContent.trim();
+        if (sellerKey) {
+            const info = sellers.get(sellerKey) || { hasReviews: false, isOnline: false };
+            if (lot.querySelector('.rating-mini-count')) {
+                info.hasReviews = true;
+            }
+            if (lot.querySelector('.media-user.online')) {
+                info.isOnline = true;
+            }
+            sellers.set(sellerKey, info);
         }
-        if (lot.querySelector('.rating-mini-count')) {
-            sellersWithReviews++;
-        }
-        if (lot.querySelector('.media-user.online')) {
-            onlineSellers++;
-        }
+    });
+    let sellersWithReviews = 0;
+    let onlineSellers = 0;
+    sellers.forEach(info => {
+        if (info.hasReviews) sellersWithReviews++;
+        if (info.isOnline) onlineSellers++;
     });
     if (prices.length === 0) {
         showNotification('Не удалось извлечь цены из лотов.', true);

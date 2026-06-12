@@ -257,8 +257,11 @@ async function initializeAutoReviewUI() {
             
             await chrome.storage.local.set({ fpToolsAutoReplies });
             renderKeywordsList(keywords);
-            // if we were editing the deleted (or a shifted) rule, reset the form
+            // если редактировали удалённое правило — сброс формы; если удалили правило
+            // ПЕРЕД редактируемым, индексы сдвинулись — корректируем editingKeywordIndex,
+            // иначе «Сохранить» перезапишет ЧУЖОЕ правило (или добавит дубликат).
             if (editingKeywordIndex === index) resetKeywordForm();
+            else if (editingKeywordIndex > index) editingKeywordIndex--;
         }
     });
 

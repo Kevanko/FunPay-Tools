@@ -106,11 +106,11 @@
     background: transparent;
 }
 .fp-tools-nav::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--fpt-line-strong, rgba(255, 255, 255, 0.15));
     border-radius: 3px;
 }
 .fp-tools-nav::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.25);
+    background: var(--fpt-text-faint, rgba(255, 255, 255, 0.25));
 }
 
 #fpToolsButton span::after {
@@ -249,14 +249,14 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: #13141a;
+    background: var(--fpt-bg, #13141a);
     border: 1px solid var(--fpt-line-strong, #22253a);
     border-radius: 10px;
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
     padding: 0;
     z-index: 10000;
     font-family: 'Inter', 'Segoe UI', sans-serif;
-    color: #d8dae8;
+    color: var(--fpt-text, #d8dae8);
     transition: opacity 0.25s ease, visibility 0.25s ease, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
     max-width: 900px;
     width: 90vw;
@@ -399,7 +399,7 @@
     font-weight: 700;
     flex-grow: 1;
     text-align: left;
-    color: #fff;
+    color: var(--fpt-text, #fff);
 }
 
 .fp-tools-popup .close-btn {
@@ -422,7 +422,7 @@
 }
 
 .fp-tools-popup .close-btn:hover {
-    background: #2a2d44;
+    background: var(--fpt-surface-3, #2a2d44);
     transform: scale(1.05);
 }
 
@@ -456,7 +456,7 @@
     display: flex;
     align-items: center;
     padding: 12px 15px;
-    color: #ccc;
+    color: var(--fpt-text-dim, #ccc);
     text-decoration: none;
     border-radius: 8px;
     margin-bottom: 5px;
@@ -466,12 +466,12 @@
 
 .fp-tools-nav li a:hover {
     background-color: var(--fpt-line, #1e2030);
-    color: #d8dae8;
+    color: var(--fpt-text, #d8dae8);
     transform: none;
 }
 
 .fp-tools-nav li.active a {
-    background: #252934;
+    background: var(--fpt-surface-3, #252934);
     color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, #ffffff);
     font-weight: 600;
 }
@@ -499,12 +499,12 @@
 }
 
 .fp-tools-content::-webkit-scrollbar-thumb {
-    background: #2a2d44;
+    background: var(--fpt-surface-3, #2a2d44);
     border-radius: 3px;
 }
 
 .fp-tools-content::-webkit-scrollbar-thumb:hover {
-    background: #363a5a;
+    background: var(--fpt-text-faint, #363a5a);
 }
 
 .fp-tools-page-content {
@@ -531,10 +531,10 @@
 .fp-tools-page-content h3 {
     font-size: 24px;
     padding-bottom: 12px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    border-bottom: 1px solid var(--fpt-line-strong, rgba(255, 255, 255, 0.15));
     margin-top: 35px;
     margin-bottom: 25px;
-    color: #eee;
+    color: var(--fpt-text, #eee);
     letter-spacing: 0.5px;
 }
 
@@ -553,12 +553,12 @@
     margin-top: 25px;
     margin-bottom: 15px;
     font-size: 18px;
-    color: #ddd;
+    color: var(--fpt-text, #ddd);
 }
 
 .fp-tools-footer {
     padding: 15px 25px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: 1px solid var(--fpt-line, rgba(255, 255, 255, 0.1));
     text-align: right;
     flex-shrink: 0;
 }
@@ -567,7 +567,7 @@
     display: block;
     margin-bottom: 10px;
     font-size: 16px;
-    color: #ddd;
+    color: var(--fpt-text, #ddd);
 }
 
 .fp-tools-popup input[type="checkbox"] {
@@ -577,7 +577,7 @@
     height: 20px;
     border-radius: 5px;
     margin-right: 10px;
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--fpt-surface-3, rgba(255, 255, 255, 0.1));
     position: relative;
     cursor: pointer;
     transition: all 0.3s ease;
@@ -615,15 +615,15 @@
     margin-bottom: 15px;
     border: none;
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
+    background: var(--fpt-surface-3, rgba(255, 255, 255, 0.1));
+    color: var(--fpt-text, #fff);
     font-size: 14px;
     transition: all 0.3s ease;
     box-sizing: border-box;
 }
 
 .fp-tools-popup select option {
-    background: #333;
+    background: var(--fpt-surface-2, #333);
 }
 
 .fp-tools-popup input[type="text"]:focus,
@@ -631,7 +631,7 @@
 .fp-tools-popup textarea:focus,
 .fp-tools-popup select:focus {
     outline: none;
-    box-shadow: 0 0 0 2px rgba(0, 247, 255, 0.5);
+    box-shadow: 0 0 0 2px var(--fpt-accent-line, rgba(0, 247, 255, 0.5));
     background: rgba(255, 255, 255, 0.15);
 }
 
@@ -693,11 +693,11 @@
 }
 
 .fp-tools-popup .btn-default {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--fpt-surface-3, rgba(255, 255, 255, 0.1));
 }
 
 .fp-tools-popup .btn-default:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: var(--fpt-line-strong, rgba(255, 255, 255, 0.2));
 }
 
 .fp-tools-popup .template-info {
@@ -787,7 +787,7 @@
 .chat-buttons-container:not([data-fpt-fullwidth="1"]) .custom-chat-template-btn { flex: 0 0 auto; }
 
 #customTemplatesListContainer .custom-template-item {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--fpt-surface-2, rgba(255, 255, 255, 0.05));
     padding: 10px;
     border-radius: 8px;
     margin-bottom: 10px;
@@ -804,11 +804,11 @@
     font-size: 14px;
     padding: 5px 8px;
     margin-left: 5px;
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--fpt-surface-3, rgba(255, 255, 255, 0.1));
 }
 
 #customTemplatesListContainer .custom-template-item button:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: var(--fpt-line-strong, rgba(255, 255, 255, 0.2));
 }
 
 .color-preview {
@@ -945,7 +945,7 @@
 }
 
 .fp-tools-popup .theme-color-input::-webkit-color-swatch {
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    border: 2px solid var(--fpt-line-strong, rgba(255, 255, 255, 0.2));
     border-radius: 10px;
 }
 
@@ -973,22 +973,22 @@
 
 .fp-tools-popup .info-toggle {
     font-size: 13px;
-    color: #aaa;
+    color: var(--fpt-text-dim, #aaa);
     cursor: pointer;
     transition: color 0.3s;
-    border-bottom: 1px dashed #aaa;
+    border-bottom: 1px dashed var(--fpt-text-dim, #aaa);
 }
 
 .fp-tools-popup .info-toggle:hover {
-    color: #fff;
-    border-bottom-color: #fff;
+    color: var(--fpt-text, #fff);
+    border-bottom-color: var(--fpt-text, #fff);
 }
 
 .fp-tools-popup .info-content {
     display: none;
     margin-top: 10px;
     padding: 10px;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--fpt-surface-2, rgba(255, 255, 255, 0.05));
     border-radius: 8px;
     font-size: 13px;
     line-height: 1.5;
@@ -997,7 +997,7 @@
 .fp-tools-popup .info-content p {
     margin-top: 0;
     margin-bottom: 8px;
-    color: #ccc;
+    color: var(--fpt-text-dim, #ccc);
 }
 
 .fp-tools-popup .info-content ul {
@@ -1261,15 +1261,15 @@
 }
 
 .fp-tools-console {
-    background-color: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background-color: var(--fpt-bg-deep, rgba(0, 0, 0, 0.3));
+    border: 1px solid var(--fpt-line, rgba(255, 255, 255, 0.1));
     border-radius: 8px;
     height: 130px;
     overflow-y: auto;
     padding: 10px;
     font-family: 'Courier New', Courier, monospace;
     font-size: 12px;
-    color: #ddd;
+    color: var(--fpt-text-dim, #ddd);
     margin-top: 15px;
     display: flex;
     flex-direction: column-reverse;
@@ -1292,7 +1292,7 @@
 }
 
 .fp-tools-console::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
+    background: var(--fpt-line-strong, rgba(255, 255, 255, 0.2));
     border-radius: 5px;
 }
 
@@ -1570,7 +1570,7 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: rgba(25, 25, 25, 0.92);
+    background: var(--fpt-p1, rgba(25, 25, 25, 0.92));
     backdrop-filter: blur(15px);
     border-radius: 20px;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
@@ -1578,8 +1578,8 @@
     z-index: 10002;
     width: 90vw;
     max-width: 500px;
-    color: #fff;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--fpt-pTx, #fff);
+    border: 1px solid var(--fpt-pLine, rgba(255, 255, 255, 0.1));
 }
 
 .fp-tools-ad-popup h4 {
@@ -1592,13 +1592,13 @@
 .fp-tools-ad-popup textarea,
 .fp-tools-ad-popup input {
     margin-bottom: 15px;
-    background-color: rgba(255, 255, 255, 0.1);
-    color: #fff;
+    background-color: var(--fpt-pInput, rgba(255, 255, 255, 0.1));
+    color: var(--fpt-pTx, #fff);
 }
 
 .fp-tools-ad-popup textarea::placeholder,
 .fp-tools-ad-popup input::placeholder {
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--fpt-pTxFaint, rgba(255, 255, 255, 0.5));
 }
 
 .fp-tools-ad-popup .popup-actions {
@@ -1614,11 +1614,11 @@
 }
 
 .fp-tools-ad-popup .btn.btn-default {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--fpt-p2, rgba(255, 255, 255, 0.1));
 }
 
 .fp-tools-ad-popup .btn.btn-default:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: var(--fpt-p3, rgba(255, 255, 255, 0.2));
 }
 
 .account-item {
@@ -2216,7 +2216,7 @@ body.funpay-redesigned .promo-games {
     height: 12px;
     border-radius: 50%;
     margin-right: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    border: 1px solid var(--fpt-pLine, rgba(255, 255, 255, 0.3));
 }
 
 .fp-tools-font-controls {
@@ -2224,7 +2224,7 @@ body.funpay-redesigned .promo-games {
     align-items: flex-end;
     gap: 15px;
     padding: 15px;
-    background-color: rgba(0, 0, 0, 0.2);
+    background-color: var(--fpt-p2, rgba(0, 0, 0, 0.2));
     border-radius: 8px;
     margin-top: 10px;
 }
@@ -2236,7 +2236,7 @@ body.funpay-redesigned .promo-games {
 .fp-tools-font-controls label {
     margin-bottom: 5px;
     font-size: 14px;
-    color: #ccc;
+    color: var(--fpt-pTxDim, #ccc);
 }
 
 .fp-tools-font-controls .btn {
@@ -2248,7 +2248,7 @@ body.funpay-redesigned .promo-games {
     grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
     gap: 10px;
     padding: 15px;
-    background-color: rgba(0, 0, 0, 0.2);
+    background-color: var(--fpt-p2, rgba(0, 0, 0, 0.2));
     border-radius: 8px;
     margin-top: 10px;
 }
@@ -2258,7 +2258,7 @@ body.funpay-redesigned .promo-games {
     justify-content: center;
     align-items: center;
     height: 40px;
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: var(--fpt-p3, rgba(255, 255, 255, 0.1));
     border-radius: 5px;
     cursor: pointer;
     font-size: 18px;
@@ -2266,7 +2266,7 @@ body.funpay-redesigned .promo-games {
 }
 
 .fp-tools-symbol-char:hover {
-    background-color: rgba(255, 255, 255, 0.2);
+    background-color: var(--fpt-pLine, rgba(255, 255, 255, 0.2));
     transform: scale(1.1);
 }
 
@@ -2513,14 +2513,14 @@ body.funpay-redesigned .promo-games {
     display: flex;
     align-items: center;
     cursor: pointer;
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--fpt-surface-2, rgba(255, 255, 255, 0.1));
     padding: 8px 15px;
     border-radius: 20px;
     transition: background-color 0.2s ease;
 }
 
 .fp-tools-radio-option:hover {
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--fpt-surface-3, rgba(255, 255, 255, 0.15));
 }
 
 .fp-tools-radio-option input[type="radio"] {
@@ -2528,7 +2528,7 @@ body.funpay-redesigned .promo-games {
     -webkit-appearance: none;
     width: 18px;
     height: 18px;
-    border: 2px solid rgba(255, 255, 255, 0.5);
+    border: 2px solid var(--fpt-text-faint, rgba(255, 255, 255, 0.5));
     border-radius: 50%;
     margin-right: 10px;
     position: relative;
@@ -2554,7 +2554,7 @@ body.funpay-redesigned .promo-games {
 
 .fp-tools-radio-option span {
     font-size: 14px;
-    color: #eee;
+    color: var(--fpt-text, #eee);
 }
 
 .lot-box {
@@ -3276,13 +3276,13 @@ body.funpay-redesigned .promo-games {
 }
 
 .fp-tools-empty-template-modal {
-    background: rgba(30, 30, 30, 0.9);
+    background: var(--fpt-p1, rgba(30, 30, 30, 0.9));
     padding: 30px;
     border-radius: 15px;
     text-align: center;
     width: 90%;
     max-width: 450px;
-    border: 1px solid rgba(255,255,255,0.1);
+    border: 1px solid var(--fpt-pLine, rgba(255,255,255,0.1));
     box-shadow: 0 10px 40px rgba(0,0,0,0.5);
     animation: popIn 0.4s cubic-bezier(0.26, 0.53, 0.74, 1.48);
 }
@@ -3294,7 +3294,7 @@ body.funpay-redesigned .promo-games {
 }
 
 .fp-tools-empty-template-modal p {
-    color: #ccc;
+    color: var(--fpt-pTxDim, #ccc);
     margin-bottom: 20px;
 }
 
@@ -3475,13 +3475,13 @@ body.funpay-redesigned .promo-games {
 }
 
 .fp-tools-empty-template-modal {
-    background: rgba(30, 30, 30, 0.9);
+    background: var(--fpt-p1, rgba(30, 30, 30, 0.9));
     padding: 30px;
     border-radius: 15px;
     text-align: center;
     width: 90%;
     max-width: 450px;
-    border: 1px solid rgba(255,255,255,0.1);
+    border: 1px solid var(--fpt-pLine, rgba(255,255,255,0.1));
     box-shadow: 0 10px 40px rgba(0,0,0,0.5);
     animation: popIn 0.4s cubic-bezier(0.26, 0.53, 0.74, 1.48);
 }
@@ -3493,7 +3493,7 @@ body.funpay-redesigned .promo-games {
 }
 
 .fp-tools-empty-template-modal p {
-    color: #ccc;
+    color: var(--fpt-pTxDim, #ccc);
     margin-bottom: 20px;
 }
 
@@ -4354,9 +4354,9 @@ body.funpay-redesigned .promo-games {
 }
 
 .fp-tools-share-modal-content {
-    background: #1e1e1e;
+    background: var(--fpt-p1, #1e1e1e);
     border-radius: 12px;
-    border: 1px solid #333;
+    border: 1px solid var(--fpt-pLine, #333);
     width: 90%;
     max-width: 500px;
     box-shadow: 0 10px 40px rgba(0,0,0,0.4);
@@ -4368,13 +4368,13 @@ body.funpay-redesigned .promo-games {
     justify-content: space-between;
     align-items: center;
     padding: 15px 20px;
-    border-bottom: 1px solid #333;
+    border-bottom: 1px solid var(--fpt-pLine, #333);
 }
 
 .fp-tools-share-modal-header h3 {
     margin: 0;
     font-size: 18px;
-    color: #eee;
+    color: var(--fpt-pTx, #eee);
     border: none;
     padding: 0;
 }
@@ -4382,7 +4382,7 @@ body.funpay-redesigned .promo-games {
 .fp-tools-share-modal-close {
     background: none;
     border: none;
-    color: #aaa;
+    color: var(--fpt-pTxDim, #aaa);
     font-size: 24px;
     cursor: pointer;
     line-height: 1;
@@ -4393,7 +4393,7 @@ body.funpay-redesigned .promo-games {
 }
 
 .fp-tools-share-modal-body p {
-    color: #ccc;
+    color: var(--fpt-pTxDim, #ccc);
     font-size: 14px;
     line-height: 1.6;
     margin: 0 0 15px 0;
@@ -4407,7 +4407,7 @@ body.funpay-redesigned .promo-games {
 
 .fp-tools-share-modal-footer {
     padding: 15px 20px;
-    border-top: 1px solid #333;
+    border-top: 1px solid var(--fpt-pLine, #333);
     text-align: right;
 }
 
@@ -4500,9 +4500,9 @@ i.promo-offer-icon {
 }
 
 .fp-tools-analytics-container {
-    background: rgba(20, 20, 20, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #e0e0e0;
+    background: var(--fpt-pA, rgba(20, 20, 20, 0.4));
+    border: 1px solid var(--fpt-pLine, rgba(255, 255, 255, 0.1));
+    color: var(--fpt-pTx, #e0e0e0);
     border-radius: 16px;
     padding: 25px;
     margin-bottom: 30px;
@@ -4582,13 +4582,13 @@ i.promo-offer-icon {
     left: 50%;
     transform: translateX(-50%);
     width: 320px;
-    background: #1e1e1e;
-    border: 1px solid #333;
+    background: var(--fpt-p1, #1e1e1e);
+    border: 1px solid var(--fpt-pLine, #333);
     border-radius: 12px;
     padding: 15px;
     z-index: 1050;
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
-    color: #fff;
+    color: var(--fpt-pTx, #fff);
     max-height: 400px;
     overflow-y: auto;
 }
@@ -4599,7 +4599,7 @@ i.promo-offer-icon {
 
 .fp-tools-piggy-bank-dropdown::-webkit-scrollbar { width: 5px; }
 .fp-tools-piggy-bank-dropdown::-webkit-scrollbar-track { background: transparent; }
-.fp-tools-piggy-bank-dropdown::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 3px; }
+.fp-tools-piggy-bank-dropdown::-webkit-scrollbar-thumb { background: var(--fpt-pLine, rgba(255, 255, 255, 0.2)); border-radius: 3px; }
 
 .pb-dropdown-item {
     margin-bottom: 15px;
@@ -5406,7 +5406,7 @@ a.contact-item:hover {
 .fp-tools-modal-close {
     background: none;
     border: none;
-    color: #aaa;
+    color: var(--fpt-text-muted, #aaa);
     font-size: 24px;
     cursor: pointer;
     line-height: 1;
@@ -5419,7 +5419,7 @@ a.contact-item:hover {
 }
 .fp-tools-modal-footer {
     padding: 15px;
-    border-top: 1px solid #333;
+    border-top: 1px solid var(--fpt-border, #333);
     text-align: right;
 }
 
@@ -5431,10 +5431,10 @@ a.contact-item:hover {
 }
 #autobump-category-search {
     flex-grow: 1;
-    background: #2a2a2a;
-    border: 1px solid #444;
+    background: var(--fpt-pInput, #2a2a2a);
+    border: 1px solid var(--fpt-border, #444);
     border-radius: 6px;
-    color: #fff;
+    color: var(--fpt-text, #fff);
     padding: 8px 12px;
     font-size: 14px;
 }
@@ -5452,7 +5452,7 @@ a.contact-item:hover {
     padding-right: 5px;
 }
 .autobump-category-list::-webkit-scrollbar { width: 5px; }
-.autobump-category-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+.autobump-category-list::-webkit-scrollbar-thumb { background: var(--fpt-border, rgba(255,255,255,0.2)); border-radius: 3px; }
 
 .autobump-category-item {
     display: flex;
@@ -5464,7 +5464,7 @@ a.contact-item:hover {
     transition: background-color 0.2s;
 }
 .autobump-category-item:hover {
-    background-color: rgba(255,255,255,0.05);
+    background-color: var(--fpt-hover, rgba(255,255,255,0.05));
 }
 .autobump-category-item input[type="checkbox"] {
     flex-shrink: 0;
@@ -5472,7 +5472,7 @@ a.contact-item:hover {
 }
 .autobump-category-item span {
     font-size: 14px;
-    color: #ccc;
+    color: var(--fpt-text-muted, #ccc);
     user-select: none;
 }
 
@@ -5521,7 +5521,7 @@ a.contact-item:hover {
 .fp-tools-styler-header .close-btn {
     background: none;
     border: none;
-    color: #aaa;
+    color: var(--fpt-pTxDim, #aaa);
     font-size: 24px;
     cursor: pointer;
     line-height: 1;
@@ -5641,17 +5641,17 @@ a.contact-item:hover {
     position: relative;
     font-size: 14px;
     font-weight: 500;
-    color: #ccc;
-    background: rgba(255, 255, 255, 0.05);
+    color: var(--fpt-text-dim, #ccc);
+    background: var(--fpt-surface-2, rgba(255, 255, 255, 0.05));
 }
 
 .fp-tools-header-tab:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
+    background: var(--fpt-surface-3, rgba(255, 255, 255, 0.1));
+    color: var(--fpt-text, #fff);
 }
 
 .fp-tools-header-tab.active {
-    background: #252934;
+    background: var(--fpt-surface-3, #252934);
     color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, #ffffff);
     font-weight: 600;
 }
@@ -5789,7 +5789,7 @@ a.contact-item:hover {
     margin-bottom: 15px; /* Добавили отступ снизу */
 }
 .lot-io-category-list::-webkit-scrollbar { width: 5px; }
-.lot-io-category-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+.lot-io-category-list::-webkit-scrollbar-thumb { background: var(--fpt-border, rgba(255,255,255,0.2)); border-radius: 3px; }
 
 .lot-io-category-item {
     display: flex;
@@ -5801,7 +5801,7 @@ a.contact-item:hover {
     transition: background-color 0.2s;
 }
 .lot-io-category-item:hover {
-    background-color: rgba(255,255,255,0.05);
+    background-color: var(--fpt-hover, rgba(255,255,255,0.05));
 }
 .lot-io-category-item input[type="checkbox"] {
     flex-shrink: 0;
@@ -5809,7 +5809,7 @@ a.contact-item:hover {
 }
 .lot-io-category-item span {
     font-size: 14px;
-    color: #ccc;
+    color: var(--fpt-text-muted, #ccc);
     user-select: none;
 }
 
@@ -5887,7 +5887,7 @@ a.contact-item:hover {
     padding-right: 5px;
 }
 .lot-io-progress-list::-webkit-scrollbar { width: 5px; }
-.lot-io-progress-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+.lot-io-progress-list::-webkit-scrollbar-thumb { background: var(--fpt-border, rgba(255,255,255,0.2)); border-radius: 3px; }
 
 .lot-io-progress-item {
     display: flex;
@@ -5962,8 +5962,8 @@ a.contact-item:hover {
 }
 
 .fp-tools-nav li a:hover {
-    background-color: rgba(255, 255, 255, 0.05);
-    color: #fff;
+    background-color: var(--fpt-surface-2, rgba(255, 255, 255, 0.05));
+    color: var(--fpt-text, #fff);
     transform: none;
 }
 
@@ -5978,7 +5978,7 @@ a.contact-item:hover {
 /* === МИНИМАЛИСТИЧНЫЙ ДИЗАЙН КНОПОК === */
 .fp-tools-popup button,
 .fp-tools-popup .btn {
-    background: #0099ff;
+    background: var(--fpt-uacc, #0099ff);
     color: white;
     box-shadow: none;
     text-transform: none;
@@ -5989,17 +5989,17 @@ a.contact-item:hover {
 
 .fp-tools-popup button:hover,
 .fp-tools-popup .btn:hover {
-    background: #33aaff;
+    background: color-mix(in srgb, var(--fpt-uacc, #0099ff) 82%, #ffffff);
     transform: translateY(-1px);
-    box-shadow: 0 4px 10px rgba(0, 153, 255, 0.2);
+    box-shadow: 0 4px 10px var(--fpt-uacc-soft, rgba(0, 153, 255, 0.2));
 }
 
 .fp-tools-popup .btn-default {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--fpt-surface-3, rgba(255, 255, 255, 0.1));
 }
 
 .fp-tools-popup .btn-default:hover {
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--fpt-line-strong, rgba(255, 255, 255, 0.15));
 }
 
 /* === СТИЛИ ДЛЯ ВКЛАДКИ АВТО-ОТВЕТОВ === */
@@ -6780,7 +6780,7 @@ a.contact-item:hover {
 }
 
 .fp-tools-nav li a {
-    color: #7a7f9a !important;
+    color: var(--fpt-text-dim, #7a7f9a) !important;
     font-size: 13px;
     border-radius: 6px;
     padding: 9px 12px;
@@ -6788,7 +6788,7 @@ a.contact-item:hover {
 }
 
 .fp-tools-nav li a:hover {
-    color: #d8dae8 !important;
+    color: var(--fpt-text, #d8dae8) !important;
     background: var(--fpt-surface-2, #1a1c2e) !important;
     transform: none !important;
 }
@@ -6812,7 +6812,7 @@ a.contact-item:hover {
 }
 
 .fp-tools-popup .btn:not(.btn-default):hover {
-    background: #5d58f0 !important;
+    background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 85%, #ffffff) !important;
 }
 
 .fp-tools-popup .btn:not(.btn-default):active {
@@ -6822,7 +6822,7 @@ a.contact-item:hover {
 /* ── Secondary button ───────────────────────────────────────────── */
 .fp-tools-popup .btn.btn-default {
     background: var(--fpt-line, #1e2030);
-    border: 1px solid #2a2d44;
+    border: 1px solid var(--fpt-line-strong, #2a2d44);
     color: var(--fpt-text-dim, #9099b8);
     font-weight: 500;
     border-radius: 6px;
@@ -6831,9 +6831,9 @@ a.contact-item:hover {
 }
 
 .fp-tools-popup .btn.btn-default:hover {
-    background: #252934;
-    color: #d8dae8;
-    border-color: #363a5a;
+    background: var(--fpt-surface-3, #252934);
+    color: var(--fpt-text, #d8dae8);
+    border-color: var(--fpt-line-strong, #363a5a);
 }
 
 /* ── Inputs & textareas ─────────────────────────────────────────── */
@@ -6843,7 +6843,7 @@ a.contact-item:hover {
 .fp-tools-popup textarea {
     background: var(--fpt-bg-deep, #0e0f16) !important;
     border: 1px solid var(--fpt-line-strong, #22253a) !important;
-    color: #d8dae8 !important;
+    color: var(--fpt-text, #d8dae8) !important;
     border-radius: 6px;
     font-size: 13px;
     transition: border-color 0.15s;
@@ -6883,7 +6883,7 @@ a.contact-item:hover {
     background: var(--fpt-surface-2, #1a1c2e);
     cursor: pointer;
     font-size: 12px;
-    color: #7a7f9a;
+    color: var(--fpt-text-dim, #7a7f9a);
     transition: background 0.15s, color 0.15s;
     border: 1px solid transparent;
 }
@@ -6891,7 +6891,7 @@ a.contact-item:hover {
 .fp-tools-radio-option:has(input:checked) {
     background: var(--fpt-surface-3, #1e1f38);
     color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, #ffffff);
-    border-color: #363a5a;
+    border-color: var(--fpt-line-strong, #363a5a);
 }
 
 .fp-tools-radio-option input[type="radio"] {
@@ -6957,7 +6957,7 @@ a.contact-item:hover {
 
 .keyword-key  { color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, #ffffff); font-weight: 600; }
 .keyword-arrow { color: var(--fpt-text-faint, #3a3d52); }
-.keyword-value { color: #7a7f9a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
+.keyword-value { color: var(--fpt-text-dim, #7a7f9a); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
 
 /* ── Keyword add form ───────────────────────────────────────────── */
 .keyword-add-form {
@@ -6981,7 +6981,7 @@ a.contact-item:hover {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: #4a4f68;
+    color: var(--fpt-text-faint, #4a4f68);
     margin: 0 0 8px;
 }
 
@@ -6996,7 +6996,7 @@ a.contact-item:hover {
 
 .variables-list li {
     font-size: 12px;
-    color: #6b7092;
+    color: var(--fpt-text-dim, #6b7092);
     line-height: 1.4;
 }
 
@@ -7030,25 +7030,25 @@ a.contact-item:hover {
 .announcement-item-header h4 {
     font-size: 13px;
     font-weight: 700;
-    color: #d8dae8;
+    color: var(--fpt-text, #d8dae8);
     margin: 0;
 }
 
 .announcement-date {
     font-size: 11px;
-    color: #4a4f68;
+    color: var(--fpt-text-faint, #4a4f68);
 }
 
 .announcement-item p {
     font-size: 12px;
-    color: #7a7f9a;
+    color: var(--fpt-text-dim, #7a7f9a);
     line-height: 1.5;
     margin: 0;
 }
 
 /* ── FP Tools console ───────────────────────────────────────────── */
 .fp-tools-console {
-    background: #0a0b10;
+    background: var(--fpt-bg-deep, #0a0b10);
     border: 1px solid var(--fpt-line, #1e2030);
     border-radius: 6px;
     padding: 10px;
@@ -7640,44 +7640,44 @@ a.contact-item:hover {
 .fpt-pos-name{ font-size:10.5px;color:var(--fpt-text-dim, #9aa0c2);font-weight:600;text-align:center; }
 .fpt-pos-card:has(input:checked) .fpt-pos-name{ color:color-mix(in srgb, var(--fpt-uacc, #5b86d8) 55%, #ffffff); }
 .fpt-pos-ico{ width:46px;height:34px;background:var(--fpt-surface-3, #1b1d2c);border-radius:6px;display:flex;flex-direction:column;justify-content:center;gap:4px;padding:5px; }
-.fpt-pos-row{ height:6px;border-radius:3px;background:#6b6dff; }       /* одна полоса кнопок */
+.fpt-pos-row{ height:6px;border-radius:3px;background:var(--fpt-uacc, #6b6dff); }       /* одна полоса кнопок */
 .fpt-pos-field{ height:10px;border-radius:3px;background:var(--fpt-line-strong, #3a3f63); }    /* поле ввода */
 .fpt-pos-ico-side{ flex-direction:row-reverse;gap:4px;align-items:stretch; }
 /* Панель ВСЕГДА слева: узкая вертикальная колонка. Кнопки прижаты к верху
    (в панели сверху) или к низу (в панели снизу) этой колонки. */
-.fpt-pos-panel{ display:flex;flex-direction:column;gap:3px;width:15px;background:#23263a;border-radius:3px;padding:3px; }
+.fpt-pos-panel{ display:flex;flex-direction:column;gap:3px;width:15px;background:var(--fpt-surface-3, #23263a);border-radius:3px;padding:3px; }
 .fpt-pos-panel-top{ justify-content:flex-start; }
 .fpt-pos-panel-bottom{ justify-content:flex-end; }
-.fpt-pos-srow{ height:5px;border-radius:2px;background:#6b6dff; }
+.fpt-pos-srow{ height:5px;border-radius:2px;background:var(--fpt-uacc, #6b6dff); }
 .fpt-pos-sfield{ flex:1;background:var(--fpt-line-strong, #3a3f63);border-radius:3px; }
 .fpt-pos-ico-pop{ flex-direction:row;align-items:center;justify-content:flex-start;gap:4px; }
-.fpt-pos-ico-pop .fpt-pos-pop-btn{ position:static;width:9px;height:9px;border-radius:50%;background:#6b6dff;flex-shrink:0; }
+.fpt-pos-ico-pop .fpt-pos-pop-btn{ position:static;width:9px;height:9px;border-radius:50%;background:var(--fpt-uacc, #6b6dff);flex-shrink:0; }
 .fpt-pos-ico-pop .fpt-pos-field{ flex:1;height:10px; }
 
 /* контейнер настроек */
 .fpt-appx{ display:flex;flex-direction:column;gap:14px;margin:6px 0 10px; }
 .fpt-appx-grid{ display:grid;grid-template-columns:1fr 1fr;gap:14px; }
 .fpt-appx-block{ display:flex;flex-direction:column;gap:7px; }
-.fpt-appx-cap{ font-size:11px;color:#7a80a6;font-weight:700;letter-spacing:.6px;text-transform:uppercase; }
+.fpt-appx-cap{ font-size:11px;color:var(--fpt-text-faint, #7a80a6);font-weight:700;letter-spacing:.6px;text-transform:uppercase; }
 
 /* сегментные переключатели - КРУПНЫЕ, с явной галочкой выбора */
 .fpt-seg{ display:flex;background:var(--fpt-bg-deep, #0e0f16);border:1.5px solid var(--fpt-line-strong, #22253a);border-radius:10px;padding:3px;gap:3px; }
 .fpt-seg button{
     flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;
     min-height:38px;padding:0 6px;background:transparent;border:1.5px solid transparent;border-radius:8px;
-    color:#aeb3d4;cursor:pointer;transition:background .12s,color .12s,border-color .12s;position:relative;
+    color:var(--fpt-text-dim, #aeb3d4);cursor:pointer;transition:background .12s,color .12s,border-color .12s;position:relative;
 }
 .fpt-seg button .material-symbols-rounded{ font-size:20px; }
-.fpt-seg button:hover{ background:color-mix(in srgb, var(--fpt-uacc, #5b86d8) 10%, transparent);color:#fff; }
+.fpt-seg button:hover{ background:color-mix(in srgb, var(--fpt-uacc, #5b86d8) 10%, transparent);color:var(--fpt-text, #fff); }
 .fpt-seg button.active{
-    background:color-mix(in srgb, var(--fpt-uacc, #5b86d8) 16%, transparent);color:#fff;border-color:var(--fpt-uacc, #5b86d8);
+    background:color-mix(in srgb, var(--fpt-uacc, #5b86d8) 16%, transparent);color:var(--fpt-text, #fff);border-color:var(--fpt-uacc, #5b86d8);
     box-shadow:0 0 0 1px color-mix(in srgb, var(--fpt-uacc, #5b86d8) 35%, transparent) inset;
 }
 /* галочка-индикатор выбора - видно ВСЕГДА, не сливается с превью заливки */
 .fpt-seg button.active::after{
     content:'';position:absolute;top:3px;right:3px;width:14px;height:14px;border-radius:50%;
     background:var(--fpt-uacc, #5b86d8) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'><path d='M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z'/></svg>") center/11px no-repeat;
-    box-shadow:0 0 0 2px #15161d;
+    box-shadow:0 0 0 2px var(--fpt-bg-deep, #15161d);
 }
 .fpt-az{ font-weight:700;line-height:1;color:inherit; }
 .fpt-shape-prev{ display:block;width:24px;height:15px;background:currentColor;opacity:.85; }
@@ -7696,7 +7696,7 @@ a.contact-item:hover {
     font-size:11px;font-weight:600;transition:background .14s,border-color .14s,color .14s;
 }
 .fpt-chip-toggle .material-symbols-rounded{ font-size:16px; }
-.fpt-chip-toggle:hover{ color:#fff;border-color:var(--fpt-line-strong, #3a3f63); }
+.fpt-chip-toggle:hover{ color:var(--fpt-text, #fff);border-color:var(--fpt-line-strong, #3a3f63); }
 .fpt-chip-toggle.active{
     background:color-mix(in srgb, var(--fpt-uacc, #5b86d8) 16%, transparent);border-color:var(--fpt-uacc, #5b86d8);color:var(--fpt-text, #f0c8ff);
     box-shadow:0 0 0 1px color-mix(in srgb, var(--fpt-uacc, #5b86d8) 35%, transparent) inset;
@@ -7706,17 +7706,17 @@ a.contact-item:hover {
 .fpt-chip-toggle.active::after{
     content:'';position:absolute;top:-6px;right:-6px;width:15px;height:15px;border-radius:50%;
     background:var(--fpt-uacc, #5b86d8) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'><path d='M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z'/></svg>") center/11px no-repeat;
-    box-shadow:0 0 0 2px #15161d;
+    box-shadow:0 0 0 2px var(--fpt-bg-deep, #15161d);
 }
 
 /* выравнивание доступно только при «на всю ширину» */
 .fpt-align-block{ transition:opacity .15s; }
 .fpt-align-block.fpt-disabled{ opacity:.4;pointer-events:none; }
-.fpt-align-hint{ font-size:10.5px;color:#6b7194;display:none; }
+.fpt-align-hint{ font-size:10.5px;color:var(--fpt-text-faint, #6b7194);display:none; }
 .fpt-align-block.fpt-disabled .fpt-align-hint{ display:block; }
 
 /* живой предпросмотр */
-#fpt-appearance-preview{ pointer-events:none;background:rgba(0,0,0,.18);border:1px solid var(--fpt-line, #1e2030);border-radius:10px;padding:10px;flex-direction:column;align-items:stretch;gap:6px; }
+#fpt-appearance-preview{ pointer-events:none;background:var(--fpt-bg-deep, rgba(0,0,0,.18));border:1px solid var(--fpt-line, #1e2030);border-radius:10px;padding:10px;flex-direction:column;align-items:stretch;gap:6px; }
 #fpt-appearance-preview .chat-template-btn,
 #fpt-appearance-preview .custom-chat-template-btn{ width:100%; }
 
@@ -7999,7 +7999,9 @@ a.contact-item:hover {
     border:1px solid color-mix(in srgb, currentColor 16%, transparent);border-radius:10px;
     color:inherit;font-size:14px;line-height:1.4;padding:10px 12px;outline:none;
     font-family:inherit;transition:border-color .15s;
+    scrollbar-width:none; /* поле авто-растёт по JS — системные стрелки скролла не нужны */
 }
+.fpt-tg-msg::-webkit-scrollbar{ display:none; }
 .fpt-tg-msg::placeholder{ color:inherit;opacity:.5; }
 .fpt-tg-msg:focus{ border-color:color-mix(in srgb, currentColor 40%, transparent); }
 
@@ -8724,7 +8726,7 @@ textarea.fp-cw-input { line-height:1.4; }
 .fpt-tg-cmd-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;}
 .fpt-tg-cmd-list li{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 .fpt-tg-cmd-list li code{
-    background:var(--fpt-bg-deep, #0e0f16);border:1px solid #2a2d3f;color:#7fa1df;
+    background:var(--fpt-bg-deep, #0e0f16);border:1px solid var(--fpt-line-strong, #2a2d3f);color:var(--fpt-uacc, #7fa1df);
     border-radius:6px;padding:2px 8px;font-size:12px;font-family:'JetBrains Mono','Consolas',monospace;
 }
 .fpt-tg-cmd-list li span{color:var(--fpt-text-dim, #9099b8);font-size:12.5px;}
@@ -9204,7 +9206,7 @@ textarea.fp-cw-input { line-height:1.4; }
 .fp-tools-popup textarea:focus,
 .fp-tools-popup select:focus {
     border-color: var(--fpt-accent-line);
-    background: #151821;
+    background: var(--fpt-bg, #151821);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--fpt-uacc, #5b86d8) 16%, transparent);
 }
 
@@ -11409,6 +11411,36 @@ body.funpay-redesigned {
     background: var(--fpt-surface);
     box-shadow: none;
 }
+/* Светлый пресет: «акцент + белый» (color-mix … 55%, #ffffff) нечитаем на
+   светлых поверхностях — затемняем акцентные тексты к тёмному. */
+[data-fpt-preset="light"] .fp-tools-popup .keyword-key,
+[data-fpt-preset="light"] .fp-tools-popup .variable-code,
+[data-fpt-preset="light"] .fp-tools-popup .support-promo a,
+[data-fpt-preset="light"] .fp-tools-popup .info-content a,
+[data-fpt-preset="light"] .fp-tools-popup .info-content a:hover,
+[data-fpt-preset="light"] .fp-tools-popup .fp-tools-header-tab.active,
+[data-fpt-preset="light"] .fp-tools-popup .fp-tools-radio-option:has(input:checked),
+[data-fpt-preset="light"] .fp-tools-popup .fpt-pos-card:has(input:checked) .fpt-pos-name,
+[data-fpt-preset="light"] .fp-tools-popup .fpt-chip-toggle.active .material-symbols-rounded {
+    color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 72%, #1c2030);
+}
+[data-fpt-preset="light"] .fp-tools-nav li.active a {
+    color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 72%, #1c2030) !important;
+    border-left-color: var(--fpt-uacc, #5b86d8);
+}
+/* Радио: отмеченное состояние на светлом — чистый акцент вместо «акцент+белый» */
+[data-fpt-preset="light"] .fp-tools-radio-option input[type="radio"]:checked {
+    border-color: var(--fpt-uacc, #5b86d8);
+}
+[data-fpt-preset="light"] .fp-tools-radio-option input[type="radio"]:checked::after {
+    background: var(--fpt-uacc, #5b86d8);
+}
+/* Предупреждение в модалке экспорта лотов: бледно-оранжевый текст не читается
+   на светлом фоне — затемняем (фон/иконка остаются оранжевыми). */
+[data-fpt-preset="light"] .lot-io-warning,
+[data-fpt-preset="light"] .lot-io-warning b {
+    color: #8a5200;
+}
 
 /* v5.1: фон страницы — только от движка тем (body::before / обои / видео).
    Старые верхние затемнения на #content (rgba(7,9,13,…) до 420–460px) на
@@ -11463,10 +11495,11 @@ body.funpay-redesigned .fpt-home .tgl[data-on="true"]::after {
     background: #ffffff !important;
 }
 
-/* Инфо-панели в попапе следуют теме (были rgba(0,0,0,.2) + жёсткий серый текст:
-   на светлой — мутная серая плашка с нечитаемым текстом). */
+/* Инфо-панели в попапе: тихий приглушённый текст БЕЗ фоновой плашки
+   (полоса var(--fpt-surface-2) на всю ширину выглядела грязными лентами
+   и в тёмной, и в светлой схеме). */
 .fp-tools-popup .template-info {
-    background: var(--fpt-surface-2, rgba(0, 0, 0, 0.2));
+    background: transparent;
     color: var(--fpt-text-dim, #b4bac7);
 }
 
@@ -11534,8 +11567,120 @@ body.funpay-redesigned .fpt-home .tgl[data-on="true"]::after {
 [data-fpt-preset="light"] .contact-item.active { background: #dbe7fa !important; color: #272b33 !important; }
 [data-fpt-preset="light"] .contact-item.active:hover { background: #cfdff7 !important; }
 [data-fpt-preset="light"] .contact-item.unread { background: #fdeece !important; }
-[data-fpt-preset="light"] .contact-item.unread, 
+[data-fpt-preset="light"] .contact-item.unread,
 [data-fpt-preset="light"] .contact-item.unread .contact-item-message { color: #4a4f5a !important; }
+
+/* ── Релиз-аудит: точечные фиксы светлого пресета ──────────────────────── */
+
+/* S-5: «Показать ещё» в панели статистики — 55% акцента к БЕЛОМУ нечитаемо
+   на светлом (1.9:1); мешаем к тёмному, как в остальных светлых фиксах. */
+[data-fpt-preset="light"] .fp-stats-expand-label,
+[data-fpt-preset="light"] .fp-stats-expand-arrow {
+    color: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 72%, #1c2030);
+}
+
+/* S-8: круглый баннер категории (/lots/…/trade) — генерируемое движком темы
+   «.cd { filter: brightness(.8) }» давало грязно-серый круг на светлом. */
+[data-fpt-preset="light"] .cd { filter: none !important; }
+
+/* S-8 (часть 2): арт .corner-cd лежит на z:-1 ПОД фоном .wrapper-content
+   (вуаль 55% белого, theme_core .wrapper-content { background: var(--fpt-pVeil) }) —
+   белая плёнка обесцвечивает круг в серое пятно. Поднять z нельзя (перекроет
+   контент), поэтому компенсируем вымывание насыщенностью/контрастом. */
+[data-fpt-preset="light"] .corner-cd {
+    filter: saturate(1.45) contrast(1.22);
+}
+
+/* B-3: пункты выпадающих меню сайта (например «⋯» в чате) — родной #919191
+   на белом не читается; приглушённый тёмный из палитры пресета.
+   :not([style*="color"]) — пункты с собственным inline-цветом (красный
+   «Добавить в ЧС», зелёные метки) сохраняют свою семантическую окраску (R-1). */
+[data-fpt-preset="light"] .dropdown-menu > li > a:not([style*="color"]) {
+    color: var(--fpt-pTxDim, #535a66) !important;
+}
+
+/* B-9: лаймовые статусы FunPay («онлайн», «Закрыт» — #7ED320) нечитаемы
+   на белом — затемняем зелёный ТОЛЬКО на светлом пресете. */
+[data-fpt-preset="light"] .text-success,
+[data-fpt-preset="light"] .tc-status.text-success,
+[data-fpt-preset="light"] .media-user.online .media-user-status {
+    color: #3f8f1d !important;
+}
+
+/* S-9: превью обоев «Дюны»/«Меш» в Оформлении почти белые на светлом —
+   видимая рамка карточки + усиленный акцент в самих превью (полноэкранные
+   светлые обои выше остаются пастельными — они лежат под вуалью). */
+[data-fpt-preset="light"] .fp-tools-popup .fpt-wall {
+    border-color: var(--fpt-pLine, rgba(20, 25, 35, .16));
+}
+[data-fpt-preset="light"] .fp-tools-popup .fpt-wall-prev.wall-dunes {
+    background:
+        radial-gradient(120% 80% at 80% -10%, color-mix(in srgb, var(--fpt-uacc, #5b86d8) 34%, transparent), transparent 60%),
+        radial-gradient(90% 70% at 0% 110%, color-mix(in srgb, var(--fpt-uacc, #5b86d8) 22%, transparent), transparent 55%),
+        #f5f8fd;
+}
+[data-fpt-preset="light"] .fp-tools-popup .fpt-wall-prev.wall-mesh {
+    background:
+        radial-gradient(60% 60% at 18% 20%, color-mix(in srgb, var(--fpt-uacc, #5b86d8) 30%, transparent), transparent 60%),
+        radial-gradient(55% 55% at 82% 30%, color-mix(in srgb, var(--fpt-uacc, #5b86d8) 22%, transparent), transparent 60%),
+        radial-gradient(70% 70% at 50% 105%, color-mix(in srgb, var(--fpt-uacc, #5b86d8) 26%, transparent), transparent 55%),
+        #f5f8fd;
+}
+
+/* ============================================================================
+   v6.0 — единые компонент-классы FP Tools (релиз 3.9.0, фаза A)
+   Любой UI расширения на страницах сайта берёт цвета отсюда или из переменных
+   --fpt-* (палитра пресета из getCustomThemeCss). Литеральные цвета поверхностей
+   и текста в JS-модулях запрещены. Фолбэки тёмные: переменных нет только при
+   выключенной кастомной теме, где легаси-тёмный вид — принятая база.
+   ============================================================================ */
+
+/* Чип-кнопка: фильтры заказов/продаж, варианты ответов AI-аудита и т.п. */
+.fpt-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--fpt-p2, #1d2026);
+    color: var(--fpt-pTxDim, #c6cbd4);
+    border: 1px solid var(--fpt-pLine, rgba(255, 255, 255, .10));
+    border-radius: 8px;
+    padding: 4px 12px;
+    font-size: 12px;
+    line-height: 1.5;
+    cursor: pointer;
+    user-select: none;
+    transition: background .18s ease, color .18s ease, border-color .18s ease;
+}
+.fpt-chip:hover {
+    background: var(--fpt-p3, #262a32);
+    color: var(--fpt-pTx, #f1f3f7);
+}
+.fpt-chip.active {
+    background: var(--fpt-uacc-soft, rgba(91, 134, 216, .14));
+    color: var(--fpt-uacc, #7da4e8);
+    border-color: var(--fpt-uacc-line, rgba(91, 134, 216, .32));
+}
+[data-fpt-preset="light"] .fpt-chip.active {
+    color: var(--fpt-uacc-strong, #3d69c4);
+}
+
+/* Плавающая поверхность: контекст-меню, поповеры, инлайн-попапы. */
+.fpt-ctx-surface {
+    background: var(--fpt-p1, #16181d);
+    color: var(--fpt-pTx, #f1f3f7);
+    border: 1px solid var(--fpt-pLine, rgba(255, 255, 255, .10));
+    border-radius: 10px;
+    box-shadow: 0 12px 32px var(--fpt-pShadow, rgba(0, 0, 0, .5));
+}
+
+/* Модальная поверхность: оболочки модальных окон расширения. */
+.fpt-modal-surface {
+    background: var(--fpt-p1, #16181d);
+    color: var(--fpt-pTx, #f1f3f7);
+    border: 1px solid var(--fpt-pLine, rgba(255, 255, 255, .10));
+    border-radius: 12px;
+    box-shadow: 0 16px 48px var(--fpt-pShadow, rgba(0, 0, 0, .5));
+}
 
 /* Выборочное копирование раздела с другого аккаунта (иконка в углу пункта меню) */
 .fp-tools-popup .fpt-seccopy { position: absolute; top: 14px; right: 16px; z-index: 30; }
@@ -11681,22 +11826,36 @@ html[data-fpt-preset="light"] .chat-form-input .form-control {
 
 /* Светлая тема: статистика профиля лежит поверх ТЁМНОЙ обложки игры — тёмный текст
    на ней не читался. Делаем светлым + лёгкая тень (имя оставляем акцентным). */
+/* Светлая тема: расширение кладёт на .profile-header полупрозрачную СВЕТЛУЮ вуаль, и
+   статистика продавца (дата регистрации, рейтинг «4.6 из 5», «Всего N отзывов»)
+   оказывалась near-white #f1f3f7 на белом → нечитаемо. Делаем тёмной/контрастной. */
 html[data-fpt-preset="light"] .profile-header h5,
 html[data-fpt-preset="light"] .profile-header .text-bold,
 html[data-fpt-preset="light"] .profile-header .inline-block-vat,
-html[data-fpt-preset="light"] .profile-header .rating-full-count,
+html[data-fpt-preset="light"] .profile-header .rating-value,
 html[data-fpt-preset="light"] .profile-header .param-item,
-html[data-fpt-preset="light"] .profile-header .param-item *,
-html[data-fpt-preset="light"] .profile-cover .rating-full-count {
+html[data-fpt-preset="light"] .profile-header .param-item * {
+    color: #2b2f37 !important;
+    text-shadow: none !important;
+}
+html[data-fpt-preset="light"] .profile-header .rating-full-count,
+html[data-fpt-preset="light"] .profile-header .param-item .text-muted {
+    color: #5a6070 !important;
+    text-shadow: none !important;
+}
+/* если контент реально лежит ПОВЕРХ тёмной обложки игры — там оставляем светлый текст */
+html[data-fpt-preset="light"] .profile-cover .rating-full-count,
+html[data-fpt-preset="light"] .profile-cover .param-item,
+html[data-fpt-preset="light"] .profile-cover .param-item * {
     color: #f1f3f7 !important;
-    text-shadow: 0 1px 4px rgba(0,0,0,.6), 0 0 2px rgba(0,0,0,.45) !important;
+    text-shadow: 0 1px 4px rgba(0,0,0,.6) !important;
 }
 /* Шапка: поиск по играм и поле «Продавец» (RMTHub) — светлое поле + тёмный текст */
 html[data-fpt-preset="light"] .navbar .form-control,
 html[data-fpt-preset="light"] .fp-rmthub-form input,
 html[data-fpt-preset="light"] .fp-rmthub-form .form-control {
-    background-color: #ffffff !important; color: #272b33 !important;
-    border: 1px solid rgba(20,25,35,.16) !important;
+    background-color: #eef0f3 !important; color: #272b33 !important;
+    border: none !important; box-shadow: none !important;   /* убрали обводку полей в шапке */
 }
 html[data-fpt-preset="light"] .navbar .form-control::placeholder,
 html[data-fpt-preset="light"] .fp-rmthub-form input::placeholder { color: #8a90a0 !important; }

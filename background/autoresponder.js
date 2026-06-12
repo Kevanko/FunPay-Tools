@@ -493,13 +493,23 @@ async function handleReview(msg, auth, settings) {
             }
         }
 
-        if (settings.bonusForReviewEnabled && stars === 5) {
+        // бонус за 5★ — со СВОИМ пер-заказным дедупом, иначе при каждом редактировании
+        // отзыва (FEEDBACK_CHANGED) бонус (часто промокод/подарок) уходил повторно.
+        if (settings.bonusForReviewEnabled && stars === 5 && !(settings.bonusSentOrderIds || []).includes(orderId)) {
             let bonusText = '';
             if (settings.bonusMode === 'single' && settings.singleBonusText) bonusText = settings.singleBonusText;
             else if (settings.bonusMode === 'random' && settings.randomBonuses?.length)
                 bonusText = settings.randomBonuses[Math.floor(Math.random() * settings.randomBonuses.length)];
             if (bonusText?.trim()) {
-                try { await sendReplyContent(msg.chatId, applyVariables(bonusText, vars), auth); }
+                try {
+                    await sendReplyContent(msg.chatId, applyVariables(bonusText, vars), auth);
+                    await atomicUpdate(s => {
+                        const ids = s.bonusSentOrderIds || [];
+                        if (!ids.includes(orderId)) ids.push(orderId);
+                        if (ids.length > 500) ids.splice(0, ids.length - 500);
+                        s.bonusSentOrderIds = ids;
+                    });
+                }
                 catch (e) { console.error(`FP Tools AR: ошибка бонуса #${orderId}`, e.message); }
             }
         }
@@ -962,6 +972,14 @@ export async function runMultiAccountAutoReply(opts = {}) {
                             kind = 'greeting'; images = settings.greetingImages; order = settings.greetingSendOrder;
                         }
                         if (!reply) continue;
+                        // приветствие — как в активном аккаунте: шлём только в чаты, где
+                        // продавец ещё НЕ писал (настоящий первый контакт), иначе поприветст-
+                        // вуем давнего клиента на фоновом аккаунте.
+                        if (kind === 'greeting') {
+                            const w = await sellerWroteInChat(chat.chatId, auth);
+                            if (w === 'wrote') { greeted.add(chat.chatId); continue; }
+                            if (w === 'error') continue;   // не отмечаем — повторим в следующем проходе
+                        }
                         try {
                             await sendReplyContent(chat.chatId, reply, auth, images, order);
                             if (kind === 'greeting') greeted.add(chat.chatId);

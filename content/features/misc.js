@@ -369,8 +369,12 @@ function initializeToolsPopup() {
 
             applyNotificationSound();
 
+            // НЕ запускаем немедленный цикл поднятия на КАЖДОМ автосейве (любая правка в
+            // попапе) — серия правок била /lots/raise несколько раз подряд → rate-limit
+            // «Подождите». Тихий автосейв полагается на storage.onChanged (перевзводит
+            // будильник); немедленный старт — только по явной кнопке «Сохранить».
             if (settingsToSave.autoBumpEnabled) {
-                chrome.runtime.sendMessage({ action: 'startAutoBump', cooldown: settingsToSave.autoBumpCooldown });
+                if (!silent) chrome.runtime.sendMessage({ action: 'startAutoBump', cooldown: settingsToSave.autoBumpCooldown });
             } else {
                 chrome.runtime.sendMessage({ action: 'stopAutoBump' });
             }

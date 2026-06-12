@@ -733,6 +733,11 @@ button.add-image-btn .material-symbols-rounded {
 .fp-tools-popup input[type="checkbox"]:checked::after {
     opacity: 1 !important;
 }
+/* FIX #29: на СВЕТЛОМ пресете галочка — ПОЛНЫЙ акцент, а не 55%+белый. Бледно-голубой
+   (~1.9:1 на белой подложке попапа) было почти не отличить от снятого. */
+[data-fpt-preset="light"] .fp-tools-popup input[type="checkbox"]::after {
+    border-color: var(--fpt-uacc, #5b86d8) !important;
+}
 
 /* ---------- FIX E: variable chips - 85% transparent, easy on the eyes -------
    "у переменных белый фон ... сделать его 85% прозрачным"                     */
@@ -1286,6 +1291,29 @@ button.add-image-btn .material-symbols-rounded {
 [data-fpt-preset="light"] .fp-tools-popup .btn:not(.btn-default):hover {
     background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 86%, #1c2230);
 }
+/* FIX #24: калькулятор — самостоятельный ТЁМНЫЙ виджет в любой теме; его кнопки НЕ
+   должны перекрашиваться широким светлым правилом выше в одинаковый синий (терялась
+   разница цифра/оператор/AC). Жёстко пиним к ТЁМНЫМ значениям (не к light-surface
+   переменным, т.к. сама панель калькулятора тёмная). */
+[data-fpt-preset="light"] .fp-tools-popup .calc-btn {
+    background-color: #252934 !important;
+    color: #f1f3f7 !important;
+    border-color: transparent !important;
+}
+[data-fpt-preset="light"] .fp-tools-popup .calc-btn.calc-btn-light {
+    background-color: #303644 !important;
+    color: #f1f3f7 !important;
+}
+[data-fpt-preset="light"] .fp-tools-popup .calc-btn.calc-btn-operator {
+    background-color: var(--fpt-uacc, #5b86d8) !important;
+    color: #ffffff !important;
+}
+/* иконочные кнопки-виджеты на светлой теме остаются «плоскими», без синей заливки */
+[data-fpt-preset="light"] .fp-tools-popup .fpt-icon-play-btn,
+[data-fpt-preset="light"] .fp-tools-popup .fpt-sec-spin-btns button {
+    background: transparent !important;
+    color: var(--fpt-uacc, #5b86d8) !important;
+}
 [data-fpt-preset="light"] .fp-tools-popup .btn.btn-default,
 [data-fpt-preset="light"] .fp-tools-popup button.btn-default {
     background: #ffffff;
@@ -1325,3 +1353,46 @@ button.add-image-btn .material-symbols-rounded {
 
 /* Текст радио-опций следует теме (был жёсткий #eee — белый на светлой) */
 .fp-tools-popup .fp-tools-radio-option span { color: var(--fpt-text, #eee); }
+
+/* ---------- Сегменты (.fpt-seg) и чипы-тумблеры: не «обычные» кнопки ----------
+   Generic-правила «.fp-tools-popup button» выше (и сплошная светлая заливка из
+   light-правила с :not-цепочкой) красили ВСЕ опции одинаковым акцентом:
+   иерархия инвертировалась (неактивные ярче активной), а превью «Заливки»
+   (.fpt-fill-prev: сплошная/мягкая/контур/призрак) тонули в фоне кнопки.
+   Возвращаем замысел из content_styles: неактивные — тихие (прозрачный фон,
+   приглушённый текст), активная — мягкий акцент + акцентная рамка.
+   !important — чтобы перебить высокоспецифичное светлое правило. */
+.fp-tools-popup .fpt-seg button {
+    background: transparent !important;
+    border-color: transparent !important;
+    color: var(--fpt-text-dim, #aeb3d4) !important;
+}
+.fp-tools-popup .fpt-seg button:hover {
+    background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 10%, transparent) !important;
+    color: var(--fpt-text, #fff) !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+.fp-tools-popup .fpt-seg button.active {
+    background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 16%, transparent) !important;
+    border-color: var(--fpt-uacc, #5b86d8) !important;
+    color: var(--fpt-text, #fff) !important;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--fpt-uacc, #5b86d8) 35%, transparent) inset !important;
+}
+/* Чипы «Дополнительно» (.fpt-chip-toggle) ломались тем же generic-правилом. */
+.fp-tools-popup .fpt-chip-toggle {
+    background: var(--fpt-bg-deep, #0e0f16) !important;
+    border-color: var(--fpt-line-strong, #22253a) !important;
+    color: var(--fpt-text-dim, #9aa0c2) !important;
+}
+.fp-tools-popup .fpt-chip-toggle:hover {
+    color: var(--fpt-text, #fff) !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+.fp-tools-popup .fpt-chip-toggle.active {
+    background: color-mix(in srgb, var(--fpt-uacc, #5b86d8) 16%, transparent) !important;
+    border-color: var(--fpt-uacc, #5b86d8) !important;
+    color: var(--fpt-text, #fff) !important;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--fpt-uacc, #5b86d8) 35%, transparent) inset !important;
+}

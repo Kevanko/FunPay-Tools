@@ -57,7 +57,7 @@ function makeOrderNumberCopyable() {
     icon.style.cssText = 'font-size:0.75em;opacity:.6;';
     chip.appendChild(icon);
 
-    chip.addEventListener('mouseenter', () => chip.style.background = 'rgba(192,38,211,0.15)');
+    chip.addEventListener('mouseenter', () => chip.style.background = 'var(--fpt-accent-soft, rgba(91,134,216,.16))');
     chip.addEventListener('mouseleave', () => chip.style.background = '');
     chip.addEventListener('click', async () => {
         try {
@@ -156,7 +156,7 @@ function initQuickPriceEdit() {
         const nodeId = nodeMatch ? nodeMatch[1] : null;
 
         const editBtn = document.createElement('span');
-        editBtn.style.cssText = 'display:none;font-size:11px;color:#C026D3;cursor:pointer;margin-left:4px;vertical-align:middle;user-select:none;';
+        editBtn.style.cssText = 'display:none;font-size:11px;color:var(--fpt-uacc, #7da4e8);cursor:pointer;margin-left:4px;vertical-align:middle;user-select:none;';
         editBtn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;">edit</span>';
         editBtn.title = 'Быстро изменить цену';
         priceEl.appendChild(editBtn);
@@ -184,9 +184,10 @@ function openPricePopup(offerId, currentPrice, anchor, nodeId) {
     document.getElementById('fp-price-popup')?.remove();
     const popup = document.createElement('div');
     popup.id = 'fp-price-popup';
+    popup.className = 'fpt-ctx-surface';
     const rect = anchor.getBoundingClientRect();
-    popup.style.cssText = `position:fixed;left:${Math.min(rect.right+8, window.innerWidth-200)}px;top:${rect.top}px;background:#13141a;border:1px solid #22253a;border-radius:8px;padding:12px;z-index:10000;box-shadow:0 8px 24px rgba(0,0,0,0.5);font-family:Inter,sans-serif;width:176px;`;
-    popup.innerHTML = `<div style="font-size:10px;color:#5a5f7a;margin-bottom:6px;font-weight:700;text-transform:uppercase;">Цена</div><input id="fp-pe-input" type="number" step="0.01" value="${parseFloat(currentPrice)||''}" style="width:100%;background:#0e0f16;border:1px solid #22253a;border-radius:5px;padding:6px;color:#d8dae8;font-size:13px;outline:none;font-family:inherit;margin-bottom:8px;"><div style="display:flex;gap:6px;"><button id="fp-pe-save" style="flex:1;background:#C026D3;border:none;color:#fff;border-radius:5px;padding:6px;font-size:12px;cursor:pointer;font-weight:600;">Сохранить</button><button id="fp-pe-cancel" style="background:#1e2030;border:1px solid #2a2d44;color:#9099b8;border-radius:5px;padding:6px 8px;font-size:12px;cursor:pointer;">✕</button></div><div id="fp-pe-status" style="font-size:11px;margin-top:6px;min-height:14px;color:#5a5f7a;"></div>`;
+    popup.style.cssText = `position:fixed;left:${Math.min(rect.right+8, window.innerWidth-200)}px;top:${rect.top}px;padding:12px;z-index:10000;font-family:Inter,sans-serif;width:176px;`;
+    popup.innerHTML = `<div style="font-size:10px;color:var(--fpt-pTxFaint, #5a5f7a);margin-bottom:6px;font-weight:700;text-transform:uppercase;">Цена</div><input id="fp-pe-input" type="number" step="0.01" value="${parseFloat(currentPrice)||''}" style="width:100%;background:var(--fpt-pInput, #0e0f16);border:1px solid var(--fpt-pLine, #22253a);border-radius:5px;padding:6px;color:var(--fpt-pTx, #d8dae8);font-size:13px;outline:none;font-family:inherit;margin-bottom:8px;"><div style="display:flex;gap:6px;"><button id="fp-pe-save" style="flex:1;background:var(--fpt-uacc, #5b86d8);border:none;color:#fff;border-radius:5px;padding:6px;font-size:12px;cursor:pointer;font-weight:600;">Сохранить</button><button id="fp-pe-cancel" style="background:var(--fpt-p2, #1e2030);border:1px solid var(--fpt-pLine, #2a2d44);color:var(--fpt-pTxDim, #9099b8);border-radius:5px;padding:6px 8px;font-size:12px;cursor:pointer;">✕</button></div><div id="fp-pe-status" style="font-size:11px;margin-top:6px;min-height:14px;color:var(--fpt-pTxFaint, #5a5f7a);"></div>`;
     document.body.appendChild(popup);
 
     const input = popup.querySelector('#fp-pe-input');
@@ -240,13 +241,13 @@ function initOfferListFilter() {
     let active = 0;
     filters.forEach(({ label, fn }, i) => {
         const btn = document.createElement('button');
-        btn.className = 'btn btn-default';
+        btn.className = 'fpt-chip';
         btn.style.cssText = 'padding:4px 10px;font-size:11px;font-weight:700;';
         btn.textContent = label;
-        if (i === 0) { btn.style.background = '#2A1830'; btn.style.color = '#E9A8FF'; }
+        if (i === 0) btn.classList.add('active');
         btn.addEventListener('click', () => {
-            bar.querySelectorAll('button').forEach(b => { b.style.background=''; b.style.color=''; });
-            btn.style.background = '#2A1830'; btn.style.color = '#E9A8FF';
+            bar.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
             active = i;
             offerBlocks.forEach(b => { b.style.display = fn(b) ? '' : 'none'; });
         });

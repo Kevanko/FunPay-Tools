@@ -103,7 +103,7 @@
         #fpt-sel-reply{position:fixed;z-index:100002;display:none;align-items:center;gap:4px;
             background:var(--fpt-surface,#1a1c26);border:1px solid var(--fpt-border,rgba(127,127,127,0.3));
             color:var(--fpt-text,#d8dae8);border-radius:7px;padding:5px 10px;font-size:12px;font-weight:600;
-            cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,0.35);font-family:Inter,'Segoe UI',sans-serif;
+            cursor:pointer;box-shadow:0 4px 14px var(--fpt-shadow,rgba(0,0,0,0.35));font-family:Inter,'Segoe UI',sans-serif;
             white-space:nowrap;user-select:none;}
         #fpt-sel-reply:hover{border-color:var(--fpt-text-muted,#8a8f9c);}
         #fpt-sel-reply .material-symbols-rounded{font-size:15px;line-height:1;}
@@ -245,10 +245,17 @@
     }
 
     function startReplyGroup(headItem) {
-        activeReply = { author: resolveAuthor(headItem), text: groupText(headItem), msgId: headItem.id || '' };
+        activeReply = { author: resolveAuthor(headItem), text: groupText(headItem), msgId: headItem.id || '', node: _fptReplyNode() };
         renderReplyBar();
         const inp = chatInput();
         if (inp) inp.focus();
+    }
+
+    function _fptReplyNode() {
+        const ni = document.querySelector('input[name="node"]');
+        if (ni && ni.value) return ni.value;
+        const m = location.href.match(/[?&]node=([^&#\s]+)/);
+        return m ? decodeURIComponent(m[1]) : '';
     }
 
     function cancelReply() {
@@ -313,9 +320,20 @@
             const inp = chatInput();
             if (inp) applyReplyToInput(inp);
         }, true);
+
+        // SPA-навигация между чатами: сбрасываем активный ответ при смене чата (node=),
+        // чтобы плашка-цитата не «переехала» к другому покупателю.
+        let _replyLastNode = _fptReplyNode();
+        setInterval(() => {
+            const n = _fptReplyNode();
+            if (n !== _replyLastNode) { _replyLastNode = n; if (activeReply) cancelReply(); }
+        }, 800);
     }
 
     function applyReplyToInput(inp) {
+        // защита от утечки цитаты между чатами: если активный чат сменился (SPA-навигация),
+        // НЕ прицепляем старую цитату к сообщению другому покупателю — просто отменяем ответ.
+        if (activeReply && activeReply.node && activeReply.node !== _fptReplyNode()) { cancelReply(); return; }
         const typed = inp.value;
         if (!typed.trim()) return;
         inp.value = buildSendText(typed);
@@ -436,7 +454,8 @@
             activeReply = {
                 author: head ? resolveAuthor(head) : 'Сообщение',
                 text: text,
-                msgId: item ? (item.id || '') : ''
+                msgId: item ? (item.id || '') : '',
+                node: _fptReplyNode()
             };
             renderReplyBar();
             hideSelBtn();

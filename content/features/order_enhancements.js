@@ -1,5 +1,5 @@
 // content/features/order_enhancements.js - FunPay Tools 2.9
-// Unconfirmed balance in stats • "Request review" button • Sales period filter • Order type labels
+// Unconfirmed balance in stats • "Request review" button • Order type labels
 
 // ── 1. Unconfirmed balance display ──────────────────────────────────────────
 async function initUnconfirmedBalance() {
@@ -43,77 +43,9 @@ async function initUnconfirmedBalance() {
     }
 }
 
-// ── 2. Sales period filter ───────────────────────────────────────────────────
-function initSalesFilter() {
-    // Only on /orders/trade page
-    if (!window.location.pathname.includes('/orders/trade')) return;
-    if (document.getElementById('fp-sales-filter')) return;
-
-    // Wait for the FP Tools stats block to appear
-    const statsBlock = document.getElementById('fp-tools-sales-block') ||
-                       document.querySelector('.fp-tools-sales, [id*="sales"]');
-    if (!statsBlock) return;
-
-    const bar = document.createElement('div');
-    bar.id = 'fp-sales-filter';
-    bar.style.cssText = 'display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;';
-
-    const periods = [
-        { label: 'Сегодня',  days: 1 },
-        { label: 'Неделя',   days: 7 },
-        { label: 'Месяц',    days: 30, default: true },
-        { label: '3 месяца', days: 90 },
-        { label: 'Год',      days: 365 },
-        { label: 'Всё время',days: 99999 },
-    ];
-
-    periods.forEach(p => {
-        const btn = document.createElement('button');
-        btn.className = 'btn btn-default';
-        btn.style.cssText = `padding:4px 10px;font-size:11px;font-weight:600;${p.default ? 'background:#2A1830;color:#E9A8FF;border-color:#363a5a;' : ''}`;
-        btn.textContent = p.label;
-        btn.addEventListener('click', () => {
-            bar.querySelectorAll('button').forEach(b => {
-                b.style.background = ''; b.style.color = ''; b.style.borderColor = '';
-            });
-            btn.style.background = '#2A1830'; btn.style.color = '#E9A8FF'; btn.style.borderColor = '#363a5a';
-            applySalesPeriodFilter(p.days);
-        });
-        bar.appendChild(btn);
-    });
-
-    statsBlock.insertBefore(bar, statsBlock.firstChild);
-    applySalesPeriodFilter(30); // Default: month
-}
-
-async function applySalesPeriodFilter(days) {
-    const { fpToolsSalesData } = await chrome.storage.local.get('fpToolsSalesData');
-    if (!fpToolsSalesData) return;
-
-    const cutoff = days >= 99999 ? 0 : Date.now() - days * 86400000;
-    const all    = Object.values(fpToolsSalesData);
-    const filt   = all.filter(o => o.orderDate >= cutoff);
-
-    const total    = filt.reduce((s, o) => s + (o.price || 0), 0);
-    const closed   = filt.filter(o => o.orderStatus === 'closed').length;
-    const pending  = filt.filter(o => o.orderStatus === 'paid');
-    const refunded = filt.filter(o => o.orderStatus === 'refunded').length;
-    const pendingAmt = pending.reduce((s, o) => s + (o.price || 0), 0);
-
-    // Update stats display elements
-    const elMap = {
-        'fp-sales-total':    `${Math.round(total * 100) / 100} ₽`,
-        'fp-sales-count':    String(filt.length),
-        'fp-sales-closed':   String(closed),
-        'fp-sales-pending':  `${pending.length} (${Math.round(pendingAmt)} ₽)`,
-        'fp-sales-refunded': String(refunded),
-    };
-
-    Object.entries(elMap).forEach(([id, val]) => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = val;
-    });
-}
+// ── 2. Sales period filter — УДАЛЁН: дублировал штатный селектор периода
+//      панели «Статистика продаж» (#fpTools-stats-period, ui_enhancements.js)
+//      и никогда не отрисовывался (контейнер #fp-tools-sales-block не существует).
 
 // ── 3. "Request review" button on closed orders ──────────────────────────────
 function initReviewRequestButtons() {
@@ -131,14 +63,14 @@ function initReviewRequestButtons() {
 
             const btn = document.createElement('button');
             btn.style.cssText = `
-                background:none;border:1px solid #22253a;border-radius:4px;
-                color:#C026D3;cursor:pointer;padding:2px 8px;font-size:11px;
+                background:none;border:1px solid var(--fpt-pLine, #22253a);border-radius:4px;
+                color:var(--fpt-uacc, #C026D3);cursor:pointer;padding:2px 8px;font-size:11px;
                 margin-left:6px;font-family:Inter,sans-serif;transition:background .15s;
                 white-space:nowrap;flex-shrink:0;
             `;
             btn.textContent = 'Попросить отзыв';
             btn.title = 'Отправить покупателю сообщение с просьбой оставить отзыв';
-            btn.addEventListener('mouseenter', () => btn.style.background = '#1e2030');
+            btn.addEventListener('mouseenter', () => btn.style.background = 'var(--fpt-p3, #1e2030)');
             btn.addEventListener('mouseleave', () => btn.style.background = '');
 
             btn.addEventListener('click', async (e) => {
@@ -168,14 +100,25 @@ function initReviewRequestButtons() {
                     const d = JSON.parse(raw);
                     const u = Array.isArray(d) ? d[0] : d;
 
+                    // НЕ используем id ПОЛЬЗОВАТЕЛЯ как node чата (разные пространства id)!
+                    // Резолвим настоящий chat node со страницы заказа.
+                    const orderRes = await fetch(`https://funpay.com/orders/${orderId}/`, { credentials: 'include', cache: 'no-store' });
+                    if (!orderRes.ok) throw new Error(`HTTP ${orderRes.status}`);
+                    const orderHtml = await orderRes.text();
+                    const odoc = new DOMParser().parseFromString(orderHtml, 'text/html');
+                    const chatLink = odoc.querySelector('a[href*="chat/?node="]');
+                    const nodeM = chatLink && (chatLink.getAttribute('href') || '').match(/node=(\d+)/);
+                    const chatNode = nodeM ? nodeM[1] : null;
+                    if (!chatNode) throw new Error('не найден чат с покупателем');
+
                     const payload = {
                         objects: JSON.stringify([{
-                            type: 'chat_node', id: buyerId, tag: '0',
-                            data: { node: buyerId, last_message: -1, content: '' }
+                            type: 'chat_node', id: chatNode, tag: '00000000',
+                            data: { node: chatNode, last_message: -1, content: '' }
                         }]),
                         request: JSON.stringify({
                             action: 'chat_message',
-                            data: { node: buyerId, content: template }
+                            data: { node: chatNode, last_message: -1, content: template }
                         }),
                         csrf_token: u['csrf-token']
                     };
@@ -190,6 +133,9 @@ function initReviewRequestButtons() {
                     });
 
                     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    // FunPay отвечает 200 даже на логическую ошибку — проверяем тело.
+                    const json = await res.json().catch(() => null);
+                    if (json && json.error) throw new Error(typeof json.error === 'string' ? json.error : 'FunPay отклонил отправку');
                     showNotification('Запрос на отзыв отправлен!');
                     btn.textContent = 'Отправлено';
 
@@ -217,7 +163,6 @@ function initReviewRequestButtons() {
 function initOrderEnhancements() {
     if (window.location.pathname.includes('/orders/trade')) {
         setTimeout(initUnconfirmedBalance, 2000);
-        setTimeout(initSalesFilter, 1000);
     }
     initReviewRequestButtons();
 }

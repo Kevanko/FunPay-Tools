@@ -112,7 +112,8 @@ function _fptGcDetectSelf() {
         const appData = document.body && document.body.dataset && document.body.dataset.appData;
         if (appData && !_fptGcSelfName) {
             const d = JSON.parse(appData);
-            if (d && d.userName) _fptGcSelfName = d.userName;
+            const usr = Array.isArray(d) ? d[0] : d;   // app-data иногда массив [ {...} ]
+            if (usr && usr.userName) _fptGcSelfName = usr.userName;
         }
     } catch (e) { /* ignore */ }
 }
@@ -358,7 +359,7 @@ async function initializeGlobalChat() {
         if (feed) {
             feed.innerHTML =
                 '<div class="fpt-gc-disabled" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:40px 20px;color:var(--fpt-text-muted,#9aa0b5);">' +
-                '<span class="material-symbols-rounded" style="font-size:48px;color:var(--fpt-accent,#E9A8FF);">hourglass_top</span>' +
+                '<span class="material-symbols-rounded" style="font-size:48px;color:var(--fpt-uacc, #5b86d8);">hourglass_top</span>' +
                 '<div style="font-size:14px;line-height:1.6;max-width:380px;">' + _fptGcEscape(_fptGcConfig.disabledMessage) + '</div>' +
                 '</div>';
         }

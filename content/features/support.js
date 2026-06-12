@@ -53,12 +53,12 @@ async function _loadTickets() {
             'Открыт':      { bg: 'rgba(224,82,82,.15)',  color: '#e05252' },
             'В ожидании':  { bg: 'rgba(240,160,64,.15)', color: '#f0a040' },
             'Решена':      { bg: 'rgba(76,175,130,.15)', color: '#4caf82' },
-            'Закрыт':      { bg: 'rgba(58,61,82,.3)',    color: '#5a5f7a' },
+            'Закрыт':      { bg: 'var(--fpt-p3, rgba(58,61,82,.3))', color: 'var(--fpt-pTxDim, #5a5f7a)' },
         };
         const closeable = new Set(['Открыт', 'В ожидании']);
 
         tickets.forEach(t => {
-            const ss = statusStyle[t.status] || { bg: 'rgba(58,61,82,.3)', color: '#5a5f7a' };
+            const ss = statusStyle[t.status] || { bg: 'var(--fpt-p3, rgba(58,61,82,.3))', color: 'var(--fpt-pTxDim, #5a5f7a)' };
             const card = document.createElement('div');
             card.className = 'fp-tkt-card';
             card.style.position = 'relative';
@@ -67,7 +67,7 @@ async function _loadTickets() {
             topRow.style.cssText = 'display:flex;align-items:flex-start;justify-content:space-between;gap:8px;';
 
             const titleSpan = document.createElement('span');
-            titleSpan.style.cssText = 'font-size:12px;font-weight:500;flex:1;line-height:1.4;color:#c8cadc;';
+            titleSpan.style.cssText = 'font-size:12px;font-weight:500;flex:1;line-height:1.4;color:var(--fpt-pTx, #c8cadc);';
             titleSpan.textContent = t.title || 'Заявка #' + t.id;
 
             const statusSpan = document.createElement('span');
@@ -79,7 +79,7 @@ async function _loadTickets() {
             topRow.appendChild(statusSpan);
 
             const meta = document.createElement('div');
-            meta.style.cssText = 'font-size:11px;color:#3a3d52;margin-top:5px;display:flex;align-items:center;justify-content:space-between;';
+            meta.style.cssText = 'font-size:11px;color:var(--fpt-pTxFaint, #3a3d52);margin-top:5px;display:flex;align-items:center;justify-content:space-between;';
 
             const metaText = document.createElement('span');
             metaText.textContent = `#${t.id}${t.lastUpdate ? ' · ' + t.lastUpdate : ''}`;
@@ -117,12 +117,25 @@ async function _loadTickets() {
 
 // ── new ticket form ───────────────────────────────────────────────────────────
 
+// Компактный/полный режим панели: до выбора типа обращения форма почти
+// пустая, поэтому панель не растягивается на весь попап (аудит T-2)
+function _setNewTicketPanelExpanded(expanded) {
+    const panel = document.getElementById('fp-new-ticket-panel');
+    if (!panel) return;
+    panel.style.inset = expanded ? '0' : '0 0 auto 0';
+    panel.style.boxShadow = expanded ? 'none' : '0 14px 28px var(--fpt-pShadow, rgba(0,0,0,.45))';
+    panel.style.borderBottom = expanded ? 'none' : '1px solid var(--fpt-pLine, #1a1c2e)';
+    const fields = document.getElementById('fp-new-ticket-fields');
+    if (fields) fields.style.flex = expanded ? '1' : '0 0 auto';
+}
+
 function _openNewTicketPanel() {
     const panel = document.getElementById('fp-new-ticket-panel');
     if (!panel) return;
     // Move panel to fp-tools-body so it covers the full popup content, not just the page div
     const body = document.querySelector('.fp-tools-body');
     if (body && panel.parentElement !== body) body.appendChild(panel);
+    _setNewTicketPanelExpanded(false);
     panel.style.display = 'flex';
     _loadCategoriesForForm();
 }
@@ -136,8 +149,9 @@ async function _loadCategoriesForForm() {
     const fieldsDiv = document.getElementById('fp-new-ticket-fields');
     const submitBtn = document.getElementById('fp-new-ticket-submit');
     if (!fieldsDiv) return;
-    fieldsDiv.innerHTML = '<div style="color:#3a3d52;font-size:12px;">Загрузка категорий...</div>';
-    if (submitBtn) submitBtn.style.display = 'none';
+    fieldsDiv.innerHTML = '<div style="color:var(--fpt-pTxFaint, #3a3d52);font-size:12px;">Загрузка категорий...</div>';
+    // Прячем всю нижнюю плашку с кнопкой: пустая полоса в компактном режиме лишняя
+    if (submitBtn) { submitBtn.style.display = 'none'; submitBtn.parentElement.style.display = 'none'; }
 
     try {
         const { categories } = await _msg('supportGetCategories');
@@ -155,7 +169,7 @@ function _renderCategorySelect(fieldsDiv, submitBtn) {
     wrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
 
     const lbl = document.createElement('label');
-    lbl.style.cssText = 'font-size:11px;color:#6a7090;';
+    lbl.style.cssText = 'font-size:11px;color:var(--fpt-pTxDim, #6a7090);';
     lbl.textContent = 'Тип обращения';
     wrap.appendChild(lbl);
 
@@ -175,15 +189,23 @@ function _renderCategorySelect(fieldsDiv, submitBtn) {
     wrap.appendChild(sel);
     fieldsDiv.appendChild(wrap);
 
+    // Подсказка вместо пустоты, пока тип не выбран
+    const hint = document.createElement('div');
+    hint.id = 'fp-ticket-cat-hint';
+    hint.style.cssText = 'font-size:11px;color:var(--fpt-pTxFaint, #3a3d52);line-height:1.5;';
+    hint.textContent = 'Выберите тип обращения — ниже появятся поля формы.';
+    fieldsDiv.appendChild(hint);
+
     sel.addEventListener('change', async () => {
         // Remove old fields
         fieldsDiv.querySelectorAll('.fp-tkt-field').forEach(r => r.remove());
-        if (submitBtn) submitBtn.style.display = 'none';
-        if (!sel.value) return;
+        if (submitBtn) { submitBtn.style.display = 'none'; submitBtn.parentElement.style.display = 'none'; }
+        hint.style.display = sel.value ? 'none' : '';
+        if (!sel.value) { _setNewTicketPanelExpanded(false); return; }
 
         const spinner = document.createElement('div');
         spinner.className = 'fp-tkt-field';
-        spinner.style.cssText = 'font-size:12px;color:#3a3d52;padding:4px 0;';
+        spinner.style.cssText = 'font-size:12px;color:var(--fpt-pTxFaint, #3a3d52);padding:4px 0;';
         spinner.textContent = 'Загрузка полей...';
         fieldsDiv.appendChild(spinner);
 
@@ -191,7 +213,8 @@ function _renderCategorySelect(fieldsDiv, submitBtn) {
             const { fields } = await _msg('supportGetFields', { categoryId: sel.value });
             spinner.remove();
             _renderFields(fields, fieldsDiv);
-            if (submitBtn) submitBtn.style.display = 'block';
+            _setNewTicketPanelExpanded(true);
+            if (submitBtn) { submitBtn.style.display = 'block'; submitBtn.parentElement.style.display = ''; }
         } catch (e) {
             spinner.textContent = e.message;
         }
@@ -244,7 +267,7 @@ function _renderFields(fields, container) {
         if (f.condition) wrap.style.display = 'none'; // скрыто до оценки условия
 
         const lbl = document.createElement('label');
-        lbl.style.cssText = 'font-size:10px;color:#6a7090;';
+        lbl.style.cssText = 'font-size:10px;color:var(--fpt-pTxDim, #6a7090);';
         lbl.textContent = f.name + (f.required ? ' *' : '');
         wrap.appendChild(lbl);
 
@@ -255,7 +278,7 @@ function _renderFields(fields, container) {
         if (f.type === 'select' || f.type === 'radio') {
             // Точно как в Android: Column с border, каждый option - Row с RadioButton + Text
             const col = document.createElement('div');
-            col.style.cssText = 'display:flex;flex-direction:column;border:1px solid rgba(106,112,144,0.3);border-radius:4px;overflow:hidden;';
+            col.style.cssText = 'display:flex;flex-direction:column;border:1px solid var(--fpt-pLine, rgba(106,112,144,0.3));border-radius:4px;overflow:hidden;';
             col.dataset.fieldId = f.id;
             col.dataset.fieldType = 'radio-group';
 
@@ -266,7 +289,7 @@ function _renderFields(fields, container) {
                     const r = row.querySelector('input[type=radio]');
                     const selected = r.value === currentVal;
                     r.checked = selected;
-                    row.style.background = selected ? 'rgba(100,102,200,0.2)' : 'transparent';
+                    row.style.background = selected ? 'var(--fpt-uacc-soft, rgba(100,102,200,0.2))' : 'transparent';
                 });
             }
 
@@ -279,11 +302,11 @@ function _renderFields(fields, container) {
                 radio.type = 'radio';
                 radio.name = f.id;
                 radio.value = o.value;
-                radio.style.cssText = 'accent-color:#6466b4;cursor:pointer;width:16px;height:16px;flex-shrink:0;';
+                radio.style.cssText = 'accent-color:var(--fpt-uacc, #6466b4);cursor:pointer;width:16px;height:16px;flex-shrink:0;';
 
                 const txt = document.createElement('span');
                 txt.textContent = o.text;
-                txt.style.cssText = 'font-size:13px;color:#c8cadc;';
+                txt.style.cssText = 'font-size:13px;color:var(--fpt-pTx, #c8cadc);';
 
                 row.appendChild(radio);
                 row.appendChild(txt);
@@ -431,7 +454,7 @@ function _renderBubble(c, myUsername) {
     // Avatar (only for others)
     if (!isMe) {
         const av = document.createElement('div');
-        av.style.cssText = `width:28px;height:28px;border-radius:50%;flex-shrink:0;background:#1a1c2e;font-size:11px;font-weight:600;color:#C026D3;display:flex;align-items:center;justify-content:center;`;
+        av.style.cssText = `width:28px;height:28px;border-radius:50%;flex-shrink:0;background:var(--fpt-p3, #1a1c2e);font-size:11px;font-weight:600;color:var(--fpt-uacc, #C026D3);display:flex;align-items:center;justify-content:center;`;
         if (c.avatarUrl) {
             av.style.backgroundImage = `url('${c.avatarUrl}')`;
             av.style.backgroundSize = 'cover';
@@ -448,16 +471,16 @@ function _renderBubble(c, myUsername) {
 
     // Name + time (only for others, or own first)
     const meta = document.createElement('div');
-    meta.style.cssText = `font-size:10px;color:#3a3d52;padding:0 4px;`;
+    meta.style.cssText = `font-size:10px;color:var(--fpt-pTxFaint, #3a3d52);padding:0 4px;`;
     meta.textContent = (!isMe ? c.author + '  ' : '') + (c.timestamp || '');
     col.appendChild(meta);
 
     // Bubble
     const bubble = document.createElement('div');
     if (isMe) {
-        bubble.style.cssText = `background:linear-gradient(135deg,#5a56e8,#7b77ff);border-radius:16px 16px 4px 16px;padding:8px 12px;font-size:13px;color:#fff;line-height:1.55;word-break:break-word;`;
+        bubble.style.cssText = `background:var(--fpt-uacc, linear-gradient(135deg,#5a56e8,#7b77ff));border-radius:16px 16px 4px 16px;padding:8px 12px;font-size:13px;color:#fff;line-height:1.55;word-break:break-word;`;
     } else {
-        bubble.style.cssText = `background:#12131f;border:1px solid #1a1c2e;border-radius:16px 16px 16px 4px;padding:8px 12px;font-size:13px;color:#d8dae8;line-height:1.55;word-break:break-word;`;
+        bubble.style.cssText = `background:var(--fpt-p2, #12131f);border:1px solid var(--fpt-pLine, #1a1c2e);border-radius:16px 16px 16px 4px;padding:8px 12px;font-size:13px;color:var(--fpt-pTx, #d8dae8);line-height:1.55;word-break:break-word;`;
     }
 
     // Parse text: images inline, links clickable
@@ -471,7 +494,7 @@ function _renderBubble(c, myUsername) {
         img.addEventListener('click', () => window.open(img.src, '_blank'));
     });
     // Make links open in new tab
-    tmp.querySelectorAll('a').forEach(a => { a.target = '_blank'; a.style.color = isMe ? 'rgba(255,255,255,0.85)' : '#7b77ff'; });
+    tmp.querySelectorAll('a').forEach(a => { a.target = '_blank'; a.style.color = isMe ? 'rgba(255,255,255,0.85)' : 'var(--fpt-uacc, #7b77ff)'; });
 
     bubble.appendChild(tmp);
     col.appendChild(bubble);
@@ -492,7 +515,7 @@ async function _openTicket(ticketId) {
     document.getElementById('fp-ticket-detail-status').textContent = '';
     document.getElementById('fp-tria').style.display = 'none';
     const msgs = document.getElementById('fp-tdm');
-    msgs.innerHTML = '<div style="text-align:center;color:#3a3d52;font-size:13px;padding:40px 0;">Загрузка...</div>';
+    msgs.innerHTML = '<div style="text-align:center;color:var(--fpt-pTxFaint, #3a3d52);font-size:13px;padding:40px 0;">Загрузка...</div>';
 
     try {
         const res = await _msg('supportGetTicketDetails', { ticketId });
@@ -502,15 +525,15 @@ async function _openTicket(ticketId) {
         const titleStr = res.title || ('Заявка #' + ticketId);
         document.getElementById('fp-ticket-detail-title').textContent = titleStr;
         const statusEl = document.getElementById('fp-ticket-detail-status');
-        const statusColor = { 'Открыт': '#4caf82', 'В ожидании': '#f0a040', 'Решена': '#4caf82', 'Закрыт': '#5a5f7a' };
-        statusEl.style.color = statusColor[res.status] || '#5a5f7a';
+        const statusColor = { 'Открыт': '#4caf82', 'В ожидании': '#f0a040', 'Решена': '#4caf82', 'Закрыт': 'var(--fpt-pTxDim, #5a5f7a)' };
+        statusEl.style.color = statusColor[res.status] || 'var(--fpt-pTxDim, #5a5f7a)';
         statusEl.textContent = res.status || '';
         const avEl = document.getElementById('fp-tkt-av');
         if (avEl) avEl.textContent = titleStr[0]?.toUpperCase() || 'Т';
 
         msgs.innerHTML = '';
         if (!(res.comments || []).length) {
-            msgs.innerHTML = '<div style="text-align:center;color:#3a3d52;font-size:12px;padding:30px 0;">Нет сообщений</div>';
+            msgs.innerHTML = '<div style="text-align:center;color:var(--fpt-pTxFaint, #3a3d52);font-size:12px;padding:30px 0;">Нет сообщений</div>';
         } else {
             (res.comments || []).forEach(c => msgs.appendChild(_renderBubble(c, myUsername)));
             msgs.scrollTop = msgs.scrollHeight;
@@ -552,6 +575,16 @@ async function _sendTicketReply() {
 // ── init ──────────────────────────────────────────────────────────────────────
 
 function initTicketsTab() {
+    // Вход в раздел всегда начинается со списка заявок: закрываем
+    // «зависшие» с прошлого открытия оверлея форму создания, карточку
+    // тикета и окно подтверждения (аудит T-2)
+    _closeNewTicketPanel();
+    const detailPanel = document.getElementById('fp-ticket-detail-panel');
+    if (detailPanel) detailPanel.style.display = 'none';
+    _currentTicketId = null;
+    const confirmOverlay = document.getElementById('fp-ticket-confirm-overlay');
+    if (confirmOverlay) confirmOverlay.style.display = 'none';
+    _ticketPendingPayload = null;
     if (_ticketsInited) { _loadTickets(); return; }
     _ticketsInited = true;
 
@@ -583,11 +616,11 @@ function initTicketsTab() {
 
     // Hover effects via JS - inline onmouseover breaks HTML in template literals
     const replyBtn = document.getElementById('fp-ticket-reply-btn');
-    replyBtn?.addEventListener('mouseenter', () => replyBtn.style.background = '#5752e8');
-    replyBtn?.addEventListener('mouseleave', () => replyBtn.style.background = '#C026D3');
+    replyBtn?.addEventListener('mouseenter', () => replyBtn.style.background = 'color-mix(in srgb, var(--fpt-uacc, #5b86d8) 82%, #fff)');
+    replyBtn?.addEventListener('mouseleave', () => replyBtn.style.background = 'var(--fpt-uacc, #5b86d8)');
     const attachLbl = document.getElementById('fp-attach-lbl');
-    attachLbl?.addEventListener('mouseenter', () => attachLbl.style.color = '#9099b8');
-    attachLbl?.addEventListener('mouseleave', () => attachLbl.style.color = '#4a4f6a');
+    attachLbl?.addEventListener('mouseenter', () => attachLbl.style.color = 'var(--fpt-pTxDim, #9099b8)');
+    attachLbl?.addEventListener('mouseleave', () => attachLbl.style.color = 'var(--fpt-pTxFaint, #4a4f6a)');
     replyInput?.addEventListener('keydown', e => {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _sendTicketReply(); }
     });
