@@ -203,6 +203,13 @@ async function _fptCloudPushCAS() {
 
 async function _fptCloudReconcile(trigger) {
     try {
+        // Идёт переключение аккаунта (пауза переживает перезагрузку) — НЕ синхронизируемся,
+        // пока активный профиль не устаканится: иначе зальём тему не того аккаунта в облако.
+        if (Date.now() < _fptCloudSuspendUntil) {
+            _fptCloudReadyFlag = true;
+            setTimeout(() => _fptCloudRun(() => _fptCloudReconcile('after-switch')), _fptCloudSuspendUntil - Date.now() + 600);
+            return;
+        }
         if (!_fptCloudAlive() || !_fptC.uid || !(await _fptCloudEnabled())) { _fptCloudReadyFlag = true; return; }
         _fptCloudOn = true;
         if (!_fptC.key) _fptC.key = await _fptCloudDeriveKey(_fptC.uid);
@@ -373,6 +380,8 @@ try { chrome.storage.onChanged.addListener((changes, area) => { if (area === 'lo
     try {
         const u = _fptCloudUser(); _fptC.uid = u.id || ''; _fptC.name = u.name || '';
         if (!_fptC.uid) { _fptCloudReadyFlag = true; return; }
+        // пауза синка на время переключения аккаунта переживает перезагрузку (storage)
+        try { const { fptCloudSwitchSuspendUntil: s = 0 } = await chrome.storage.local.get('fptCloudSwitchSuspendUntil'); if (s > _fptCloudSuspendUntil) _fptCloudSuspendUntil = s; } catch (_) {}
         _fptCloudOn = await _fptCloudEnabled();
         await _fptCloudLoadState();
         if (_fptCloudOn) _fptC.key = await _fptCloudDeriveKey(_fptC.uid);
