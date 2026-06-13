@@ -3,20 +3,26 @@
 (function() {
     'use strict';
 
-    // Отметка активности пользователя (троттлинг ~раз в 8 c). Фоновый «пинг онлайна»
-    // читает её и НЕ подменяет golden_key чужих аккаунтов, пока пользователь активен —
-    // иначе клик/переход в момент подмены на секунду переключал бы аккаунт.
-    (function trackUserActivity() {
+    // ПРИСУТСТВИЕ на странице FunPay. Пока вкладка ВИДИМА, держим в storage метку
+    // fptPresentUntil (≈ сейчас + 30 c, обновляем раз в 12 c и на любое действие). Фоновые
+    // задачи (пинг онлайна, мульти-аккаунтный автоответ, снимки аккаунтов) НЕ подменяют
+    // golden_key/PHPSESSID, пока метка свежа — иначе подмена куки рушит активную сессию и
+    // FunPay начинает требовать «перезагрузите страницу» каждые ~30 секунд.
+    (function trackPresence() {
         if (window !== window.top) return;
         let last = 0;
-        const mark = () => {
+        const ping = () => {
             const now = Date.now();
-            if (now - last < 8000) return;
+            if (now - last < 9000) return;
             last = now;
-            try { chrome.storage.local.set({ fptLastUserAction: now }); } catch (_) {}
+            try { chrome.storage.local.set({ fptPresentUntil: now + 30000, fptLastUserAction: now }); } catch (_) {}
         };
+        const tick = () => { if (document.visibilityState === 'visible') ping(); };
+        tick();
+        setInterval(tick, 12000);
+        document.addEventListener('visibilitychange', () => { last = 0; tick(); });
         ['pointerdown', 'keydown', 'wheel'].forEach(ev =>
-            document.addEventListener(ev, mark, { passive: true, capture: true }));
+            document.addEventListener(ev, () => { last = 0; tick(); }, { passive: true, capture: true }));
     })();
 
     // --- НОВЫЙ БЛОК: ФУНКЦИОНАЛ ОБЪЯВЛЕНИЙ ---
