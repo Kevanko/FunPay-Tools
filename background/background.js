@@ -848,76 +848,44 @@ async function processNextLotImport() {
 // Все вызовы сериализуются ОБЩИМ замком withCookieLock, чтобы параллельные снимки
 // и мульти-аккаунтные циклы не затирали cookie друг друга и не разлогинивали сессию.
 // =====================================================================
-function fptSnapshotForKey(key) {
-    const run = async () => {
-        // 1) Запоминаем текущую golden_key, чтобы вернуть её после запроса.
-        let original = null;
-        try { original = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' }); } catch (_) {}
+// Снимок аккаунта БЕЗ подмены общей куки. fetch() запрещает ставить заголовок Cookie
+// вручную, поэтому ставим его правилом declarativeNetRequest ТОЛЬКО для нашего помеченного
+// запроса (URL c ?_fptsnap=1 — такого больше никто не делает), а сам fetch идём с
+// credentials:'omit'. Итог: общий cookie jar (сессия открытой вкладки) НЕ читается и НЕ
+// меняется → больше нет «перезагрузите страницу» от фоновых снимков/пинга онлайна.
+// Сериализуем общим замком withCookieLock: одновременно активно не больше одного правила,
+// и снимки не пересекаются с мульти-аккаунтным циклом.
+const FPT_DNR_SNAP_RULE = 90217;
 
-        // Если ключ совпадает с активным — просто грузим главную как есть.
-        if (original && original.value === key) {
-            try {
-                const resp = await fpFetch('https://funpay.com/', { credentials: 'include', cache: 'no-store' });
-                const html = await resp.text();
-                return await parseHtmlViaOffscreen(html, 'parseAccountSnapshot');
-            } catch (e) { return null; }
-        }
-
-        const setKey = async (value) => {
-            return chrome.cookies.set({
-                url: 'https://funpay.com',
-                name: 'golden_key',
-                value,
-                domain: '.funpay.com',
-                path: '/',
-                secure: true,
-                sameSite: 'lax',
-                expirationDate: Math.floor(Date.now() / 1000) + (365 * 24 * 60 * 60)
-            });
-        };
-
-        // НЕ подменяем куку, пока пользователь СИДИТ на FunPay (вкладка видима): снятие
-        // PHPSESSID/подмена golden_key рушат его активную сессию и FunPay требует
-        // «перезагрузите страницу». Снимок чужого аккаунта откладываем до простоя.
-        try { const { fptPresentUntil = 0 } = await chrome.storage.local.get('fptPresentUntil'); if (Date.now() < fptPresentUntil) return null; } catch (_) {}
-
-        // PHPSESSID доминирует над golden_key: без его снятия FunPay отдаёт АКТИВНУЮ
-        // сессию для любого ключа → у всех аккаунтов один баланс/аватар (заражение).
-        let originalSess = null;
-        try { originalSess = await chrome.cookies.get({ url: 'https://funpay.com', name: 'PHPSESSID' }); } catch (_) {}
+async function _fptFetchAsAccount(goldenKey) {
+    return withCookieLock(async () => {
+        const url = 'https://funpay.com/?_fptsnap=1';
         try {
-            // 2) Снимаем PHPSESSID и ставим cookie целевого аккаунта.
-            try { await chrome.cookies.remove({ url: 'https://funpay.com', name: 'PHPSESSID' }); } catch (_) {}
-            await setKey(key);
-            // 3) Грузим главную под этим аккаунтом (через общий темп/бэк-офф).
-            const resp = await fpFetch('https://funpay.com/', { credentials: 'include', cache: 'no-store' });
-            const html = await resp.text();
-            const snap = await parseHtmlViaOffscreen(html, 'parseAccountSnapshot');
-            return snap;
-        } catch (e) {
-            return null;
+            await chrome.declarativeNetRequest.updateSessionRules({
+                removeRuleIds: [FPT_DNR_SNAP_RULE],
+                addRules: [{
+                    id: FPT_DNR_SNAP_RULE, priority: 1,
+                    action: { type: 'modifyHeaders', requestHeaders: [{ header: 'cookie', operation: 'set', value: `golden_key=${goldenKey}` }] },
+                    condition: { urlFilter: '_fptsnap=1', resourceTypes: ['main_frame', 'xmlhttprequest', 'other'] }
+                }]
+            });
+            const resp = await fpFetch(url, { credentials: 'omit', cache: 'no-store' });
+            return await resp.text();
         } finally {
-            // 4) ВСЕГДА возвращаем исходные golden_key и PHPSESSID (свежесозданную
-            //    сессию целевого аккаунта убираем).
-            try {
-                if (original && original.value) await setKey(original.value);
-                else await chrome.cookies.remove({ url: 'https://funpay.com', name: 'golden_key' });
-            } catch (_) {}
-            try {
-                await chrome.cookies.remove({ url: 'https://funpay.com', name: 'PHPSESSID' });
-                if (originalSess && originalSess.value) {
-                    await chrome.cookies.set({
-                        url: 'https://funpay.com', name: 'PHPSESSID', value: originalSess.value,
-                        domain: originalSess.domain || '.funpay.com', path: originalSess.path || '/',
-                        secure: originalSess.secure !== false, httpOnly: !!originalSess.httpOnly,
-                        sameSite: originalSess.sameSite || 'lax'
-                    });
-                }
-            } catch (_) {}
+            try { await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: [FPT_DNR_SNAP_RULE] }); } catch (_) {}
         }
-    };
-    // общий замок на подмену куки: пинг онлайна и мульти-аккаунт не свапят разом
-    return withCookieLock(run);
+    });
+}
+
+function fptSnapshotForKey(key) {
+    return (async () => {
+        if (!key) return null;
+        try {
+            const html = await _fptFetchAsAccount(key);
+            if (!html) return null;
+            return await parseHtmlViaOffscreen(html, 'parseAccountSnapshot');
+        } catch (e) { return null; }
+    })();
 }
 
 // ── «Всегда в сети» для сохранённых аккаунтов ───────────────────────────────
@@ -933,32 +901,17 @@ async function runOnlineHeartbeat() {
     if (fpIsRateLimited()) return;            // FunPay под бэк-оффом — пропускаем пинг
     _fptOnlineRunning = true;
     try {
-        const { fpToolsAccounts = [], fptPresentUntil = 0 } = await chrome.storage.local.get(['fpToolsAccounts', 'fptPresentUntil']);
+        const { fpToolsAccounts = [] } = await chrome.storage.local.get('fpToolsAccounts');
         const online = fpToolsAccounts.filter(a => a && a.key && a.online !== false);
-        const updates = {};   // key -> snapshot
-        // Ключ АКТИВНОЙ сессии: для него снимок без подмены куки (безопасно). Для остальных
-        // fptSnapshotForKey подменяет golden_key/PHPSESSID — это рушит активную сессию
-        // пользователя (FunPay требует «перезагрузите страницу»). Поэтому пока пользователь
-        // НА СТРАНИЦЕ FunPay (вкладка видима) НЕ трогаем чужие куки — активный аккаунт онлайн
-        // и так от его присутствия, остальные пингуем, когда вкладка скрыта/закрыта.
-        let activeKey = '';
-        try { const c = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' }); activeKey = c ? c.value : ''; } catch (_) {}
-        // Пока пользователь НА СТРАНИЦЕ FunPay (вкладка видима) — пропускаем пинг ЦЕЛИКОМ:
-        // активный аккаунт онлайн от его присутствия, а любой фоновый запрос к funpay.com
-        // (даже снимок активного без свапа) может ротацией PHPSESSID сбить сессию открытой
-        // страницы → «перезагрузите страницу». Неактивные аккаунты пингуем, когда вкладка скрыта.
-        if (Date.now() < fptPresentUntil) return;
+        const updates = {};   // name -> snapshot
+        // Снимок идёт через declarativeNetRequest без подмены общей куки (см. fptSnapshotForKey),
+        // поэтому сессия открытой вкладки не страдает и пинговать можно ВСЕ онлайн-аккаунты
+        // в любой момент — и держать их в сети, и обновлять счётчики.
         for (const a of online) {
             if (fpIsRateLimited()) break;     // поймали лимит в процессе — стоп
-            // АКТИВНЫЙ аккаунт пингом НЕ трогаем: даже без свапа фетч его главной может
-            // ротировать PHPSESSID и сбить сессию открытой страницы (когда пользователь
-            // вернётся — «перезагрузите страницу»). Он и так онлайн от активности страницы.
-            if (a.key === activeKey) continue;
             try {
-                // fptSnapshotForKey КОРРЕКТНО авторизуется (подменяет golden_key и
-                // возвращает обратно). Ручной заголовок Cookie браузер игнорирует —
-                // поэтому он не годится ни для онлайна, ни для подсчёта. Этот запрос
-                // и регистрирует аккаунт онлайн, и даёт счётчики.
+                // fptSnapshotForKey авторизуется под ключом аккаунта (Cookie ставится правилом
+                // DNR только для помеченного запроса) и регистрирует аккаунт онлайн + даёт счётчики.
                 const snap = await fptSnapshotForKey(a.key);
                 if (snap && snap.loggedIn) {
                     // защита от перекрёстного заражения: если снимок принадлежит ДРУГОМУ
