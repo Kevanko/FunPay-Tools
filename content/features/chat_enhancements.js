@@ -200,6 +200,17 @@
             // новые сообщения / смена раскладки — пересчитываем (на childList, не на style → без петли)
             new MutationObserver(scheduleFit).observe(list, { childList: true });
         }
+        // Полоса шаблонов («Приветствие», «Заказ выполнен») рендерится АСИНХРОННО, уже после
+        // нашей первой подгонки → высота считается без неё, и при появлении полоса/композер
+        // «вдавливаются» и сжимаются. Следим за панелью чата: появилась/сменилась полоса →
+        // пересчитываем. Плюс пара отложенных пересчётов, чтобы поймать позднюю отрисовку.
+        const panel = list && list.closest('.chat, .chat-app, .chat-full');
+        if (panel && !panel.dataset.fptFitPanel) {
+            panel.dataset.fptFitPanel = '1';
+            new MutationObserver(scheduleFit).observe(panel, { childList: true });
+        }
+        setTimeout(scheduleFit, 500);
+        setTimeout(scheduleFit, 1500);
     }
 
     function init() {
