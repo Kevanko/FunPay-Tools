@@ -8760,6 +8760,11 @@ textarea.fp-cw-input { line-height:1.4; }
 .fpt-settings-cta-btn .material-symbols-rounded{font-size:18px;}
 @media (max-width:640px){.fpt-settings-cta{flex-wrap:wrap;}.fpt-settings-cta-btn{width:100%;justify-content:center;}}
 
+/* Полоса быстрых шаблонов и поле ввода в чате НЕ сжимаем — иначе при появлении полосы
+   «Приветствие/Заказ выполнен» она вдавливалась и текст съёживался. Ужимается только
+   лента сообщений (её высоту считает chat_enhancements.js). */
+.chat-buttons-container, .chat-form { flex-shrink: 0 !important; }
+
 /* «призрачный» профиль-заглушка «Добавить аккаунт» под основными */
 .fpt-accsw-add{margin-top:2px;}
 .fpt-accsw-av-ghost{background:transparent !important;border:1.5px dashed var(--fpt-pLine, rgba(255,255,255,.22));box-shadow:none !important;}

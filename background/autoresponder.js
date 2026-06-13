@@ -62,6 +62,13 @@ export async function fpFetch(url, options) {
 }
 
 async function fetchWithRetry(url, options, { retries = 4, baseDelay = 800 } = {}) {
+    // В контексте мульти-аккаунта (_dnrCtx) идём по помеченному URL (?_fptar=1) + credentials:'omit',
+    // чтобы Cookie ставило правило declarativeNetRequest, а общий jar не трогался. Маркер бьёт
+    // только по нашим запросам, активный аккаунт (без _dnrCtx) — как раньше, по ambient-куке.
+    if (_dnrCtx && typeof url === 'string' && url.startsWith('https://funpay.com')) {
+        url += (url.includes('?') ? '&' : '?') + '_fptar=1';
+        options = { ...(options || {}), credentials: 'omit' };
+    }
     let lastErr;
     for (let attempt = 0; attempt <= retries; attempt++) {
         try {
@@ -829,37 +836,66 @@ async function _runAutoResponderCycleInner() {
 // и ВОЗВРАЩАЕМ исходную куку. Включается флагом fptMultiAccountAR. Состояние и
 // настройки — у каждого аккаунта свои (профиль). Дедуп — на аккаунт.
 // ─────────────────────────────────────────────────────────────────────────────
-function _setGolden(value) {
-    return chrome.cookies.set({
-        url: 'https://funpay.com', name: 'golden_key', value,
-        domain: '.funpay.com', path: '/', secure: true, sameSite: 'lax',
-        expirationDate: Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60
-    });
+// Под нужным аккаунтом работаем через declarativeNetRequest БЕЗ подмены общей куки:
+// fetch() запрещает заголовок Cookie вручную, поэтому правило ставит его только для наших
+// помеченных запросов (?_fptar=1), а сами они идут с credentials:'omit'. Общий cookie jar
+// (сессия открытой вкладки) НЕ читается и НЕ меняется → больше нет «перезагрузите страницу».
+// PHPSESSID целевого аккаунта (нужен раннеру) берём из Set-Cookie ЕГО ЖЕ ответа через
+// webRequest — в jar при этом ничего не пишем.
+const _phpCache = {};            // golden_key -> { ts, php }
+let _dnrCtx = '';                // активный golden_key контекста (для маркер-фетчей и кэша)
+const FPT_DNR_AR_RULE = 90218;
+
+try {
+    chrome.webRequest.onHeadersReceived.addListener((d) => {
+        if (!_dnrCtx) return;
+        for (const h of (d.responseHeaders || [])) {
+            if ((h.name || '').toLowerCase() === 'set-cookie') {
+                const m = (h.value || '').match(/PHPSESSID=([^;]+)/);
+                if (m) _phpCache[_dnrCtx] = { ts: Date.now(), php: m[1] };
+            }
+        }
+    }, { urls: ['https://funpay.com/*'], types: ['main_frame', 'xmlhttprequest', 'other'] }, ['responseHeaders', 'extraHeaders']);
+} catch (_) {}
+
+async function _setArRule(key) {
+    const c = _phpCache[key];
+    const cookie = (c && Date.now() - c.ts < 20 * 60 * 1000) ? `golden_key=${key}; PHPSESSID=${c.php}` : `golden_key=${key}`;
+    try {
+        await chrome.declarativeNetRequest.updateSessionRules({
+            removeRuleIds: [FPT_DNR_AR_RULE],
+            addRules: [{
+                id: FPT_DNR_AR_RULE, priority: 1,
+                action: { type: 'modifyHeaders', requestHeaders: [{ header: 'cookie', operation: 'set', value: cookie }] },
+                condition: { urlFilter: '_fptar=1', resourceTypes: ['main_frame', 'xmlhttprequest', 'other'] }
+            }]
+        });
+    } catch (_) {}
 }
 
 let _maChain = Promise.resolve();
 function _maSerialize(fn) { const next = _maChain.then(fn, fn); _maChain = next.catch(() => {}); return next; }
 
-// Выполнить fn, когда активна golden_key целевого аккаунта; затем вернуть исходную.
-// Под общим замком withCookieLock — чтобы пинг онлайна и мульти-аккаунт не
-// подменяли куку одновременно (иначе гонки и 500/выход из аккаунта).
+// Выполнить fn под аккаунтом key, НЕ подменяя общую куку. fn получает auth (csrf/userId
+// целевого аккаунта). Активный аккаунт идёт по ambient-куке (без DNR); остальные — через
+// DNR-правило, с прогревом для получения их PHPSESSID.
 async function withAccountCookie(key, fn) {
     return withCookieLock(async () => {
         const orig = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
-        if (orig && orig.value === key) return await fn();   // уже активен — без свапа
-        // НЕ подменяем куку, пока пользователь СИДИТ на странице FunPay: подмена golden_key/
-        // PHPSESSID рушит его активную сессию (FunPay требует «перезагрузите страницу»).
-        // Аккаунт обработается позже, когда вкладка скрыта/закрыта. Активный аккаунт авто-
-        // ответом не затрагивается — он идёт по ambient-куке без свапа (ветка выше).
-        try { const { fptPresentUntil = 0 } = await chrome.storage.local.get('fptPresentUntil'); if (Date.now() < fptPresentUntil) return null; } catch (_) {}
-        try { await chrome.cookies.remove({ url: 'https://funpay.com', name: 'PHPSESSID' }); } catch (_) {}
-        await _setGolden(key);
+        if (orig && orig.value === key) {                    // активный — без DNR, по ambient-куке
+            const auth = await _ambientAuth();
+            return auth ? await fn(auth) : null;
+        }
+        _dnrCtx = key;
+        await _setArRule(key);                               // стартовое правило (golden_key [+ кэш PHPSESSID])
         try {
-            return await fn();
+            const auth = await _ambientAuth();               // прогрев: csrf/userId + PHPSESSID в кэш
+            if (!auth) return null;
+            await _setArRule(key);                           // теперь правило с PHPSESSID — для раннера
+            return await fn(auth);
         } finally {
-            try { await chrome.cookies.remove({ url: 'https://funpay.com', name: 'PHPSESSID' }); } catch (_) {}
-            if (orig && orig.value) await _setGolden(orig.value);
-            else { try { await chrome.cookies.remove({ url: 'https://funpay.com', name: 'golden_key' }); } catch (_) {} }
+            _dnrCtx = '';
+            try { await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: [FPT_DNR_AR_RULE] }); } catch (_) {}
         }
     });
 }
@@ -934,9 +970,7 @@ export async function runMultiAccountAutoReply(opts = {}) {
 
             const state = stateMap[account.key] || { seeded: false, lastSeen: {}, greeted: [] };
             try {
-                await withAccountCookie(account.key, async () => {
-                    const auth = await _ambientAuth();
-                    if (!auth) { report.errors.push(`${account.name}: не удалось авторизоваться`); return; }
+                await withAccountCookie(account.key, async (auth) => {
                     const chats = await _ambientChats(auth);
                     const acc = { name: account.name, userId: auth.userId, totalChats: chats.length, seeded: state.seeded, settings: { greeting: !!settings.greetingEnabled, keywords: !!settings.keywordsEnabled, keywordRules: (settings.keywords || []).length }, items: [], sent: [] };
                     const greeted = new Set(state.greeted || []);

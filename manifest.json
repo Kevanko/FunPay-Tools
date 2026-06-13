@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "FunPay Tools",
-    "version": "3.11.0",
+    "version": "3.11.1",
     "description": "Инструменты продавца для FunPay: статистика продаж, автоматизация, авто-выдача, массовые действия с лотами, темы оформления.",
     "permissions": [
         "storage",
@@ -12,7 +12,8 @@
         "offscreen",
         "notifications",
         "background",
-        "declarativeNetRequestWithHostAccess"
+        "declarativeNetRequestWithHostAccess",
+        "webRequest"
     ],
     "host_permissions": [
         "https://fptools-ai-server.vercel.app/*",
