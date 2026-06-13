@@ -159,21 +159,28 @@
     // Срабатывает ТОЛЬКО при реальном вылете (иначе — no-op); только уменьшает высоту.
     let _fitT = null;
     function fitChatList() {
+        // FunPay держит ленту сообщений в .chat-message-container (flex:1), а сам список —
+        // абсолютным внутри него; высоту он считает по JS и НЕ учитывает нашу полосу шаблонов,
+        // поэтому композер+полоса уезжают за низ окна и последнее сообщение прячется. Двигать
+        // надо КОНТЕЙНЕР (он позиционирует композер), а не список. Считаем доступную высоту
+        // ленты так, чтобы композер+полоса влезли в окно, и подгоняем контейнер и список.
         const list = document.querySelector('.chat-message-list');
+        const container = document.querySelector('.chat-message-container');
         const form = document.querySelector('.chat-form');
-        if (!list || !form) return;
-        const lr = list.getBoundingClientRect();
-        if (lr.height < 160) return;
-        const fr = form.getBoundingClientRect();
+        if (!list || !container || !form) return;
+        const cTop = container.getBoundingClientRect().top;
+        const formH = form.getBoundingClientRect().height;
         const strip = document.querySelector('.chat-buttons-container');
-        const sr = strip ? strip.getBoundingClientRect() : null;
-        const bottomChrome = sr ? Math.max(fr.bottom, sr.bottom) : fr.bottom;   // самый низ композера/полосы
-        const overflow = bottomChrome - window.innerHeight;
-        if (overflow > 4) {                                  // что-то реально срезано снизу
-            const atBottom = list.scrollHeight - list.clientHeight - list.scrollTop < 40;
-            list.style.height = Math.max(140, lr.height - overflow - 6) + 'px';
-            if (atBottom) list.scrollTop = list.scrollHeight; // оставляем пользователя у последнего сообщения
-        }
+        const stripH = strip ? strip.getBoundingClientRect().height : 0;
+        const avail = Math.round(window.innerHeight - cTop - formH - stripH - 8);
+        if (avail < 140) return;                              // слишком мало / не та раскладка — не трогаем
+        if (Math.abs(container.getBoundingClientRect().height - avail) < 3) return;   // уже верно
+        const atBottom = list.scrollHeight - list.clientHeight - list.scrollTop < 50;
+        container.style.flex = '0 0 auto';
+        container.style.minHeight = '0';
+        container.style.height = avail + 'px';
+        list.style.height = avail + 'px';                     // абсолютный список заполняет контейнер
+        if (atBottom) list.scrollTop = list.scrollHeight;     // оставляем пользователя у последнего сообщения
     }
     function scheduleFit() { if (_fitT) clearTimeout(_fitT); _fitT = setTimeout(fitChatList, 120); }
     function initChatListFit() {
