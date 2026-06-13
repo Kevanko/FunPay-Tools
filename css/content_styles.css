@@ -8685,6 +8685,14 @@ textarea.fp-cw-input { line-height:1.4; }
 .fpt-price-dot.fpt-price-yellow{background:#e0a93a;}
 .fpt-price-dot.fpt-price-red{background:#e05252;}
 .fpt-price-dot.fpt-price-grey{background:#8a93a8;}
+/* каркасный (wireframe) кружок «собираем данные» — пока категория грузится/считается */
+.fpt-price-dot.fpt-price-pending{
+    background:transparent;box-shadow:none;
+    border:1.5px dashed var(--fpt-pTxDim, #9099b8);
+    animation:fpt-pending-pulse 1.05s ease-in-out infinite;
+}
+@keyframes fpt-pending-pulse{0%,100%{opacity:.35;transform:scale(.82);}50%{opacity:.95;transform:scale(1.06);}}
+@media (prefers-reduced-motion: reduce){.fpt-price-dot.fpt-price-pending{animation:none;opacity:.6;}}
 /* кнопка «Проверить цены» над лотами профиля */
 .fpt-price-check-btn{
     display:inline-flex;align-items:center;gap:6px;margin:0 0 12px;padding:7px 14px;

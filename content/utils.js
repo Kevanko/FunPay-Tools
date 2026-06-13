@@ -47,18 +47,28 @@ function fptTitleTokens(title) {
     return (String(title || '').toLowerCase().match(/[a-zа-яё0-9]{3,}/giu) || [])
         .filter(w => !_FPT_STOP.has(w));
 }
-// Рекомендованная цена для лота. Схожесть — по РЕДКИМ (информативным) словам заголовка
-// (IDF): гайд сравнивается с гайдами, чит — с читами; название игры (общее для всей
-// категории) на отбор не влияет. Среди похожих — ВЗВЕШЕННАЯ медиана: вес оффера = число
-// отзывов продавца (≈ число продаж) × бонус за онлайн, ЛИНЕЙНО — чтобы пара топ-продавцов
-// перевесила толпу безотзывных лотов по 1 ₽ (накрутка сортировки). Дешёвые лоты за 1 ₽
-// (часто легитимные гайды) учитываются наравне; но если ВСЯ категория — демпинг по 1 ₽,
-// рынок помечается dumped (вердикт не показателен). offers: [{price, title, reviews, online}].
-function fptRecommendedPrice(lotTitle, offers) {
+// ПРОИЗВОДИТЕЛЬНОСТЬ: индекс категории (df слов, токены офферов, общая статистика)
+// считается ОДИН раз на категорию — fptBuildOfferIndex — а пер-лотная рекомендация
+// (fptRecommendedFromIndex) лишь сверяет слова лота с готовым df. Иначе пересчёт df по
+// всем офферам на КАЖДЫЙ лот давал O(лоты×офферы) и подвешивал прокрутку страницы.
+function fptBuildOfferIndex(offers) {
     const all = (offers || []).filter(o => o && isFinite(o.price) && o.price > 0);
+    const df = {};
+    const offTokens = all.map(o => { const s = new Set(fptTitleTokens(o.title)); s.forEach(w => { df[w] = (df[w] || 0) + 1; }); return s; });
+    const st = fptRobustPriceStats(all.map(o => o.price));   // общая по категории (фолбэк)
+    return { all, df, offTokens, N: all.length, st };
+}
+// Рекомендованная цена для ОДНОГО лота по готовому индексу. Схожесть — по РЕДКИМ
+// (информативным) словам заголовка (IDF): гайд сравнивается с гайдами, чит — с читами;
+// название игры (общее для всей категории) на отбор не влияет. Среди похожих —
+// ВЗВЕШЕННАЯ медиана: вес = число отзывов продавца (≈ продажи) × бонус за онлайн, ЛИНЕЙНО,
+// чтобы пара топ-продавцов перевесила толпу безотзывных лотов по 1 ₽. Дешёвые лоты за 1 ₽
+// (часто гайды) учитываются наравне; но если ВСЯ категория — демпинг, рынок dumped.
+function fptRecommendedFromIndex(lotTitle, idx) {
+    const all = idx.all;
     const finish = (comp) => {
-        const st = fptRobustPriceStats(comp.map(o => o.price));      // отсев только заоблачных сверху
-        const kept = comp.filter(o => o.price <= st.max);
+        const st = (comp === all) ? idx.st : fptRobustPriceStats(comp.map(o => o.price));
+        const kept = comp.filter(o => o.price <= st.max);          // отсев только заоблачных сверху
         let rec = fptWeightedMedian(kept.map(o => ({ price: o.price, w: (o.reviews || 0) * (o.online ? 1.3 : 1) })));
         if (!rec) rec = st.median;                                  // ни у кого нет отзывов — обычная медиана
         const spamShare = kept.length ? kept.filter(o => o.price <= 2).length / kept.length : 0;
@@ -66,20 +76,27 @@ function fptRecommendedPrice(lotTitle, offers) {
         return { recommended: rec, p25: st.p25, p75: st.p75, comparable: kept.length, total: all.length, dumped };
     };
     if (all.length < 4) return finish(all);
-    // df слова по категории → IDF (редкое слово информативнее)
-    const df = {};
-    const offTokens = all.map(o => { const s = new Set(fptTitleTokens(o.title)); s.forEach(w => { df[w] = (df[w] || 0) + 1; }); return s; });
-    const N = all.length;
+    const N = idx.N, df = idx.df, offTokens = idx.offTokens;
     const idf = w => Math.log((N + 1) / ((df[w] || 0) + 1));
     const lotTok = [...new Set(fptTitleTokens(lotTitle))].map(w => ({ w, i: idf(w) }));
     const lotW = lotTok.reduce((s, x) => s + x.i, 0);
     if (!lotW) return finish(all);
-    // оценка схожести = доля IDF-веса слов лота, встретившихся в оффере
-    const scored = all.map((o, k) => ({ o, sim: lotTok.reduce((s, x) => s + (offTokens[k].has(x.w) ? x.i : 0), 0) / lotW }));
-    let comp = scored.filter(s => s.sim >= 0.45).map(s => s.o);
-    if (comp.length < 4) comp = scored.filter(s => s.sim >= 0.25).map(s => s.o);
-    if (comp.length < 4) comp = all;
+    // схожесть = доля IDF-веса слов лота, встретившихся в оффере (один проход по офферам)
+    const strong = [], weak = [];
+    for (let k = 0; k < all.length; k++) {
+        const ot = offTokens[k]; let m = 0;
+        for (const x of lotTok) if (ot.has(x.w)) m += x.i;
+        const sim = m / lotW;
+        if (sim >= 0.45) strong.push(all[k]);
+        else if (sim >= 0.25) weak.push(all[k]);
+    }
+    const comp = strong.length >= 4 ? strong
+        : (strong.length + weak.length >= 4 ? strong.concat(weak) : all);
     return finish(comp);
+}
+// Back-compat: одиночный вызов (строит индекс на лету). offers: [{price,title,reviews,online}].
+function fptRecommendedPrice(lotTitle, offers) {
+    return fptRecommendedFromIndex(lotTitle, fptBuildOfferIndex(offers));
 }
 
 // 3.0: Image reference store. Instead of dumping a giant [image:data:...base64...] string
