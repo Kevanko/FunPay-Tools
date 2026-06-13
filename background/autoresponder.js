@@ -847,6 +847,11 @@ async function withAccountCookie(key, fn) {
     return withCookieLock(async () => {
         const orig = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
         if (orig && orig.value === key) return await fn();   // уже активен — без свапа
+        // НЕ подменяем куку, пока пользователь СИДИТ на странице FunPay: подмена golden_key/
+        // PHPSESSID рушит его активную сессию (FunPay требует «перезагрузите страницу»).
+        // Аккаунт обработается позже, когда вкладка скрыта/закрыта. Активный аккаунт авто-
+        // ответом не затрагивается — он идёт по ambient-куке без свапа (ветка выше).
+        try { const { fptPresentUntil = 0 } = await chrome.storage.local.get('fptPresentUntil'); if (Date.now() < fptPresentUntil) return null; } catch (_) {}
         try { await chrome.cookies.remove({ url: 'https://funpay.com', name: 'PHPSESSID' }); } catch (_) {}
         await _setGolden(key);
         try {

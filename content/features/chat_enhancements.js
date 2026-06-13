@@ -104,20 +104,29 @@
                 // не срабатывает, а программная очистка поля НЕ генерит 'input'. Поэтому
                 // ловим саму отправку: клик по кнопке отправки и Enter (без Shift).
                 const form = input.closest('form');
-                const clearDraftNow = () => {
+                // На ПОПЫТКУ отправки: (1) СРАЗУ сохраняем черновик — если FunPay вернёт
+                // «перезагрузите страницу», набранный текст не потеряется при перезагрузке;
+                // (2) через 0.5 c проверяем поле: очистилось → отправка УСПЕШНА → убираем
+                // черновик; текст на месте → отправка НЕ прошла → ОСТАВЛЯЕМ черновик.
+                // (Раньше черновик стирался по клику безусловно — текст пропадал при ошибке.)
+                const onSendAttempt = () => {
                     const chatId = getChatIdFromUrl();
                     if (!chatId) return;
-                    clearTimeout(_draftTimer);          // отменяем отложенное пересохранение
-                    if (_drafts[chatId] !== undefined) {
-                        delete _drafts[chatId];
-                        try { chrome.storage.local.set({ [DRAFT_KEY]: _drafts }); } catch (_) {}
-                    }
+                    const text = input.value.trim();
+                    if (text) { clearTimeout(_draftTimer); saveDraft(chatId, text); }
+                    setTimeout(() => {
+                        if (input.value.trim()) return;            // текст на месте → отправка не прошла → не трогаем
+                        if (_drafts[chatId] !== undefined) {
+                            delete _drafts[chatId];
+                            try { chrome.storage.local.set({ [DRAFT_KEY]: _drafts }); } catch (_) {}
+                        }
+                    }, 500);
                 };
-                form?.addEventListener('submit', clearDraftNow);
+                form?.addEventListener('submit', onSendAttempt);
                 const sendBtn = form?.querySelector('button[type="submit"], button.btn-round, .chat-form-btn button');
-                sendBtn?.addEventListener('click', () => setTimeout(clearDraftNow, 30));
+                sendBtn?.addEventListener('click', onSendAttempt);
                 input.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) setTimeout(clearDraftNow, 30);
+                    if (e.key === 'Enter' && !e.shiftKey) onSendAttempt();
                 });
             }
         });

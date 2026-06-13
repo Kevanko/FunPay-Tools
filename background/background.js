@@ -876,6 +876,11 @@ function fptSnapshotForKey(key) {
             });
         };
 
+        // НЕ подменяем куку, пока пользователь СИДИТ на FunPay (вкладка видима): снятие
+        // PHPSESSID/подмена golden_key рушат его активную сессию и FunPay требует
+        // «перезагрузите страницу». Снимок чужого аккаунта откладываем до простоя.
+        try { const { fptPresentUntil = 0 } = await chrome.storage.local.get('fptPresentUntil'); if (Date.now() < fptPresentUntil) return null; } catch (_) {}
+
         // PHPSESSID доминирует над golden_key: без его снятия FunPay отдаёт АКТИВНУЮ
         // сессию для любого ключа → у всех аккаунтов один баланс/аватар (заражение).
         let originalSess = null;
@@ -928,20 +933,27 @@ async function runOnlineHeartbeat() {
     if (fpIsRateLimited()) return;            // FunPay под бэк-оффом — пропускаем пинг
     _fptOnlineRunning = true;
     try {
-        const { fpToolsAccounts = [], fptLastUserAction = 0 } = await chrome.storage.local.get(['fpToolsAccounts', 'fptLastUserAction']);
+        const { fpToolsAccounts = [], fptPresentUntil = 0 } = await chrome.storage.local.get(['fpToolsAccounts', 'fptPresentUntil']);
         const online = fpToolsAccounts.filter(a => a && a.key && a.online !== false);
         const updates = {};   // key -> snapshot
         // Ключ АКТИВНОЙ сессии: для него снимок без подмены куки (безопасно). Для остальных
-        // fptSnapshotForKey подменяет golden_key на время запроса — и если пользователь в этот
-        // миг кликнет/перейдёт по странице, он на секунду окажется под чужим аккаунтом. Поэтому
-        // пока пользователь АКТИВЕН (действие за последние 25 c) НЕ трогаем чужие куки —
-        // активный аккаунт онлайн и так от его присутствия, а остальные подождут до простоя.
+        // fptSnapshotForKey подменяет golden_key/PHPSESSID — это рушит активную сессию
+        // пользователя (FunPay требует «перезагрузите страницу»). Поэтому пока пользователь
+        // НА СТРАНИЦЕ FunPay (вкладка видима) НЕ трогаем чужие куки — активный аккаунт онлайн
+        // и так от его присутствия, остальные пингуем, когда вкладка скрыта/закрыта.
         let activeKey = '';
         try { const c = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' }); activeKey = c ? c.value : ''; } catch (_) {}
-        const userBusy = Date.now() - (fptLastUserAction || 0) < 25000;
+        // Пока пользователь НА СТРАНИЦЕ FunPay (вкладка видима) — пропускаем пинг ЦЕЛИКОМ:
+        // активный аккаунт онлайн от его присутствия, а любой фоновый запрос к funpay.com
+        // (даже снимок активного без свапа) может ротацией PHPSESSID сбить сессию открытой
+        // страницы → «перезагрузите страницу». Неактивные аккаунты пингуем, когда вкладка скрыта.
+        if (Date.now() < fptPresentUntil) return;
         for (const a of online) {
             if (fpIsRateLimited()) break;     // поймали лимит в процессе — стоп
-            if (a.key !== activeKey && userBusy) continue;   // не свапаем куку во время активности
+            // АКТИВНЫЙ аккаунт пингом НЕ трогаем: даже без свапа фетч его главной может
+            // ротировать PHPSESSID и сбить сессию открытой страницы (когда пользователь
+            // вернётся — «перезагрузите страницу»). Он и так онлайн от активности страницы.
+            if (a.key === activeKey) continue;
             try {
                 // fptSnapshotForKey КОРРЕКТНО авторизуется (подменяет golden_key и
                 // возвращает обратно). Ручной заголовок Cookie браузер игнорирует —
