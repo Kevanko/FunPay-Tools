@@ -8762,8 +8762,10 @@ textarea.fp-cw-input { line-height:1.4; }
 
 /* Полоса быстрых шаблонов и поле ввода в чате НЕ сжимаем — иначе при появлении полосы
    «Приветствие/Заказ выполнен» она вдавливалась и текст съёживался. Ужимается только
-   лента сообщений (её высоту считает chat_enhancements.js). */
-.chat-buttons-container, .chat-form { flex-shrink: 0 !important; }
+   лента сообщений (её высоту считает chat_enhancements.js). ТОЛЬКО на полной странице
+   чата (body.fpt-chatpage) — у встроенного мини-чата в профиле своя раскладка. */
+body.fpt-chatpage .chat-buttons-container,
+body.fpt-chatpage .chat-form { flex-shrink: 0 !important; }
 
 /* «призрачный» профиль-заглушка «Добавить аккаунт» под основными */
 .fpt-accsw-add{margin-top:2px;}

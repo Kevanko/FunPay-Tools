@@ -126,17 +126,23 @@ async function fptCheckSwitchResult() {
         }
     } else {
         if (acc) acc.loginError = true;                            // вход не удался — ключ устарел
+        // Структурные ключи мы применили авансом под цель. Если выкинуло в РАЗЛОГИН — возвращаем
+        // прежние (загрузочный хук их не поправит, т.к. не залогинены). Если попали в ДРУГОЙ
+        // аккаунт — его профиль (вкл. структурные) применит fptAccountBoot, здесь не трогаем.
+        if (!name && mark.prevStruct) { try { await fptRestoreStruct(mark.prevStruct); } catch (_) {} }
         if (typeof showNotification === 'function') showNotification(`Не удалось войти в «${mark.name}» — ключ устарел. Нажмите «Перевойти».`, true);
     }
     try { await chrome.storage.local.set({ fpToolsAccounts: accts, fptSwitchCheck: null }); } catch (_) {}
 }
 
 // Переключение на сохранённый аккаунт.
-// КРИТИЧНО: тема/настройки цели заранее НЕ применяются и fptLastSeen НЕ трогается. Тема
-// меняется ТОЛЬКО ПОСЛЕ ФАКТИЧЕСКОГО ВХОДА — это делает загрузочный хук (fptDetectAccountLogin),
-// прочитав РЕАЛЬНЫЙ активный аккаунт после перезагрузки и применив ЕГО профиль. Иначе при
-// провале входа (устаревший ключ → выкинуло в другой аккаунт) тема цели оставалась бы на том
-// аккаунте, куда нас выкинуло (и утекала в облако). Сохраняем лишь настройки ТЕКУЩЕГО аккаунта.
+// КРИТИЧНО: ТЕМА/обои цели заранее НЕ применяются и fptLastSeen НЕ трогается. Тема меняется
+// ТОЛЬКО ПОСЛЕ ФАКТИЧЕСКОГО ВХОДА — это делает загрузочный хук (fptDetectAccountLogin), прочитав
+// РЕАЛЬНЫЙ активный аккаунт после перезагрузки и применив ЕГО профиль. Иначе при провале входа
+// (устаревший ключ → выкинуло в другой аккаунт) тема цели оставалась бы на том аккаунте, куда нас
+// выкинуло (и утекала в облако). АВАНСОМ применяются ТОЛЬКО структурные ключи (редизайн/отключённые
+// функции) — их без перезагрузки не применить, и сделать это ДО свапа = одна перезагрузка вместо двух;
+// при провале они откатываются. Тему/личные настройки применяет хук после подтверждённого входа.
 async function fptSwitchToAccount(acc) {
     if (!acc || !acc.key) return;
     const cur = _fptCurName();
@@ -148,14 +154,21 @@ async function fptSwitchToAccount(acc) {
         if (typeof fptCloudSuspendSync === 'function') fptCloudSuspendSync(SUSPEND);
         await chrome.storage.local.set({ fptCloudSwitchSuspendUntil: Date.now() + SUSPEND });
     } catch (_) {}
+    // ЕДИНСТВЕННАЯ перезагрузка: структурные ключи (редизайн-главная, отключённые функции)
+    // применяются ТОЛЬКО перезагрузкой. Применяем их ЗДЕСЬ, ДО setGoldenKey, чтобы перезагрузка
+    // от свапа стартовала уже с верными ключами и загрузочный хук НЕ дёргал ВТОРУЮ перезагрузку
+    // («нажал сменить → всё поменялось → опять перезагрузка»). Тему/обои НЕ трогаем — их применит
+    // хук вживую только ПОСЛЕ подтверждённого входа (иначе тема цели утечёт при провале ключа).
+    const prevStruct = await fptPreapplyStruct(acc.name);
     const before = await chrome.storage.local.get('fptSwitchCheck');
-    try { await chrome.storage.local.set({ fptSwitchCheck: { name: acc.name, prevName: cur || null, ts: Date.now() } }); } catch (_) {}
+    try { await chrome.storage.local.set({ fptSwitchCheck: { name: acc.name, prevName: cur || null, ts: Date.now(), prevStruct } }); } catch (_) {}
     let res = null;
     try { res = await chrome.runtime.sendMessage({ action: 'setGoldenKey', key: acc.key }); }
     catch (e) { if (typeof showNotification === 'function') showNotification(`Ошибка переключения: ${e.message}`, true); }
-    // ПРОВАЛ setGoldenKey → куку не сменили, перезагрузки не будет: снимаем метку. Тема осталась
-    // прежней (мы её и не трогали) — это и есть правильное поведение.
+    // ПРОВАЛ setGoldenKey → куку не сменили, перезагрузки не будет: возвращаем структурные ключи
+    // (применили авансом) и снимаем метку. Тему мы не трогали — она и так осталась прежней.
     if (!res || res.success === false) {
+        try { await fptRestoreStruct(prevStruct); } catch (_) {}
         try { await chrome.storage.local.set({ fptSwitchCheck: before.fptSwitchCheck || null }); } catch (_) {}
         if (typeof showNotification === 'function') showNotification('Не удалось переключить аккаунт.', true);
     }
@@ -751,6 +764,42 @@ async function fptSnapshotProfile(name) {
 // для них перезагрузка не нужна, поэтому при смене аккаунта не дёргаем лишний reload.
 const FPT_RELOAD_KEYS = ['enableRedesignedHomepage', 'fpToolsDisabledFeatures'];
 function _fptStableVal(v) { try { return JSON.stringify(v === undefined ? null : v); } catch (_) { return String(v); } }
+// Нормализуем структурный ключ к ЭФФЕКТИВНОМУ значению: отсутствие ключа в бандле = его
+// дефолт (редизайн выключен / список отключённых пуст). Иначе false vs undefined считалось
+// «изменением» и давало ЛИШНЮЮ вторую перезагрузку при переключении аккаунта.
+function _fptReloadNorm(k, v) {
+    if (k === 'enableRedesignedHomepage') return !!v ? '1' : '0';
+    if (k === 'fpToolsDisabledFeatures') { try { return JSON.stringify(v || []); } catch (_) { return '[]'; } }
+    return _fptStableVal(v);
+}
+
+// Привести СТРУКТУРНЫЕ ключи (FPT_RELOAD_KEYS) к состоянию бандла профиля name. Возвращает
+// СНИМОК прежних значений этих ключей (для отката при провале входа). Используется ДО свапа
+// golden_key, чтобы единственная перезагрузка стартовала уже с верными структурными ключами и
+// загрузочный хук НЕ дёргал вторую перезагрузку. bundle отсутствует → дефолт (ключи убраны).
+async function fptPreapplyStruct(name) {
+    const prev = await chrome.storage.local.get(FPT_RELOAD_KEYS);
+    try {
+        const profiles = await fptGetProfiles();
+        const bundle = profiles[name];
+        const toSet = {}, toRemove = [];
+        FPT_RELOAD_KEYS.forEach(k => { if (bundle && bundle[k] !== undefined) toSet[k] = bundle[k]; else toRemove.push(k); });
+        if (toRemove.length) await chrome.storage.local.remove(toRemove);
+        if (Object.keys(toSet).length) await chrome.storage.local.set(toSet);
+    } catch (_) {}
+    return prev;
+}
+
+// Откат структурных ключей к снимку prev (объект из storage.get: отсутствие ключа = убрать).
+async function fptRestoreStruct(prev) {
+    if (!prev) return;
+    try {
+        const toRemove = FPT_RELOAD_KEYS.filter(k => prev[k] === undefined);
+        const toSet = {}; FPT_RELOAD_KEYS.forEach(k => { if (prev[k] !== undefined) toSet[k] = prev[k]; });
+        if (toRemove.length) await chrome.storage.local.remove(toRemove);
+        if (Object.keys(toSet).length) await chrome.storage.local.set(toSet);
+    } catch (_) {}
+}
 
 // Применить бандл профиля name к глобальным ключам. Если бандла нет — чистим ключи,
 // чтобы новый аккаунт получил НАСТРОЙКИ ПО УМОЛЧАНИЮ (а не унаследовал чужие).
@@ -772,7 +821,7 @@ async function fptApplyProfile(name) {
         } else {
             await chrome.storage.local.remove(FPT_ACCOUNT_KEYS);   // новый аккаунт → дефолт/пусто
         }
-        const needsReload = FPT_RELOAD_KEYS.some(k => _fptStableVal(beforeReload[k]) !== _fptStableVal(bundle ? bundle[k] : undefined));
+        const needsReload = FPT_RELOAD_KEYS.some(k => _fptReloadNorm(k, beforeReload[k]) !== _fptReloadNorm(k, bundle ? bundle[k] : undefined));
         return { changed: true, needsReload };
     } catch (_) { return { changed: false, needsReload: false }; }
 }
@@ -971,10 +1020,10 @@ async function fptAccountBoot() {
 
 (function fptBootAccountMenu() {
     if (window !== window.top) return;
-    // после входа/перезагрузки: подхватить добавление аккаунта и проверить вход
-    fptCheckPendingAdd();
-    fptCheckSwitchResult();
-    fptAccountBoot();
+    // после входа/перезагрузки: подхватить добавление аккаунта и проверить вход.
+    // СТРОГО последовательно: эти три читают/пишут fpToolsAccounts; параллельный запуск
+    // ловил гонку (потерянная запись) → мог дёрнуть лишнюю перезагрузку/перетереть ключ.
+    (async () => { try { await fptCheckPendingAdd(); await fptCheckSwitchResult(); await fptAccountBoot(); } catch (_) {} })();
     const tryInject = () => fptInjectAccountMenuItems() || fptInjectLoggedOutSwitcher();
     if (tryInject()) return;
     const mo = new MutationObserver(() => { if (tryInject()) mo.disconnect(); });
