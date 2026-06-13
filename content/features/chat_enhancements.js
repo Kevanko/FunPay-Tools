@@ -168,6 +168,10 @@
     // Срабатывает ТОЛЬКО при реальном вылете (иначе — no-op); только уменьшает высоту.
     let _fitT = null;
     function fitChatList() {
+        // ТОЛЬКО на полной странице чата (/chat/). На странице профиля пользователя
+        // (/users/<id>/) есть встроенный мини-чат с ДРУГОЙ раскладкой — там подгонка по
+        // высоте окна растягивала ленту и текст вылезал за пределы виджета.
+        if (!location.pathname.includes('/chat/')) return;
         // FunPay держит ленту сообщений в .chat-message-container (flex:1), а сам список —
         // абсолютным внутри него; высоту он считает по JS и НЕ учитывает нашу полосу шаблонов,
         // поэтому композер+полоса уезжают за низ окна и последнее сообщение прячется. Двигать
@@ -213,8 +217,13 @@
         setTimeout(scheduleFit, 1500);
     }
 
+    // Метим body классом ТОЛЬКО на полной странице чата (/chat/), чтобы стили чата
+    // (flex-shrink композера/полосы) не задевали встроенный мини-чат в профиле.
+    function markChatPage() { try { document.body.classList.toggle('fpt-chatpage', location.pathname.includes('/chat/')); } catch (_) {} }
+
     function init() {
         initCtrlEnterSend();
+        markChatPage();
         window.addEventListener('resize', scheduleFit);
 
         // For chat pages, init draft + char counter
@@ -246,6 +255,7 @@
             // chatId is used for saving.
             if (window.location.href !== _lastUrl) {
                 _lastUrl = window.location.href;
+                markChatPage();
                 if (document.querySelector('.chat-form-input')) { initDraftSaving(); initChatListFit(); }
             }
         }).observe(root, { childList: true, subtree: true });
