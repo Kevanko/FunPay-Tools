@@ -152,8 +152,43 @@
     }
 
     // --- Init ---
+    // Когда композер/полоса шаблонов уезжают НИЖЕ окна (FunPay задаёт .chat-message-list
+    // абсолютную высоту по JS и не учитывает добавленную нами полосу шаблонов, либо окно
+    // низкое) — последнее сообщение оказывается за нижним краем и до него не долистать.
+    // Подрезаем высоту списка ровно на «вылет», чтобы низ списка и композер влезли в экран.
+    // Срабатывает ТОЛЬКО при реальном вылете (иначе — no-op); только уменьшает высоту.
+    let _fitT = null;
+    function fitChatList() {
+        const list = document.querySelector('.chat-message-list');
+        const form = document.querySelector('.chat-form');
+        if (!list || !form) return;
+        const lr = list.getBoundingClientRect();
+        if (lr.height < 160) return;
+        const fr = form.getBoundingClientRect();
+        const strip = document.querySelector('.chat-buttons-container');
+        const sr = strip ? strip.getBoundingClientRect() : null;
+        const bottomChrome = sr ? Math.max(fr.bottom, sr.bottom) : fr.bottom;   // самый низ композера/полосы
+        const overflow = bottomChrome - window.innerHeight;
+        if (overflow > 4) {                                  // что-то реально срезано снизу
+            const atBottom = list.scrollHeight - list.clientHeight - list.scrollTop < 40;
+            list.style.height = Math.max(140, lr.height - overflow - 6) + 'px';
+            if (atBottom) list.scrollTop = list.scrollHeight; // оставляем пользователя у последнего сообщения
+        }
+    }
+    function scheduleFit() { if (_fitT) clearTimeout(_fitT); _fitT = setTimeout(fitChatList, 120); }
+    function initChatListFit() {
+        scheduleFit();
+        const list = document.querySelector('.chat-message-list');
+        if (list && !list.dataset.fptFit) {
+            list.dataset.fptFit = '1';
+            // новые сообщения / смена раскладки — пересчитываем (на childList, не на style → без петли)
+            new MutationObserver(scheduleFit).observe(list, { childList: true });
+        }
+    }
+
     function init() {
         initCtrlEnterSend();
+        window.addEventListener('resize', scheduleFit);
 
         // For chat pages, init draft + char counter
         const isChatPage = window.location.pathname.includes('/chat/') ||
@@ -162,6 +197,7 @@
         if (document.querySelector('.chat-form-input')) {
             initDraftSaving();
             initCharCounter();
+            initChatListFit();
         }
 
         // Watch for chat form appearing (SPA routing)
@@ -173,6 +209,7 @@
                 _initDone = true;
                 initDraftSaving();
                 initCharCounter();
+                initChatListFit();
             }
             if (_initDone && !document.querySelector('.chat-form-input')) {
                 _initDone = false;
@@ -182,7 +219,7 @@
             // chatId is used for saving.
             if (window.location.href !== _lastUrl) {
                 _lastUrl = window.location.href;
-                if (document.querySelector('.chat-form-input')) initDraftSaving();
+                if (document.querySelector('.chat-form-input')) { initDraftSaving(); initChatListFit(); }
             }
         }).observe(root, { childList: true, subtree: true });
     }

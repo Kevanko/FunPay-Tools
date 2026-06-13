@@ -928,11 +928,20 @@ async function runOnlineHeartbeat() {
     if (fpIsRateLimited()) return;            // FunPay под бэк-оффом — пропускаем пинг
     _fptOnlineRunning = true;
     try {
-        const { fpToolsAccounts = [] } = await chrome.storage.local.get('fpToolsAccounts');
+        const { fpToolsAccounts = [], fptLastUserAction = 0 } = await chrome.storage.local.get(['fpToolsAccounts', 'fptLastUserAction']);
         const online = fpToolsAccounts.filter(a => a && a.key && a.online !== false);
         const updates = {};   // key -> snapshot
+        // Ключ АКТИВНОЙ сессии: для него снимок без подмены куки (безопасно). Для остальных
+        // fptSnapshotForKey подменяет golden_key на время запроса — и если пользователь в этот
+        // миг кликнет/перейдёт по странице, он на секунду окажется под чужим аккаунтом. Поэтому
+        // пока пользователь АКТИВЕН (действие за последние 25 c) НЕ трогаем чужие куки —
+        // активный аккаунт онлайн и так от его присутствия, а остальные подождут до простоя.
+        let activeKey = '';
+        try { const c = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' }); activeKey = c ? c.value : ''; } catch (_) {}
+        const userBusy = Date.now() - (fptLastUserAction || 0) < 25000;
         for (const a of online) {
             if (fpIsRateLimited()) break;     // поймали лимит в процессе — стоп
+            if (a.key !== activeKey && userBusy) continue;   // не свапаем куку во время активности
             try {
                 // fptSnapshotForKey КОРРЕКТНО авторизуется (подменяет golden_key и
                 // возвращает обратно). Ручной заголовок Cookie браузер игнорирует —
