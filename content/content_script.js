@@ -2,7 +2,23 @@
 
 (function() {
     'use strict';
-    
+
+    // Отметка активности пользователя (троттлинг ~раз в 8 c). Фоновый «пинг онлайна»
+    // читает её и НЕ подменяет golden_key чужих аккаунтов, пока пользователь активен —
+    // иначе клик/переход в момент подмены на секунду переключал бы аккаунт.
+    (function trackUserActivity() {
+        if (window !== window.top) return;
+        let last = 0;
+        const mark = () => {
+            const now = Date.now();
+            if (now - last < 8000) return;
+            last = now;
+            try { chrome.storage.local.set({ fptLastUserAction: now }); } catch (_) {}
+        };
+        ['pointerdown', 'keydown', 'wheel'].forEach(ev =>
+            document.addEventListener(ev, mark, { passive: true, capture: true }));
+    })();
+
     // --- НОВЫЙ БЛОК: ФУНКЦИОНАЛ ОБЪЯВЛЕНИЙ ---
     function initializeAnnouncementsFeature() {
         const announcementsTab = document.getElementById('announcementsNavTab');
@@ -370,7 +386,7 @@
                     cta.id = 'fpt-settings-cta';
                     cta.className = 'fpt-settings-cta';
                     cta.innerHTML =
-                        '<span class="material-symbols-rounded fpt-settings-cta-ic">tune</span>' +
+                        '<span class="fpt-settings-cta-ic"><span class="material-symbols-rounded">tune</span></span>' +
                         '<div class="fpt-settings-cta-tx"><b>Это настройки FunPay</b><span>Настройки расширения FP&nbsp;Tools — оформление, авто-ответы, аккаунты — отдельно.</span></div>' +
                         '<button type="button" class="fpt-settings-cta-btn"><span class="material-symbols-rounded">open_in_new</span>Открыть FP Tools</button>';
                     cta.querySelector('.fpt-settings-cta-btn').addEventListener('click', () => {

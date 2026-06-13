@@ -8742,10 +8742,11 @@ textarea.fp-cw-input { line-height:1.4; }
     box-shadow:0 6px 20px var(--fpt-pShadow, rgba(0,0,0,.35));
 }
 .fpt-settings-cta-ic{
-    flex:0 0 auto;font-size:30px;color:var(--fpt-uacc, #5b86d8);
-    width:48px;height:48px;display:flex;align-items:center;justify-content:center;
-    border-radius:12px;background:var(--fpt-accent-soft, rgba(91,134,216,.16));
+    flex:0 0 auto;color:var(--fpt-uacc, #5b86d8);
+    width:48px;height:48px;display:flex !important;align-items:center !important;justify-content:center !important;
+    border-radius:12px;background:var(--fpt-accent-soft, rgba(91,134,216,.16));line-height:1;
 }
+.fpt-settings-cta-ic .material-symbols-rounded{font-size:28px;line-height:1;display:block;}
 .fpt-settings-cta-tx{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;}
 .fpt-settings-cta-tx b{font-size:14px;font-weight:700;}
 .fpt-settings-cta-tx span{font-size:12px;color:var(--fpt-pTxDim, #9099b8);line-height:1.4;}
