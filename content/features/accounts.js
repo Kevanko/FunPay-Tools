@@ -131,39 +131,33 @@ async function fptCheckSwitchResult() {
     try { await chrome.storage.local.set({ fpToolsAccounts: accts, fptSwitchCheck: null }); } catch (_) {}
 }
 
-// Переключение на сохранённый аккаунт. Перед сменой куки: сохраняем настройки
-// текущего профиля в его бандл и заранее применяем настройки целевого профиля в
-// глобальные ключи — после перезагрузки фичи прочитают уже СВОИ настройки.
+// Переключение на сохранённый аккаунт.
+// КРИТИЧНО: тема/настройки цели заранее НЕ применяются и fptLastSeen НЕ трогается. Тема
+// меняется ТОЛЬКО ПОСЛЕ ФАКТИЧЕСКОГО ВХОДА — это делает загрузочный хук (fptDetectAccountLogin),
+// прочитав РЕАЛЬНЫЙ активный аккаунт после перезагрузки и применив ЕГО профиль. Иначе при
+// провале входа (устаревший ключ → выкинуло в другой аккаунт) тема цели оставалась бы на том
+// аккаунте, куда нас выкинуло (и утекала в облако). Сохраняем лишь настройки ТЕКУЩЕГО аккаунта.
 async function fptSwitchToAccount(acc) {
     if (!acc || !acc.key) return;
-    // приостановить облачный синк на время свапа: применение чужого профиля пишет
-    // настройки в глобальные ключи, и без этого они ушли бы в облачную запись ТЕКУЩЕГО
-    // аккаунта до перезагрузки (см. cloud_sync.js, баг свапа).
-    try { if (typeof fptCloudSuspendSync === 'function') fptCloudSuspendSync(60000); } catch (_) {}
     const cur = _fptCurName();
-    const before = await chrome.storage.local.get(['fptLastSeen', 'fptSwitchCheck']);
-    let appliedB = false;
+    if (cur && cur !== acc.name) { try { await fptSnapshotProfile(cur); } catch (_) {} }
+    // Пауза облачного синка, ПЕРЕЖИВАЮЩАЯ перезагрузку (в storage): пока активный профиль не
+    // устаканится после входа, облако не пушит — иначе залило бы тему не того аккаунта.
+    const SUSPEND = 25000;
     try {
-        // применяем чужой профиль ТОЛЬКО если успели сохранить текущий (иначе не рискуем)
-        const snapped = cur && cur !== acc.name ? await fptSnapshotProfile(cur) : true;
-        if (snapped) { await fptApplyProfile(acc.name); appliedB = true; }
-        // помечаем как «последний виденный», чтобы загрузка не делала свап повторно
-        await chrome.storage.local.set({
-            fptSwitchCheck: { name: acc.name, ts: Date.now() },
-            fptLastSeen: { key: acc.key, name: acc.name }
-        });
+        if (typeof fptCloudSuspendSync === 'function') fptCloudSuspendSync(SUSPEND);
+        await chrome.storage.local.set({ fptCloudSwitchSuspendUntil: Date.now() + SUSPEND });
     } catch (_) {}
+    const before = await chrome.storage.local.get('fptSwitchCheck');
+    try { await chrome.storage.local.set({ fptSwitchCheck: { name: acc.name, prevName: cur || null, ts: Date.now() } }); } catch (_) {}
     let res = null;
     try { res = await chrome.runtime.sendMessage({ action: 'setGoldenKey', key: acc.key }); }
     catch (e) { if (typeof showNotification === 'function') showNotification(`Ошибка переключения: ${e.message}`, true); }
-    // Успех → setGoldenKey перезагрузит вкладку, и она прочитает уже применённые
-    // настройки B. ПРОВАЛ → куку НЕ сменили: откатываем глобальные ключи и метки к A,
-    // иначе вкладка осталась бы под A с данными/настройками B (и при следующей
-    // загрузке запорола бы профиль B чужими данными).
+    // ПРОВАЛ setGoldenKey → куку не сменили, перезагрузки не будет: снимаем метку. Тема осталась
+    // прежней (мы её и не трогали) — это и есть правильное поведение.
     if (!res || res.success === false) {
-        if (appliedB && cur) { try { await fptApplyProfile(cur); } catch (_) {} }
-        try { await chrome.storage.local.set({ fptLastSeen: before.fptLastSeen || null, fptSwitchCheck: before.fptSwitchCheck || null }); } catch (_) {}
-        if (typeof showNotification === 'function') showNotification('Не удалось переключить аккаунт — настройки возвращены.', true);
+        try { await chrome.storage.local.set({ fptSwitchCheck: before.fptSwitchCheck || null }); } catch (_) {}
+        if (typeof showNotification === 'function') showNotification('Не удалось переключить аккаунт.', true);
     }
 }
 
