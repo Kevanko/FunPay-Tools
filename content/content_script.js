@@ -360,6 +360,27 @@
                 }
             }
             // --- КОНЕЦ НОВОГО БЛОКА ---
+
+            // На странице настроек FunPay — заметная карточка-ссылка на настройки расширения:
+            // пользователи путают «Настройки» FunPay с настройками FP Tools и заходят не туда.
+            if (window.location.pathname.startsWith('/account/settings') && !document.getElementById('fpt-settings-cta')) {
+                const hdr = document.querySelector('h1.page-header');
+                if (hdr && /настройки/i.test(hdr.textContent || '')) {
+                    const cta = document.createElement('div');
+                    cta.id = 'fpt-settings-cta';
+                    cta.className = 'fpt-settings-cta';
+                    cta.innerHTML =
+                        '<span class="material-symbols-rounded fpt-settings-cta-ic">tune</span>' +
+                        '<div class="fpt-settings-cta-tx"><b>Это настройки FunPay</b><span>Настройки расширения FP&nbsp;Tools — оформление, авто-ответы, аккаунты — отдельно.</span></div>' +
+                        '<button type="button" class="fpt-settings-cta-btn"><span class="material-symbols-rounded">open_in_new</span>Открыть FP Tools</button>';
+                    cta.querySelector('.fpt-settings-cta-btn').addEventListener('click', () => {
+                        const b = document.getElementById('fpToolsButton');
+                        if (b) b.click();
+                        else if (typeof showNotification === 'function') showNotification('Кнопка FP Tools ещё загружается — попробуйте через секунду.', true);
+                    });
+                    hdr.insertAdjacentElement('afterend', cta);
+                }
+            }
         };
     
         checkAndInitFeatures();

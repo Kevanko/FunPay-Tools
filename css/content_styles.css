@@ -4239,26 +4239,36 @@ body.funpay-redesigned .promo-games {
     vertical-align: middle; 
 }
 
-@keyframes redPulse {
-  0%   { background: rgba(255, 0, 0, 0.05); }
-  50%  { background: rgba(255, 0, 0, 0.08); }
-  100% { background: rgba(255, 0, 0, 0.05); }
+/* Строки заказов со статусом «Возврат» (FunPay даёт им класс .tc-item.warning).
+   Спокойная КРАСНАЯ подсветка БЕЗ закругления, паддингов, blur и масштабирования —
+   прежний хак добавлял border-radius:16px + padding + scale прямо на строку таблицы,
+   из-за чего обводка была «кривой» и по краям лезли артефакты. Теперь — ровный фон +
+   аккуратная левая полоса, чуть ярче при наведении. transition оставляем плавным. */
+.tc.table-hover .tc-item.warning,
+.tc-item.warning {
+    background: rgba(224, 82, 82, 0.08) !important;
+    box-shadow: inset 3px 0 0 #e05252 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    backdrop-filter: none !important;
+    transform: none !important;
+    animation: none !important;
+    transition: background .15s ease !important;
 }
-
-.warning {
-    animation: redPulse 6s ease-in-out infinite;
-    backdrop-filter: blur(6px); 
-    border-radius: 16px;
-    border: 1px solid rgba(255, 0, 0, 0.4);
-    padding: 14px 18px;
-    color: #822;
-    transition: box-shadow 0.3s ease, transform 0.3s ease;
+.tc.table-hover .tc-item.warning:hover,
+.tc-item.warning:hover {
+    background: rgba(224, 82, 82, 0.16) !important;
+    box-shadow: inset 3px 0 0 #e05252 !important;
+    transform: none !important;
 }
-
-.warning:hover {
-    box-shadow: 0 0 12px 2px rgba(255, 0, 0, 0.4), 0 0 24px 4px rgba(255, 0, 0, 0.1) inset;
-    transform: scale(1.02);
-}
+/* «Возврат» — КРАСНЫЙ, а не оранжевый (FunPay по умолчанию красит .text-warning в #f5a623);
+   делаем консистентно с карточкой заказа во всех местах списка продаж/покупок. */
+.tc-item.warning .tc-status,
+.tc-item.warning .tc-status.text-warning { color: #e05252 !important; }
+[data-fpt-preset="light"] .tc.table-hover .tc-item.warning,
+[data-fpt-preset="light"] .tc-item.warning { background: #fbe6e6 !important; }
+[data-fpt-preset="light"] .tc.table-hover .tc-item.warning:hover,
+[data-fpt-preset="light"] .tc-item.warning:hover { background: #f6d8d8 !important; }
 
 /* === Улучшенная панель управления темами (Версия 3) === */
 .theme-actions-grid {
@@ -8723,6 +8733,32 @@ textarea.fp-cw-input { line-height:1.4; }
 .fpt-price-tip-row span{color:var(--fpt-pTxDim, #9099b8);}
 .fpt-price-tip-row b{font-weight:600;white-space:nowrap;}
 .fpt-price-tip-note{margin-top:6px;color:var(--fpt-pTxDim, #9099b8);font-size:11px;line-height:1.45;}
+/* карточка-ссылка на настройки FP Tools на странице настроек FunPay */
+.fpt-settings-cta{
+    display:flex;align-items:center;gap:14px;margin:14px 0 18px;padding:14px 16px;
+    border-radius:12px;border:1px solid var(--fpt-pLine, rgba(255,255,255,.12));
+    background:linear-gradient(135deg, var(--fpt-accent-soft, rgba(91,134,216,.16)), transparent 70%), var(--fpt-p2, #20242c);
+    color:var(--fpt-pTx, #f1f3f7);font-family:Inter,sans-serif;
+    box-shadow:0 6px 20px var(--fpt-pShadow, rgba(0,0,0,.35));
+}
+.fpt-settings-cta-ic{
+    flex:0 0 auto;font-size:30px;color:var(--fpt-uacc, #5b86d8);
+    width:48px;height:48px;display:flex;align-items:center;justify-content:center;
+    border-radius:12px;background:var(--fpt-accent-soft, rgba(91,134,216,.16));
+}
+.fpt-settings-cta-tx{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;}
+.fpt-settings-cta-tx b{font-size:14px;font-weight:700;}
+.fpt-settings-cta-tx span{font-size:12px;color:var(--fpt-pTxDim, #9099b8);line-height:1.4;}
+.fpt-settings-cta-btn{
+    flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;cursor:pointer;
+    padding:9px 16px;border-radius:9px;border:none;font-size:13px;font-weight:700;
+    background:var(--fpt-uacc, #5b86d8);color:#fff;transition:filter .15s, transform .05s;
+}
+.fpt-settings-cta-btn:hover{filter:brightness(1.08);}
+.fpt-settings-cta-btn:active{transform:translateY(1px);}
+.fpt-settings-cta-btn .material-symbols-rounded{font-size:18px;}
+@media (max-width:640px){.fpt-settings-cta{flex-wrap:wrap;}.fpt-settings-cta-btn{width:100%;justify-content:center;}}
+
 /* «призрачный» профиль-заглушка «Добавить аккаунт» под основными */
 .fpt-accsw-add{margin-top:2px;}
 .fpt-accsw-av-ghost{background:transparent !important;border:1.5px dashed var(--fpt-pLine, rgba(255,255,255,.22));box-shadow:none !important;}

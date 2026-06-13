@@ -746,14 +746,22 @@ async function fptSnapshotProfile(name) {
     } catch (_) { return false; }
 }
 
+// Структурные ключи: применяются ТОЛЬКО перезагрузкой (редизайн главной, отключение
+// функций). Тему/обои/ник/звуки theme.js и фичи применяют ВЖИВУЮ через storage.onChanged —
+// для них перезагрузка не нужна, поэтому при смене аккаунта не дёргаем лишний reload.
+const FPT_RELOAD_KEYS = ['enableRedesignedHomepage', 'fpToolsDisabledFeatures'];
+function _fptStableVal(v) { try { return JSON.stringify(v === undefined ? null : v); } catch (_) { return String(v); } }
+
 // Применить бандл профиля name к глобальным ключам. Если бандла нет — чистим ключи,
 // чтобы новый аккаунт получил НАСТРОЙКИ ПО УМОЛЧАНИЮ (а не унаследовал чужие).
-// Возвращает true, если что-то изменили (нужна перезагрузка для применения).
+// Возвращает { changed, needsReload }: needsReload=true только если изменились СТРУКТУРНЫЕ
+// ключи (их без перезагрузки не применить); тему и т.п. подхватит storage.onChanged вживую.
 async function fptApplyProfile(name) {
-    if (!name || !_fptAlive()) return false;
+    if (!name || !_fptAlive()) return { changed: false, needsReload: false };
     try {
         const profiles = await fptGetProfiles();
         const bundle = profiles[name];
+        const beforeReload = await chrome.storage.local.get(FPT_RELOAD_KEYS);
         if (bundle && Object.keys(bundle).length) {
             // ВАЖНО: глобальное состояние должно ТОЧНО совпасть с бандлом профиля.
             // Ключи, которых в бандле нет (напр. продажи у старого бандла без них),
@@ -764,8 +772,9 @@ async function fptApplyProfile(name) {
         } else {
             await chrome.storage.local.remove(FPT_ACCOUNT_KEYS);   // новый аккаунт → дефолт/пусто
         }
-        return true;
-    } catch (_) { return false; }
+        const needsReload = FPT_RELOAD_KEYS.some(k => _fptStableVal(beforeReload[k]) !== _fptStableVal(bundle ? bundle[k] : undefined));
+        return { changed: true, needsReload };
+    } catch (_) { return { changed: false, needsReload: false }; }
 }
 
 // Копирование ТОЛЬКО раздела pageId с аккаунта srcName в текущий.
@@ -943,17 +952,20 @@ async function fptAccountBoot() {
     }
 
     // настройки профиля: текущие глобальные ключи принадлежат ПРЕДЫДУЩЕМУ аккаунту
-    let changed = false;
+    let applied = { changed: false, needsReload: false };
     if (prevName && prevName !== name) {
         const snapped = await fptSnapshotProfile(prevName);   // сохранить настройки прежнего
-        if (snapped) changed = await fptApplyProfile(name);   // применить настройки нового (или дефолт)
+        if (snapped) applied = await fptApplyProfile(name);   // применить настройки нового (или дефолт)
     }
     try { await chrome.storage.local.set({ fpToolsAccounts: accts, fptLastSeen: { key, name } }); } catch (_) {}
     if (typeof fpToolsAccounts !== 'undefined') { try { fpToolsAccounts.length = 0; accts.forEach(a => fpToolsAccounts.push(a)); renderAccountsList(); } catch (_) {} }
     if (added && typeof showNotification === 'function') showNotification(`Аккаунт «${name}» добавлен автоматически.`);
-    if (changed) {                                       // применили личный профиль → перезагрузка для применения
-        if (typeof showNotification === 'function') showNotification('Загружаю настройки профиля…', false);
-        setTimeout(() => { try { location.reload(); } catch (_) {} }, 500);
+    // Тему/оформление theme.js уже применил ВЖИВУЮ (мы записали ключи выше) — лишняя
+    // перезагрузка не нужна. Перезагружаемся ТОЛЬКО если изменились структурные ключи
+    // (редизайн главной / отключённые функции), которые без reload не применить.
+    if (applied.needsReload) {
+        if (typeof showNotification === 'function') showNotification('Применяю настройки профиля…', false);
+        setTimeout(() => { try { location.reload(); } catch (_) {} }, 400);
     }
 }
 
