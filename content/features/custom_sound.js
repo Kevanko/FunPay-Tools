@@ -8,7 +8,17 @@ const soundMap = {
     whatsapp: 'whatsapp.mp3'
 };
 
-async function applyNotificationSound() {
+// СЕРИАЛИЗАЦИЯ: applyNotificationSound зовётся из init, observer и storage.onChanged.
+// Параллельные запуски могли URL.revokeObjectURL() тот blob, что только что стал src
+// у <source> → следующее воспроизведение было немым. Гоним строго по очереди.
+let _fptSoundChain = Promise.resolve();
+function applyNotificationSound() {
+    const run = () => _applyNotificationSound();
+    _fptSoundChain = _fptSoundChain.then(run, run);
+    return _fptSoundChain;
+}
+
+async function _applyNotificationSound() {
     const { notificationSound, notificationVolume, fpToolsCustomSoundData } = await chrome.storage.local.get(['notificationSound', 'notificationVolume', 'fpToolsCustomSoundData']);
     const selectedSound = notificationSound || 'default';
     const vol = (typeof notificationVolume === 'number') ? Math.max(0, Math.min(1, notificationVolume)) : 1;
@@ -22,6 +32,9 @@ async function applyNotificationSound() {
 
     // 3.0: volume control
     audioPlayer.volume = vol;
+    // буферизуем заранее, чтобы ПЕРВОЕ уведомление после подмены не оказалось немым
+    // (blob/файл должен успеть подгрузиться до первого play()).
+    if (audioPlayer.preload !== 'auto') audioPlayer.preload = 'auto';
 
     if (selectedSound === 'default') {
         const originalSrc = 'https://funpay.com/audio/chat_loud.mp3';
@@ -83,9 +96,23 @@ async function previewNotificationSound(soundValue, volume) {
     } catch (_) {}
 }
 
+// Следим ПРЯМО за <audio class="loud"> на сброс src у него/у его <source>: если FunPay
+// (или SPA-перерисовка/перевыбор источника) вернёт дефолтный /audio/chat_loud.mp3 — сразу
+// возвращаем кастом. Без этого подмена «слетала» и часть уведомлений играла дефолт.
+// Наблюдатель привязан к самому элементу (не ко всему body), поэтому дешёвый; наш же
+// собственный set src даёт no-op в applyNotificationSound (src уже верный) и не зациклит.
+function watchAudioSrc() {
+    const audioPlayer = document.querySelector('audio.loud');
+    if (!audioPlayer || audioPlayer.dataset.fptSrcWatch) return;
+    audioPlayer.dataset.fptSrcWatch = '1';
+    const obs = new MutationObserver(() => applyNotificationSound());
+    obs.observe(audioPlayer, { attributes: true, attributeFilter: ['src'], subtree: true });
+}
+
 function initializeCustomSound() {
     // Первоначальное применение звука
     applyNotificationSound();
+    watchAudioSrc();
 
     // Наблюдатель на случай, если FunPay динамически пересоздаст плеер
     const observer = new MutationObserver((mutations) => {
@@ -94,6 +121,7 @@ function initializeCustomSound() {
                 for (let node of mutation.addedNodes) {
                     if (node.nodeType === 1 && (node.matches("audio.loud") || node.querySelector("audio.loud"))) {
                         applyNotificationSound();
+                        watchAudioSrc();          // подцепить наблюдатель к новому элементу
                         return;
                     }
                 }
