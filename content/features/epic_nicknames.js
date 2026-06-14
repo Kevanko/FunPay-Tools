@@ -350,6 +350,11 @@
         try {
             const { [MY_NICK_KEY]: saved } = await chrome.storage.local.get(MY_NICK_KEY);
             if (saved && saved.nick && saved.cfg) {
+                // Применяем оформление ТОЛЬКО если сохранённый ник = ТЕКУЩИЙ аккаунт. При
+                // нескольких аккаунтах общий/унаследованный ключ мог хранить ник другого
+                // аккаунта — тогда стиль не наш, применять его не нужно (см. редактор ниже).
+                const me = getMyNick();
+                if (me && saved.nick !== me) return false;
                 unwrapNick(saved.nick);          // пересоздать обёртку → эффект применится сразу
                 registerNickStyle(saved.nick, saved.cfg);
                 scanDOM(document.body);
@@ -446,9 +451,13 @@
             });
         }
 
-        // загрузить сохранённый конфиг в UI (или дефолт)
+        // Ник в поле — ВСЕГДА текущий аккаунт (из шапки сайта). Сохранённый стиль (cfg)
+        // подхватываем ТОЛЬКО если он сохранён для этого же ника; иначе это оформление
+        // другого аккаунта (общий ключ показывал чужой ник «со 2-го аккаунта»).
         chrome.storage.local.get(MY_NICK_KEY).then(({ [MY_NICK_KEY]: saved }) => {
-            if (saved && saved.cfg) { if (saved.nick) nickInput.value = saved.nick; cfgToUI(saved.cfg); }
+            const me = getMyNick();
+            if (me) nickInput.value = me;
+            if (saved && saved.cfg && saved.nick && saved.nick === me) cfgToUI(saved.cfg);
             renderLivePreview();
         });
 
