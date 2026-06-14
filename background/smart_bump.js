@@ -13,6 +13,8 @@
 // Result: each category is raised as early as FunPay allows, with no wasted requests and no
 // rate-limit spam - exactly FP Tools's behaviour, adapted to MV3.
 
+import { fpFetch, fpIsRateLimited, fpRateLimitedUntil } from './autoresponder.js';
+
 export const SMART_BUMP_ALARM = 'fpToolsSmartBump';
 const STATE_KEY = 'fpToolsSmartBumpState'; // { [categoryUrl]: { nextRaiseAt, name } }
 const OFFSCREEN_PATH = 'offscreen/offscreen.html';
@@ -40,10 +42,11 @@ async function parseHtmlViaOffscreen(html, action) {
 }
 
 async function getAuth() {
+    // Авторизация идёт ambient-кукой активного аккаунта (credentials:'include'). Ручной
+    // заголовок Cookie в service worker браузер ВЫРЕЗАЕТ (forbidden header) — раньше из-за
+    // этого все запросы умного поднятия уходили БЕЗ авторизации и ничего не поднималось.
     const gk = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
     if (!gk?.value) return null;
-    const ps = await chrome.cookies.get({ url: 'https://funpay.com', name: 'PHPSESSID' });
-    const cookies = ps?.value ? `golden_key=${gk.value}; PHPSESSID=${ps.value}` : `golden_key=${gk.value}`;
 
     const tabs = await chrome.tabs.query({ url: 'https://funpay.com/*' });
     for (const tab of tabs) {
@@ -52,19 +55,19 @@ async function getAuth() {
             const r = await chrome.tabs.sendMessage(tab.id, { action: 'getAppData' });
             if (r?.success) {
                 const d = Array.isArray(r.data) ? r.data[0] : r.data;
-                if (d?.['csrf-token'] && d.userId) return { cookies, csrfToken: d['csrf-token'], userId: d.userId };
+                if (d?.['csrf-token'] && d.userId) return { csrfToken: d['csrf-token'], userId: d.userId };
             }
         } catch (_) {}
     }
-    // fallback: scrape main page
+    // fallback: scrape main page (cookie приложит браузер сам по credentials:'include')
     try {
-        const res = await fetch('https://funpay.com/', { headers: { cookie: cookies } });
+        const res = await fpFetch('https://funpay.com/', { credentials: 'include', cache: 'no-store' });
         const text = await res.text();
         const m = text.match(/<body[^>]*data-app-data="([^"]+)"/);
         if (m) {
             const d = JSON.parse(m[1].replace(/&quot;/g, '"'));
             const u = Array.isArray(d) ? d[0] : d;
-            if (u?.['csrf-token'] && u.userId) return { cookies, csrfToken: u['csrf-token'], userId: u.userId };
+            if (u?.['csrf-token'] && u.userId) return { csrfToken: u['csrf-token'], userId: u.userId };
         }
     } catch (_) {}
     return null;
@@ -72,15 +75,17 @@ async function getAuth() {
 
 // Raise one category. Returns { ok, waitSec, name } - waitSec is when to try again.
 async function raiseCategory(categoryUrl, auth) {
+    // Cookie НЕ ставим вручную (forbidden header, вырезается) — браузер приложит ambient-куку
+    // активного аккаунта благодаря credentials:'include'. Все запросы идут через fpFetch:
+    // общий темп (800мс) + бэк-офф на 429/5xx, чтобы поднятие не упиралось в rate-limit.
     const headers = {
         'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'cookie': auth.cookies,
         'x-requested-with': 'XMLHttpRequest',
         'x-csrf-token': auth.csrfToken
     };
 
     // Load category page to discover game_id / node_id and name.
-    const pageRes = await fetch(categoryUrl, { headers: { cookie: auth.cookies } });
+    const pageRes = await fpFetch(categoryUrl, { credentials: 'include', cache: 'no-store' });
     if (!pageRes.ok) return { ok: false, waitSec: 600, name: categoryUrl };
     const pageHtml = await pageRes.text();
     const nameMatch = pageHtml.match(/<span class="inside">([^<]+)<\/span>/);
@@ -92,7 +97,7 @@ async function raiseCategory(categoryUrl, auth) {
 
     // First attempt (single node).
     let body = new URLSearchParams({ game_id: gameId, node_id: nodeId });
-    let res = await fetch('https://funpay.com/lots/raise', { method: 'POST', headers, body: body.toString() });
+    let res = await fpFetch('https://funpay.com/lots/raise', { method: 'POST', headers, body: body.toString(), credentials: 'include' });
     let json = await res.json().catch(() => ({}));
 
     // FunPay may ask to confirm multiple subcategories via a modal.
@@ -103,7 +108,7 @@ async function raiseCategory(categoryUrl, auth) {
             body.append('game_id', gameId);
             body.append('node_id', nodeId);
             ids.forEach(id => body.append('node_ids[]', id));
-            res = await fetch('https://funpay.com/lots/raise', { method: 'POST', headers, body: body.toString() });
+            res = await fpFetch('https://funpay.com/lots/raise', { method: 'POST', headers, body: body.toString(), credentials: 'include' });
             json = await res.json().catch(() => ({}));
         }
     }
@@ -140,6 +145,15 @@ function logToTabs(message) {
 // Run one smart-bump pass. Raises only due categories, updates per-category nextRaiseAt,
 // and arms the alarm for the soonest upcoming due time.
 export async function runSmartBumpCycle() {
+    // FunPay под бэк-оффом (после 429/5xx) — не лезем, иначе усугубим лимит. Перевзводим
+    // будильник на конец паузы (alarm одноразовый — без перевзвода умное поднятие бы встало).
+    if (fpIsRateLimited()) {
+        const delayMin = Math.max(1, Math.ceil((fpRateLimitedUntil() - Date.now()) / 60000) + 1);
+        await chrome.alarms.create(SMART_BUMP_ALARM, { delayInMinutes: delayMin });
+        logToTabs(`Умное поднятие: FunPay под бэк-оффом (rate-limit), повтор через ~${delayMin} мин.`);
+        return;
+    }
+
     const { fpToolsSelectiveBumpEnabled, fpToolsSelectedBumpCategories, fpToolsBumpOnlyAutoDelivery } =
         await chrome.storage.local.get(['fpToolsSelectiveBumpEnabled', 'fpToolsSelectedBumpCategories', 'fpToolsBumpOnlyAutoDelivery']);
 
@@ -147,7 +161,7 @@ export async function runSmartBumpCycle() {
     if (!auth) { logToTabs('Умное поднятие: нет авторизации (golden_key/csrf).'); return; }
 
     const userUrl = `https://funpay.com/users/${auth.userId}/`;
-    const userHtml = await (await fetch(userUrl, { headers: { cookie: auth.cookies } })).text();
+    const userHtml = await (await fpFetch(userUrl, { credentials: 'include', cache: 'no-store' })).text();
     let categories = await parseHtmlViaOffscreen(userHtml, 'parseUserCategories');
     if (!Array.isArray(categories)) categories = [];
 
