@@ -1,5 +1,5 @@
 // background/autobump.js
-import { withCookieLock, fpIsRateLimited } from './autoresponder.js';
+import { withCookieLock, fpIsRateLimited, fpFetch } from './autoresponder.js';
 
 export const BUMP_ALARM_NAME = 'fpToolsAutoBump';
 
@@ -75,7 +75,7 @@ async function getAuthDetails() {
     // 2) Открытой вкладки нет (например, команда /bump из Telegram) — берём
     //    userId/csrf напрямую с главной страницы, используя настоящие cookie.
     try {
-        const resp = await withCookieLock(() => fetch('https://funpay.com/', { credentials: 'include', cache: 'no-store' }));
+        const resp = await withCookieLock(() => fpFetch('https://funpay.com/', { credentials: 'include', cache: 'no-store' }));
         const html = await resp.text();
         const auth = await parseHtmlViaOffscreen(html, 'parseAuthData');
         if (auth && auth.userId && auth.csrfToken) {
@@ -103,7 +103,7 @@ async function raiseCategory(categoryData, auth) {
         'X-Csrf-Token': csrfToken
     };
 
-    let response = await fetch('https://funpay.com/lots/raise', { method: 'POST', headers: headers, body: initialData.toString(), credentials: 'include' });
+    let response = await fpFetch('https://funpay.com/lots/raise', { method: 'POST', headers: headers, body: initialData.toString(), credentials: 'include' });
     let responseText = await response.text();
 
     try {
@@ -120,7 +120,7 @@ async function raiseCategory(categoryData, auth) {
                 multiRaiseData.append('node_id', nodeId);
                 nodeIds.forEach(id => multiRaiseData.append('node_ids[]', id));
                 
-                response = await fetch('https://funpay.com/lots/raise', { method: 'POST', headers: headers, body: multiRaiseData.toString(), credentials: 'include' });
+                response = await fpFetch('https://funpay.com/lots/raise', { method: 'POST', headers: headers, body: multiRaiseData.toString(), credentials: 'include' });
                 responseText = await response.text();
 
             } else {
@@ -158,7 +158,7 @@ export async function runBumpCycle() {
         // запроса/поднятия, иначе поднимем НЕ ТОТ аккаунт (или csrf/key mismatch).
         const auth = await getAuthDetails();
         const userUrl = `https://funpay.com/users/${auth.userId}/`;
-        const userPageResponse = await withCookieLock(() => fetch(userUrl, { credentials: 'include', cache: 'no-store' }));
+        const userPageResponse = await withCookieLock(() => fpFetch(userUrl, { credentials: 'include', cache: 'no-store' }));
         const userPageHtml = await userPageResponse.text();
 
         // Получаем структурированный список категорий
@@ -190,7 +190,7 @@ export async function runBumpCycle() {
         const categoryUrlHrefs = categoryUrls.map(url => url.href);
 
         for (const categoryUrl of categoryUrlHrefs) {
-            const categoryPageResponse = await withCookieLock(() => fetch(categoryUrl, { credentials: 'include', cache: 'no-store' }));
+            const categoryPageResponse = await withCookieLock(() => fpFetch(categoryUrl, { credentials: 'include', cache: 'no-store' }));
             
             const urlParts = categoryUrl.split('/');
             const guessedName = urlParts.length > 2 ? urlParts[urlParts.length - 2] : 'Неизвестная категория';
