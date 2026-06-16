@@ -16,7 +16,7 @@
 // can't. Worst case a category is raised up to one period late - an acceptable price for
 // never silently stopping.
 
-import { fpFetch, fpIsRateLimited } from './autoresponder.js';
+import { fpFetch, fpIsRateLimited, withCookieLock, notifyRaised } from './autoresponder.js';
 
 export const SMART_BUMP_ALARM = 'fpToolsSmartBump';
 // ПЕРИОДИЧЕСКИЙ будильник (а не одноразовый «перевзвод»): раньше цикл сам пересоздавал
@@ -28,23 +28,13 @@ const SMART_BUMP_PERIOD_MIN = 10;
 const STATE_KEY = 'fpToolsSmartBumpState'; // { [categoryUrl]: { nextRaiseAt, name } }
 const OFFSCREEN_PATH = 'offscreen/offscreen.html';
 
-// Красивое уведомление справа на странице: «Лоты подняты: …». Шлём только когда реально
-// что-то поднялось и пользователь не выключил уведомления (по умолчанию включены).
-async function notifyRaised(names) {
-    if (!names || !names.length) return;
-    try {
-        const { fpToolsBumpNotifyEnabled } = await chrome.storage.local.get('fpToolsBumpNotifyEnabled');
-        if (fpToolsBumpNotifyEnabled === false) return;
-        const tabs = await chrome.tabs.query({ url: 'https://funpay.com/*' });
-        tabs.forEach(t => chrome.tabs.sendMessage(t.id, { action: 'fptBumpRaised', names }).catch(() => {}));
-    } catch (_) {}
-}
-
-// Ported 1:1 from FP Tools utils.parse_wait_time - returns seconds to wait.
+// Ported from FP Tools utils.parse_wait_time - returns seconds to wait.
 function parseWaitTime(msg) {
     const s = String(msg || '');
-    const digits = (s.match(/\d/g) || []).join('');
-    const n = digits ? parseInt(digits, 10) : 0;
+    // Берём ПЕРВОЕ число в сообщении, а не склейку всех цифр: «Подождите 1 час 30 минут»
+    // раньше превращалось в 130 → ~5 суток ожидания и заморозку категории на дни.
+    const m = s.match(/\d+/);
+    const n = m ? parseInt(m[0], 10) : 0;
     if (/секунд|second/i.test(s)) return n || 2;
     if (/минут|хвилин|minute/i.test(s)) return ((n || 2) - 1) * 60;
     if (/час|годин|hour/i.test(s)) return Math.round(((n || 1) - 0.5) * 3600);
@@ -74,7 +64,9 @@ async function getAuth() {
     // несвёрнутой вкладки → грузили чужой профиль (без кнопок поднятия) → «ничего не
     // поднимается, консоль пустая». Поэтому главная — приоритетна, вкладки лишь fallback.
     try {
-        const res = await fpFetch('https://funpay.com/', { credentials: 'include', cache: 'no-store' });
+        // под cookie-замком: heartbeat/переключение аккаунта не должны подменить golden_key
+        // во время этого запроса, иначе главная вернёт данные ДРУГОГО аккаунта (как в autobump).
+        const res = await withCookieLock(() => fpFetch('https://funpay.com/', { credentials: 'include', cache: 'no-store' }));
         const text = await res.text();
         const m = text.match(/<body[^>]*data-app-data="([^"]+)"/);
         if (m) {
@@ -139,16 +131,12 @@ async function raiseCategory(categoryUrl, auth) {
         }
     }
 
-    // HTTP-ответ обязан быть успешным: 429/5xx или HTML-редирект на логин дают пустой
-    // json={}, который иначе свалился бы в ветку «поднято» → ложный тост «Лоты подняты» и
-    // фейковый кулдаун 4ч, замораживающий реальное поднятие. Считаем «не поднято».
+    // HTTP-ответ обязан быть успешным: 429/5xx или HTML-редирект на логин дают пустой json={}.
     if (!res.ok) return { ok: false, waitSec: 600, name };
 
-    // Порядок важен: «Подождите N часов» приходит БЕЗ error и БЕЗ url — раньше такой ответ
-    // ошибочно считался успехом (ok=true, кулдаун 4ч). Сначала отсеиваем ожидание/ошибку,
-    // и только чистый ответ без них считаем реальным поднятием.
     const msg = String(json.msg || '');
-    if (/(Подожди|Please wait|Зачекай|Зачекайте)/i.test(msg)) {
+    // Сначала отсеиваем ожидание/редирект/ошибку.
+    if (/(Подожди|Please wait|Зачекай)/i.test(msg)) {
         return { ok: false, waitSec: parseWaitTime(msg), name };
     }
     if (json.url) {
@@ -157,8 +145,14 @@ async function raiseCategory(categoryUrl, auth) {
     if (json.error) {
         return { ok: false, waitSec: 600, name };
     }
-    // Нет ожидания/ошибки/url → предложения действительно подняты.
-    return { ok: true, waitSec: 4 * 3600, name }; // дефолтный кулдаун FunPay ~4ч
+    // УСПЕХ подтверждаем ПОЗИТИВНО (как обычное поднятие проверяет 'подняты'/'raised'), а НЕ
+    // по отсутствию ошибки. Иначе 200-страница логина/капчи или модалка без распознанных
+    // чекбоксов дают json={} → ложный тост «Лоты подняты» + заморозка категории на 4ч.
+    if (/подня|підня|raised/i.test(msg)) {
+        return { ok: true, waitSec: 4 * 3600, name }; // дефолтный кулдаун FunPay ~4ч
+    }
+    // Непонятный ответ — НЕ считаем успехом; пробуем снова скоро (а не замораживаем на 4ч).
+    return { ok: false, waitSec: 600, name };
 }
 
 async function getState() {
@@ -200,6 +194,17 @@ export async function runSmartBumpCycle() {
             return;
         }
 
+        const state = await getState();
+        const now = Date.now();
+
+        // Дешёвый ранний выход: если по сохранённому состоянию ни одна категория ещё не созрела,
+        // не делаем тяжёлую работу (фетч главной + профиля + offscreen-парс) — периодический alarm
+        // вернётся через ~10 мин. Молча, чтобы не засорять консоль каждый тик. Новая категория,
+        // добавленная позже, подхватится при ближайшем полном проходе (когда созреет любая из
+        // существующих; при пустом состоянии — сразу, на первом проходе).
+        const entries = Object.values(state);
+        if (entries.length && entries.every(e => e && e.nextRaiseAt > now)) return;
+
         const { fpToolsSelectiveBumpEnabled, fpToolsSelectedBumpCategories, fpToolsBumpOnlyAutoDelivery } =
             await chrome.storage.local.get(['fpToolsSelectiveBumpEnabled', 'fpToolsSelectedBumpCategories', 'fpToolsBumpOnlyAutoDelivery']);
 
@@ -227,9 +232,6 @@ export async function runSmartBumpCycle() {
             return;
         }
 
-        const state = await getState();
-        const now = Date.now();
-
         for (const cat of categories) {
             const url = new URL(cat.id, 'https://funpay.com/').href;
             const entry = state[url];
@@ -248,10 +250,12 @@ export async function runSmartBumpCycle() {
                 state[url] = { nextRaiseAt: now + 600000, name: url };
                 logToTabs(`Ошибка поднятия ${url}: ${e.message}. Повтор через ~10 мин.`);
             }
+            // Персистим ПОСЛЕ КАЖДОЙ категории: если MV3 усыпит воркер в середине прохода,
+            // уже поднятые категории сохранят свой nextRaiseAt и не будут подняты повторно
+            // (раньше state писался только в конце → eviction приводил к двойному поднятию → 429).
+            await setState(state);
             await new Promise(r => setTimeout(r, 3000)); // pacing between categories
         }
-
-        await setState(state);
     } catch (e) {
         logToTabs(`Умное поднятие: сбой прохода (${e.message}). Повтор по расписанию.`);
     } finally {

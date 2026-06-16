@@ -1,5 +1,5 @@
 // background/autobump.js
-import { withCookieLock, fpIsRateLimited, fpFetch } from './autoresponder.js';
+import { withCookieLock, fpIsRateLimited, fpFetch, notifyRaised } from './autoresponder.js';
 
 export const BUMP_ALARM_NAME = 'fpToolsAutoBump';
 
@@ -39,18 +39,7 @@ async function parseHtmlViaOffscreen(html, action) {
     return await chrome.runtime.sendMessage({ target: 'offscreen', action, html });
 }
 // --- КОНЕЦ НОВОГО БЛОКА ---
-
-// Красивое уведомление справа на странице: «Лоты подняты: …». Шлём только когда реально
-// что-то поднялось и пользователь не выключил уведомления (по умолчанию включены).
-async function notifyRaised(names) {
-    if (!names || !names.length) return;
-    try {
-        const { fpToolsBumpNotifyEnabled } = await chrome.storage.local.get('fpToolsBumpNotifyEnabled');
-        if (fpToolsBumpNotifyEnabled === false) return;
-        const tabs = await chrome.tabs.query({ url: 'https://funpay.com/*' });
-        tabs.forEach(tab => chrome.tabs.sendMessage(tab.id, { action: 'fptBumpRaised', names }).catch(() => {}));
-    } catch (_) {}
-}
+// Уведомление «Лоты подняты» — общая notifyRaised импортируется из autoresponder.js.
 
 async function getAuthDetails() {
     const goldenKeyCookie = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
