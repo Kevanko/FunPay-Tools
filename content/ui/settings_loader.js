@@ -285,7 +285,7 @@ async function loadSavedSettings() {
         'fpToolsPopupPosition', 'fpToolsPopupSize', 'enableRedesignedHomepage', 'fpToolsPopupDragged',
         'fpToolsAccounts', 'showSalesStats', 'hideBalance', 'viewSellersPromo', 'notificationSound', 'notificationVolume',
         'fpToolsDiscord',
-        'fpToolsSelectiveBumpEnabled', 'fpToolsSelectedBumpCategories', 'fpToolsBumpOnlyAutoDelivery',
+        'fpToolsSelectiveBumpEnabled', 'fpToolsSelectedBumpCategories', 'fpToolsBumpOnlyAutoDelivery', 'fpToolsBumpNotifyEnabled',
         'autoReviewEnabled', 'reviewTemplates', 'greetingEnabled', 'greetingText', 'keywordsEnabled', 'keywords',
         'fpToolsIdentifierEnabled',
         'fpToolsShowPaymentType',
@@ -389,6 +389,7 @@ async function loadSavedSettings() {
     document.getElementById('selectiveBumpEnabled').checked = settings.fpToolsSelectiveBumpEnabled === true;
     document.getElementById('bumpOnlyAutoDelivery').checked = settings.fpToolsBumpOnlyAutoDelivery === true;
     { const sb = document.getElementById('fpToolsSmartBumpEnabled'); if (sb) sb.checked = settings.fpToolsSmartBumpEnabled === true; }
+    { const bn = document.getElementById('fpToolsBumpNotifyEnabled'); if (bn) bn.checked = settings.fpToolsBumpNotifyEnabled !== false; }
 
     document.getElementById('enableRedesignedHomepage').checked = settings.enableRedesignedHomepage !== false;
 

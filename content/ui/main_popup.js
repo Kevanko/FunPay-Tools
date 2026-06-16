@@ -830,6 +830,9 @@ function createMainPopup() {
                     <div class="checkbox-label-inline" style="margin-top: 15px;"><input type="checkbox" id="bumpOnlyAutoDelivery"><label for="bumpOnlyAutoDelivery" style="margin-bottom:0;"><span>Поднимать только категории с автовыдачей</span></label></div>
                     <small style="font-size: 12px; opacity: 0.7; display: block; margin-top: -10px; margin-left: 30px;">Будут подняты только те категории, в которых есть хотя бы один лот с иконкой автовыдачи (<span class="material-symbols-rounded" style="font-size:14px;vertical-align:-3px;">bolt</span>).</small>
 
+                    <div class="checkbox-label-inline" style="margin-top: 15px;"><input type="checkbox" id="fpToolsBumpNotifyEnabled" checked><label for="fpToolsBumpNotifyEnabled" style="margin-bottom:0;"><span>Уведомлять о поднятии лотов</span></label></div>
+                    <small style="font-size: 12px; opacity: 0.7; display: block; margin-top: -10px; margin-left: 30px;">Показывает аккуратное уведомление справа, когда лоты подняты — с перечнем категорий и их количеством. По умолчанию включено.</small>
+
                     <label style="margin-top: 20px;">Консоль логов:</label>
                     <div id="autoBumpConsole" class="fp-tools-console"></div>
                 </div>

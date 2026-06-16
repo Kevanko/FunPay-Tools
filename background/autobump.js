@@ -40,6 +40,18 @@ async function parseHtmlViaOffscreen(html, action) {
 }
 // --- КОНЕЦ НОВОГО БЛОКА ---
 
+// Красивое уведомление справа на странице: «Лоты подняты: …». Шлём только когда реально
+// что-то поднялось и пользователь не выключил уведомления (по умолчанию включены).
+async function notifyRaised(names) {
+    if (!names || !names.length) return;
+    try {
+        const { fpToolsBumpNotifyEnabled } = await chrome.storage.local.get('fpToolsBumpNotifyEnabled');
+        if (fpToolsBumpNotifyEnabled === false) return;
+        const tabs = await chrome.tabs.query({ url: 'https://funpay.com/*' });
+        tabs.forEach(tab => chrome.tabs.sendMessage(tab.id, { action: 'fptBumpRaised', names }).catch(() => {}));
+    } catch (_) {}
+}
+
 async function getAuthDetails() {
     const goldenKeyCookie = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
     if (!goldenKeyCookie) throw new Error('Не удалось найти cookie "golden_key". Вы вошли в свой аккаунт FunPay?');
@@ -48,7 +60,22 @@ async function getAuthDetails() {
     const phpsessidPart = phpSessIdCookie?.value ? `; PHPSESSID=${phpSessIdCookie.value}` : '';
     const cookies = `golden_key=${goldenKeyCookie.value}${phpsessidPart};`;
 
-    // 1) Пытаемся получить userId/csrf из открытой вкладки FunPay (быстрый путь).
+    // 1) ИСТОЧНИК ИСТИНЫ об АКТИВНОМ аккаунте — главная с ambient-кукой: всегда отдаёт того,
+    //    чьим golden_key мы залогинены сейчас. В мульти-аккаунте перебор вкладок мог вернуть
+    //    userId ДРУГОГО аккаунта из несвёрнутой вкладки → грузили чужой профиль (без кнопок
+    //    поднятия). Поэтому главная — приоритетна, вкладки лишь fallback.
+    try {
+        const resp = await withCookieLock(() => fpFetch('https://funpay.com/', { credentials: 'include', cache: 'no-store' }));
+        const html = await resp.text();
+        const auth = await parseHtmlViaOffscreen(html, 'parseAuthData');
+        if (auth && auth.userId && auth.csrfToken) {
+            return { cookies, userId: auth.userId, csrfToken: auth.csrfToken };
+        }
+    } catch (e) {
+        console.warn('FP Tools AutoBump: homepage auth lookup failed:', e.message);
+    }
+
+    // 2) Fallback: открытая вкладка FunPay (если главную не удалось распарсить).
     const tabs = await chrome.tabs.query({ url: "https://funpay.com/*" });
     for (const tab of tabs) {
         try {
@@ -70,19 +97,6 @@ async function getAuthDetails() {
         } catch (e) {
             console.warn(`Could not connect to tab ${tab.id}. Trying next. Error: ${e.message}`);
         }
-    }
-
-    // 2) Открытой вкладки нет (например, команда /bump из Telegram) — берём
-    //    userId/csrf напрямую с главной страницы, используя настоящие cookie.
-    try {
-        const resp = await withCookieLock(() => fpFetch('https://funpay.com/', { credentials: 'include', cache: 'no-store' }));
-        const html = await resp.text();
-        const auth = await parseHtmlViaOffscreen(html, 'parseAuthData');
-        if (auth && auth.userId && auth.csrfToken) {
-            return { cookies, userId: auth.userId, csrfToken: auth.csrfToken };
-        }
-    } catch (e) {
-        console.warn('FP Tools AutoBump: homepage auth fallback failed:', e.message);
     }
 
     throw new Error("Не удалось получить данные авторизации (userId/csrf). Откройте вкладку FunPay или войдите заново.");
@@ -150,6 +164,7 @@ async function raiseCategory(categoryData, auth) {
 // --- ИЗМЕНЕННАЯ ФУНКЦИЯ ---
 export async function runBumpCycle() {
     const summary = { raised: 0, errors: 0, skipped: 0 };
+    const raisedNames = [];
     try {
         if (fpIsRateLimited()) { await logToConsole('FunPay под бэк-оффом (rate-limit) — поднятие пропущено.'); return summary; }
         const { fpToolsSelectiveBumpEnabled, fpToolsSelectedBumpCategories, fpToolsBumpOnlyAutoDelivery } = await chrome.storage.local.get(['fpToolsSelectiveBumpEnabled', 'fpToolsSelectedBumpCategories', 'fpToolsBumpOnlyAutoDelivery']);
@@ -216,13 +231,14 @@ export async function runBumpCycle() {
                     categoryName: categoryName
                 };
                 const ok = await raiseCategory(categoryData, auth);
-                if (ok) summary.raised++; else summary.skipped++;
+                if (ok) { summary.raised++; raisedNames.push(categoryName); } else summary.skipped++;
             } else {
                 await logToConsole(`Не поднято: ${categoryName}. Причина: Не найдена кнопка поднятия.`);
                 summary.skipped++;
             }
             await new Promise(resolve => setTimeout(resolve, 4500)); // 2.9: increased to 4.5s to avoid rate limiting
         }
+        if (raisedNames.length) await notifyRaised(raisedNames);
         return summary;
     } catch (error) {
         await logToConsole(`Не поднято: [Системная ошибка]. Причина: ${error.message}`);

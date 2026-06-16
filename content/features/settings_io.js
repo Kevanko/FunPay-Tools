@@ -25,6 +25,8 @@ const EXPORT_KEYS = [
     'fpToolsSelectiveBumpEnabled',
     'fpToolsSelectedBumpCategories',
     'fpToolsBumpOnlyAutoDelivery',
+    'fpToolsBumpNotifyEnabled',
+    'fpToolsSmartBumpEnabled',
     'fpToolsTemplateSettings',
     'fpToolsCursorFx',
     'fpToolsCustomCursor',
