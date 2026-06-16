@@ -376,7 +376,7 @@ function showBumpRaisedToast(names) {
     const itemsHtml = list.map(n =>
         `<div style="display:flex;align-items:center;gap:7px;padding:3px 0;font-size:13px;line-height:1.35;">
             <span style="flex:0 0 auto;width:5px;height:5px;border-radius:50%;background:var(--fpt-success,#3ecf8e);"></span>
-            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${fptEscapeHtml(String(n))}</span>
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_fptToastEsc(String(n))}</span>
         </div>`).join('');
 
     toast.innerHTML =
@@ -403,7 +403,9 @@ function showBumpRaisedToast(names) {
     }, 9000);
 }
 
-function fptEscapeHtml(s) {
+// Локальный escaper для тоста. НЕ называем fptEscapeHtml — такое имя уже занято глобально
+// в needs_tab.js (оба — обычные content-скрипты в одной области видимости; коллизия имён).
+function _fptToastEsc(s) {
     return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 

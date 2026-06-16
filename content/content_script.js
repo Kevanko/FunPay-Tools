@@ -553,7 +553,7 @@
             }
             if (request.action === 'fptBumpRaised') {
                 if (typeof showBumpRaisedToast === 'function') showBumpRaisedToast(request.names);
-                return true;
+                return false; // обработчик синхронный — не держим канал сообщения открытым
             }
             if (request.action === "getAppData") {
                 try {

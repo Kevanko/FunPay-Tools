@@ -94,6 +94,19 @@ async function fetchWithRetry(url, options, { retries = 4, baseDelay = 800 } = {
 let _cookieLock = Promise.resolve();
 export function withCookieLock(fn) { const next = _cookieLock.then(fn, fn); _cookieLock = next.catch(() => {}); return next; }
 
+// Уведомление «Лоты подняты: …» на странице FunPay. Единая точка для обычного и умного
+// поднятия (раньше функция была скопирована в оба модуля). Шлём только когда реально что-то
+// поднялось и пользователь не выключил уведомления (по умолчанию включены).
+export async function notifyRaised(names) {
+    if (!names || !names.length) return;
+    try {
+        const { fpToolsBumpNotifyEnabled } = await chrome.storage.local.get('fpToolsBumpNotifyEnabled');
+        if (fpToolsBumpNotifyEnabled === false) return;
+        const tabs = await chrome.tabs.query({ url: 'https://funpay.com/*' });
+        tabs.forEach(t => chrome.tabs.sendMessage(t.id, { action: 'fptBumpRaised', names }).catch(() => {}));
+    } catch (_) {}
+}
+
 const RX = {
 
     ORDER_PURCHASED:    /(оплатил заказ|has paid for order) #([A-Z0-9]{8})/i,
