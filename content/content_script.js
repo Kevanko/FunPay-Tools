@@ -551,6 +551,10 @@
                 logToAutoBumpConsole(request.message);
                 return true;
             }
+            if (request.action === 'fptBumpRaised') {
+                if (typeof showBumpRaisedToast === 'function') showBumpRaisedToast(request.names);
+                return true;
+            }
             if (request.action === "getAppData") {
                 try {
                     const appDataString = document.body.dataset.appData;

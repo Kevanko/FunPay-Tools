@@ -298,6 +298,7 @@ function initializeToolsPopup() {
                 fpToolsSelectiveBumpEnabled: document.getElementById('selectiveBumpEnabled').checked,
                 fpToolsBumpOnlyAutoDelivery: document.getElementById('bumpOnlyAutoDelivery').checked,
                 fpToolsSmartBumpEnabled: (document.getElementById('fpToolsSmartBumpEnabled') ? document.getElementById('fpToolsSmartBumpEnabled').checked : false),
+                fpToolsBumpNotifyEnabled: (document.getElementById('fpToolsBumpNotifyEnabled') ? document.getElementById('fpToolsBumpNotifyEnabled').checked : true),
 
                 // Авто-ответы (добавленный блок)
                 autoReviewEnabled: document.getElementById('autoReviewEnabled').checked,

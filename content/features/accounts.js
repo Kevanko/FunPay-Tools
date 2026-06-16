@@ -696,7 +696,7 @@ const FPT_SETTINGS_KEYS = [
     'notificationVolume', 'fpToolsCustomSoundData', 'fpToolsCustomSoundMeta',
     'fpToolsCursorFx', 'fpToolsCustomCursor', 'keywords', 'greetingText',
     // авто-поднятие (вкл на 1 аккаунте больше НЕ включает на всех)
-    'autoBumpEnabled', 'autoBumpCooldown', 'fpToolsSmartBumpEnabled',
+    'autoBumpEnabled', 'autoBumpCooldown', 'fpToolsSmartBumpEnabled', 'fpToolsBumpNotifyEnabled',
     // оформление и отображение
     'fpToolsLiveStyles', 'enableRedesignedHomepage', 'showSalesStats', 'hideBalance',
     'viewSellersPromo', 'fpToolsDisabledFeatures', 'fpToolsHeaderButtonStyles',
@@ -712,7 +712,7 @@ const FPT_SECTION_KEYS = {
     theme: ['fpToolsTheme', 'enableCustomTheme', 'fpToolsLiveStyles', 'enableRedesignedHomepage', 'fpToolsHeaderButtonStyles'],
     effects: ['fpToolsCursorFx', 'fpToolsCustomCursor'],
     general: ['notificationSound', 'notificationVolume', 'fpToolsCustomSoundData', 'fpToolsCustomSoundMeta', 'showSalesStats', 'hideBalance', 'viewSellersPromo', 'fpToolsDisabledFeatures', 'fpToolsShowPaymentType', 'fpToolsShowUnconfirmed'],
-    autobump: ['autoBumpEnabled', 'autoBumpCooldown', 'fpToolsSmartBumpEnabled', 'fpToolsSelectiveBumpEnabled', 'fpToolsBumpOnlyAutoDelivery', 'fpToolsSelectedBumpCategories']
+    autobump: ['autoBumpEnabled', 'autoBumpCooldown', 'fpToolsSmartBumpEnabled', 'fpToolsBumpNotifyEnabled', 'fpToolsSelectiveBumpEnabled', 'fpToolsBumpOnlyAutoDelivery', 'fpToolsSelectedBumpCategories']
 };
 
 // ЛИЧНЫЕ ДАННЫЕ аккаунта — НЕ должны смешиваться между аккаунтами (продажи/графики,

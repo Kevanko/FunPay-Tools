@@ -334,6 +334,79 @@ function showNotification(message, isError = false) {
     }, PARTICLE_ANIMATION_DURATION + 300);
 }
 
+// === УВЕДОМЛЕНИЕ О ПОДНЯТИИ ЛОТОВ ===================================================
+// Аккуратная карточка справа снизу: «Лоты подняты» + список категорий + счётчик.
+// Не засоряет: один общий элемент (повторное поднятие обновляет ту же карточку, не плодит
+// новые), клик закрывает, авто-скрытие ~9с. Цвета — из тем расширения (--fpt-*).
+function showBumpRaisedToast(names) {
+    const list = Array.isArray(names) ? names.filter(Boolean) : [];
+    if (!list.length) return;
+
+    if (!document.querySelector('style[data-fpt-bump-toast-keyframes]')) {
+        const kf = `
+            @keyframes fptBumpToastIn { from { opacity: 0; transform: translateX(40px) scale(.96); } to { opacity: 1; transform: translateX(0) scale(1); } }
+            @keyframes fptBumpToastOut { from { opacity: 1; transform: translateX(0) scale(1); } to { opacity: 0; transform: translateX(40px) scale(.96); } }
+        `;
+        document.head.appendChild(createElement('style', { 'data-fpt-bump-toast-keyframes': 'true' }, {}, kf));
+    }
+
+    // одна общая карточка — обновляем содержимое, а не создаём новую
+    let toast = document.getElementById('fpt-bump-toast');
+    const justCreated = !toast;
+    if (!toast) {
+        toast = createElement('div', { id: 'fpt-bump-toast' }, {
+            position: 'fixed', bottom: '24px', right: '24px', zIndex: '20002',
+            maxWidth: '340px', minWidth: '240px', padding: '14px 16px',
+            background: 'var(--fpt-surface-2, rgba(28, 32, 38, 0.96))',
+            color: 'var(--fpt-text, #e8eaf0)',
+            border: '1px solid var(--fpt-border, rgba(255,255,255,0.10))',
+            borderLeft: '3px solid var(--fpt-success, #3ecf8e)',
+            borderRadius: '12px',
+            boxShadow: '0 10px 32px var(--fpt-shadow, rgba(0,0,0,0.40))',
+            backdropFilter: 'blur(10px)', webkitBackdropFilter: 'blur(10px)',
+            cursor: 'pointer', fontFamily: 'inherit',
+            animation: 'fptBumpToastIn 0.35s cubic-bezier(0.2, 0.9, 0.3, 1) forwards'
+        });
+        toast.title = 'Нажмите, чтобы закрыть';
+        toast.addEventListener('click', () => { try { toast.remove(); } catch (_) {} });
+        document.body.appendChild(toast);
+    }
+
+    const count = list.length;
+    const itemsHtml = list.map(n =>
+        `<div style="display:flex;align-items:center;gap:7px;padding:3px 0;font-size:13px;line-height:1.35;">
+            <span style="flex:0 0 auto;width:5px;height:5px;border-radius:50%;background:var(--fpt-success,#3ecf8e);"></span>
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${fptEscapeHtml(String(n))}</span>
+        </div>`).join('');
+
+    toast.innerHTML =
+        `<div style="display:flex;align-items:center;gap:9px;margin-bottom:8px;">
+            <span style="font-size:18px;line-height:1;">🚀</span>
+            <span style="font-weight:700;font-size:14px;">Лоты подняты</span>
+            <span style="margin-left:auto;font-size:12px;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--fpt-success-soft, rgba(62,207,142,0.16));color:var(--fpt-success,#3ecf8e);">${count} шт.</span>
+        </div>
+        <div>${itemsHtml}</div>`;
+
+    if (!justCreated) {
+        // освежаем анимацию появления при обновлении содержимого
+        toast.style.animation = 'none';
+        // eslint-disable-next-line no-unused-expressions
+        toast.offsetHeight;
+        toast.style.animation = 'fptBumpToastIn 0.3s cubic-bezier(0.2, 0.9, 0.3, 1) forwards';
+    }
+
+    clearTimeout(toast._fptHideTimer);
+    toast._fptHideTimer = setTimeout(() => {
+        if (!document.body.contains(toast)) return;
+        toast.style.animation = 'fptBumpToastOut 0.4s ease forwards';
+        setTimeout(() => { try { toast.remove(); } catch (_) {} }, 420);
+    }, 9000);
+}
+
+function fptEscapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 // === ВЛОЖЕНИЯ ИЗОБРАЖЕНИЙ (отдельно от текста) ===
 // Картинки больше НЕ вставляются в поле ввода. Вместо этого под полем появляется чип
 // "Прикреплённая картинка" с возможностью посмотреть (👁) и убрать (✕). Сами данные хранятся
