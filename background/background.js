@@ -1025,6 +1025,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ ok: true });
         return true;
     }
+    // VPS API: ходим из service worker (а не со страницы funpay.com) — так обычный
+    // http://IP:8787 работает без mixed-content и без HTTPS/nginx. URL+токен в storage.
+    if (request.action === 'fptVpsApi') {
+        (async () => {
+            try {
+                const { fptVps } = await chrome.storage.local.get('fptVps');
+                const { url, token } = fptVps || {};
+                if (!url || !token) { sendResponse({ ok: false, error: 'нет подключения' }); return; }
+                const res = await fetch(url.replace(/\/+$/, '') + request.path, {
+                    method: request.method || 'GET',
+                    headers: { authorization: 'Bearer ' + token, ...(request.body ? { 'content-type': 'application/json' } : {}) },
+                    body: request.body ? JSON.stringify(request.body) : undefined
+                });
+                let json = null; try { json = JSON.parse(await res.text()); } catch (_) {}
+                sendResponse({ ok: res.ok, status: res.status, json });
+            } catch (e) { sendResponse({ ok: false, error: e.message }); }
+        })();
+        return true;
+    }
     // Cloud settings sync: gzip + network in the SW; content sends only settings (no creds).
     if (request.action === 'fptCloudPush') {
         (async () => { try { sendResponse(await fptCloudPush(request.id, request.settings, request.updatedAt, request.baseVersion)); } catch (e) { sendResponse({ ok: false, error: e.message }); } })();

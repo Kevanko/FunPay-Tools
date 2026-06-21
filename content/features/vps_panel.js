@@ -9,17 +9,13 @@
 
 async function _vpsCfg() { const { fptVps } = await chrome.storage.local.get('fptVps'); return fptVps || {}; }
 
+// Запрос идёт через фон (service worker), чтобы http://IP:8787 работал без mixed-content.
 async function _vpsApi(path, method = 'GET', body) {
-    const { url, token } = await _vpsCfg();
-    if (!url || !token) throw new Error('нет подключения');
-    const res = await fetch(url.replace(/\/+$/, '') + path, {
-        method,
-        headers: { authorization: 'Bearer ' + token, ...(body ? { 'content-type': 'application/json' } : {}) },
-        body: body ? JSON.stringify(body) : undefined
-    });
-    if (res.status === 401) throw new Error('неверный токен');
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    return res.json();
+    const resp = await chrome.runtime.sendMessage({ action: 'fptVpsApi', path, method, body });
+    if (!resp) throw new Error('нет ответа от фона');
+    if (resp.status === 401) throw new Error('неверный токен');
+    if (!resp.ok) throw new Error(resp.error || ('HTTP ' + resp.status));
+    return resp.json;
 }
 
 function _vpsSay(msg, err) {
@@ -80,8 +76,7 @@ async function _vpsConnect() {
     let url = (document.getElementById('fpt-vps-url')?.value || '').trim();
     const token = (document.getElementById('fpt-vps-token')?.value || '').trim();
     if (!url || !token) { _vpsSay('Укажите URL и токен.', true); return; }
-    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-    if (/^http:\/\//i.test(url)) { _vpsSay('Нужен HTTPS — по http браузер заблокирует запрос, и ключи нельзя слать открыто.', true); return; }
+    if (!/^https?:\/\//i.test(url)) url = 'http://' + url;   // голый IP:порт → http по умолчанию
     await chrome.storage.local.set({ fptVps: { url, token } });
     _vpsSay('Проверяю…');
     try {
