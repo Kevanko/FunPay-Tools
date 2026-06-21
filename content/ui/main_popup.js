@@ -118,6 +118,7 @@ function createMainPopup() {
                     <li data-page="theme"><a><span class="nav-icon material-symbols-rounded">palette</span><span>Оформление</span></a></li>
                     <li data-page="effects"><a><span class="nav-icon material-symbols-rounded">auto_awesome</span><span>Эффекты</span></a></li>
                     <li data-page="accounts"><a><span class="nav-icon material-symbols-rounded">group</span><span>Аккаунты</span></a></li>
+                    <li data-page="vps"><a><span class="nav-icon material-symbols-rounded">dns</span><span>VPS</span></a></li>
                     <li data-page="needs"><a><span class="nav-icon material-symbols-rounded">tune</span><span>Что тебе нужно</span></a></li>
                     <li data-page="epic_nicks"><a><span class="nav-icon material-symbols-rounded">diamond</span><span>Это увидят все</span></a></li>
                     <li data-page="telegram"><a><span class="nav-icon material-symbols-rounded">send</span><span>Telegram</span></a></li>
@@ -1026,6 +1027,43 @@ function createMainPopup() {
                     </div>
                 </div>
 
+                <div class="fp-tools-page-content" data-page="vps">
+                    <h3>VPS — фоновая работа аккаунтов</h3>
+                    <p class="template-info">Свой сервер держит аккаунты онлайн (каждый через свой прокси), собирает статистику и отвечает за них — даже когда браузер закрыт. Аккаунт, отданный на VPS, в браузере перестаёт пинговаться и авто-отвечать (чтобы не было дублей).</p>
+                    <p class="template-info">Установка одной командой на VPS (от root):</p>
+                    <pre style="background:var(--fpt-bg-deep,#0e0f16);border:1px solid var(--fpt-line,rgba(255,255,255,.08));border-radius:6px;padding:8px 10px;font-size:11px;overflow:auto;white-space:pre-wrap;">curl -fsSL https://raw.githubusercontent.com/Kevanko/FunPay-Tools/main/vps/install.sh | bash</pre>
+                    <p class="template-info">Команда напечатает URL и токен. VPS должен быть доступен по <strong>HTTPS</strong> (по http браузер заблокирует запрос, и ключи нельзя слать открыто).</p>
+
+                    <div class="fpt-cloud-card">
+                        <div class="fpt-cloud-card-head">
+                            <span class="material-symbols-rounded fpt-cloud-card-ic">dns</span>
+                            <div class="fpt-cloud-card-txt">
+                                <div class="fpt-cloud-card-title">Подключение к VPS</div>
+                                <div class="fpt-cloud-card-sub">URL и токен из вывода установщика</div>
+                            </div>
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px;">
+                            <input type="text" id="fpt-vps-url" placeholder="https://ваш-домен или https://IP:8787" style="background:var(--fpt-bg-deep,#0e0f16);border:1px solid var(--fpt-line-strong,#22253a);border-radius:6px;padding:8px;color:var(--fpt-text,#d8dae8);font-size:13px;outline:none;">
+                            <input type="text" id="fpt-vps-token" placeholder="Токен" style="background:var(--fpt-bg-deep,#0e0f16);border:1px solid var(--fpt-line-strong,#22253a);border-radius:6px;padding:8px;color:var(--fpt-text,#d8dae8);font-size:13px;outline:none;">
+                            <button id="fpt-vps-connect" class="btn"><span class="material-symbols-rounded" style="font-size:16px;vertical-align:-3px;margin-right:5px;">link</span>Подключить</button>
+                            <p class="template-info" id="fpt-vps-status" style="margin:2px 0 0;"></p>
+                        </div>
+                    </div>
+
+                    <div id="fpt-vps-body" style="display:none;margin-top:16px;">
+                        <div class="fpt-eyebrow fpt-blocklabel">Аккаунты на VPS</div>
+                        <div id="fpt-vps-list" style="margin-bottom:14px;"></div>
+
+                        <div class="fpt-eyebrow fpt-blocklabel">Добавить аккаунт на VPS</div>
+                        <div style="display:flex;flex-direction:column;gap:8px;">
+                            <select id="fpt-vps-add-account" class="template-input"></select>
+                            <input type="text" id="fpt-vps-add-proxy" placeholder="Прокси (http://user:pass@host:port) — необязательно" style="background:var(--fpt-bg-deep,#0e0f16);border:1px solid var(--fpt-line-strong,#22253a);border-radius:6px;padding:8px;color:var(--fpt-text,#d8dae8);font-size:13px;outline:none;">
+                            <button id="fpt-vps-add-btn" class="btn"><span class="material-symbols-rounded" style="font-size:16px;vertical-align:-3px;margin-right:5px;">add</span>Отдать на VPS</button>
+                        </div>
+                        <p class="template-info" style="margin-top:8px;">Авто-ответы аккаунта (текст) уезжают на VPS автоматически. golden_key хранится на вашем VPS, не на GitHub.</p>
+                    </div>
+                </div>
+
                 <div class="fp-tools-page-content" data-page="blacklist">
                     <h3>Чёрный список покупателей</h3>
                     <p class="template-info">Добавьте ненадёжных покупателей — для них отключатся автоматизация и уведомления.</p>
@@ -1255,6 +1293,7 @@ function setupPopupNavigation() {
             if (pageId === 'needs') { if (typeof initializeNeedsTab === 'function') initializeNeedsTab(); }
             if (pageId === 'slash_commands') { if (typeof initializeSlashCommandsUI === 'function') initializeSlashCommandsUI(); }
             if (pageId === 'telegram') { if (typeof initializeTelegramUI === 'function') initializeTelegramUI(); }
+            if (pageId === 'vps') { if (typeof fptVpsInitUI === 'function') fptVpsInitUI(); }
             if (pageId === 'blacklist') { if (typeof initializeBlacklist === 'function') initializeBlacklist(); }
             if (pageId === 'tickets') { initTicketsTab(); }
             // Темы/обои/акцент инициализируются один раз в theme.js

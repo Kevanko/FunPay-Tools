@@ -720,6 +720,15 @@ async function _runAutoResponderCycleInner() {
     const auth = await getAuth();
     if (!auth.golden_key || !auth.csrf_token || !auth.userId) return;
 
+    // Активный аккаунт отдан на VPS → за него отвечает VPS, браузер молчит (анти-дубль).
+    try {
+        const { fpToolsAccounts = [], fptVpsManaged = [] } = await chrome.storage.local.get(['fpToolsAccounts', 'fptVpsManaged']);
+        if (fptVpsManaged.length) {
+            const me = fpToolsAccounts.find(a => a && (a.key === auth.golden_key || String(a.userId) === String(auth.userId)));
+            if (me && fptVpsManaged.includes(me.name)) return;
+        }
+    } catch (_) {}
+
     try {
         // FP Tools's approach: use a FRESH RANDOM tag every cycle. A single persisted tag
         // (the old behaviour) goes stale and FunPay stops returning chat updates - the
@@ -969,15 +978,16 @@ export async function runMultiAccountAutoReply(opts = {}) {
         const report = { accounts: [], errors: [], dryRun };
         // FunPay сейчас под бэк-оффом — не лезем, чтобы не усугублять 429/500.
         if (fpIsRateLimited()) { report.rateLimited = true; report.retryInMs = _fpRlUntil - Date.now(); return report; }
-        const store = await chrome.storage.local.get(['fpToolsAccounts', 'fptProfiles', 'fptMultiAR', 'fptMultiAccountAR']);
+        const store = await chrome.storage.local.get(['fpToolsAccounts', 'fptProfiles', 'fptMultiAR', 'fptMultiAccountAR', 'fptVpsManaged']);
         const accounts = store.fpToolsAccounts || [];
         const profiles = store.fptProfiles || {};
         const stateMap = store.fptMultiAR || {};
+        const vpsManaged = store.fptVpsManaged || [];   // на VPS-аккаунты отвечает сам VPS (анти-дубль)
         if (!dryRun && !store.fptMultiAccountAR) { report.disabled = true; return report; }
 
         const active = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
         const activeKey = active?.value;
-        let targets = accounts.filter(a => a && a.key && a.online !== false && a.key !== activeKey);
+        let targets = accounts.filter(a => a && a.key && a.online !== false && a.key !== activeKey && !vpsManaged.includes(a.name));
         if (onlyKey) targets = accounts.filter(a => a && a.key === onlyKey);  // dry-run может смотреть и активный
 
         for (const account of targets) {

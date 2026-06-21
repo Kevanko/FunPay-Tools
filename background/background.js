@@ -901,8 +901,9 @@ async function runOnlineHeartbeat() {
     if (fpIsRateLimited()) return;            // FunPay под бэк-оффом — пропускаем пинг
     _fptOnlineRunning = true;
     try {
-        const { fpToolsAccounts = [], fptMultiAccountAR } = await chrome.storage.local.get(['fpToolsAccounts', 'fptMultiAccountAR']);
-        let online = fpToolsAccounts.filter(a => a && a.key && a.online !== false);
+        const { fpToolsAccounts = [], fptMultiAccountAR, fptVpsManaged = [] } = await chrome.storage.local.get(['fpToolsAccounts', 'fptMultiAccountAR', 'fptVpsManaged']);
+        // Аккаунты, отданные на VPS, держит онлайн сам VPS — браузер их не пингует (анти-дубль).
+        let online = fpToolsAccounts.filter(a => a && a.key && a.online !== false && !fptVpsManaged.includes(a.name));
         // Без мульти-аккаунт режима активность держим ТОЛЬКО на активном аккаунте —
         // остальные «оживают» лишь когда явно включён фоновый мульти-аккаунт (будущий
         // VPS-режим). Иначе все сохранённые ключи светились бы онлайн без ведома юзера.

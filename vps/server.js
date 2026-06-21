@@ -155,8 +155,9 @@ const server = http.createServer(async (req, res) => {
             if (b.golden_key) acc.golden_key = b.golden_key;
             if (b.proxy != null) acc.proxy = b.proxy;
             if (b.autoReply != null) acc.autoReply = !!b.autoReply;
+            if (b.autoReplies != null) acc.autoReplies = b.autoReplies;   // текст авто-ответов (картинки не шлём)
         } else {                                    // добавление
-            acc = { id: randomBytes(6).toString('hex'), name: b.name || '', golden_key: b.golden_key, proxy: b.proxy || '', autoReply: !!b.autoReply };
+            acc = { id: randomBytes(6).toString('hex'), name: b.name || '', golden_key: b.golden_key, proxy: b.proxy || '', autoReply: !!b.autoReply, autoReplies: b.autoReplies || {} };
             data.accounts.push(acc);
         }
         saveData(data);
