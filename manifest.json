@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "FunPay Tools",
-    "version": "3.12.5",
+    "version": "3.13.0",
     "description": "Инструменты продавца для FunPay: статистика продаж, автоматизация, авто-выдача, массовые действия с лотами, темы оформления.",
     "permissions": [
         "storage",
@@ -116,6 +116,7 @@
                 "content/features/ai_lot_audit.js",
                 "content/features/settings_io.js",
                 "content/features/cloud_sync.js",
+                "content/features/vps_panel.js",
                 "content/features/bulk_lot_editor.js",
                 "content/features/buyer_history.js",
                 "content/features/chat_enhancements.js",
