@@ -14,11 +14,17 @@ import { readFileSync, writeFileSync, existsSync, renameSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { runAutoReply, _selftest as _arSelftest } from './autoreply.js';
 
 const DIR = dirname(fileURLToPath(import.meta.url));
 const DATA_FILE = join(DIR, 'data.json');
 const PORT = parseInt(process.env.FPT_PORT || '8787', 10);
 const REFRESH_MS = 3 * 60 * 1000;      // как онлайн-heartbeat в расширении
+const AR_MS = 2 * 60 * 1000;           // цикл авто-ответа
+
+// кольцевой журнал последних событий (для панели расширения через /log)
+const LOG = [];
+function log(msg) { const line = `${new Date().toISOString().slice(11, 19)} ${msg}`; LOG.push(line); if (LOG.length > 200) LOG.shift(); console.log('[fpt] ' + msg); }
 
 // undici подгружаем лениво (selftest не требует сети/зависимостей).
 let ProxyAgent = null;
@@ -110,6 +116,24 @@ async function refreshAll() {
     }
 }
 
+// Цикл авто-ответа: по аккаунтам с включёнными авто-ответами в их профиле.
+let _arRunning = false;
+async function autoReplyAll() {
+    if (_arRunning) return;
+    _arRunning = true;
+    try {
+        let changed = false;
+        for (const acc of data.accounts) {
+            const s = acc.autoReplies || {};
+            if (!s.greetingEnabled && !s.keywordsEnabled) continue;
+            try { await runAutoReply(acc, log); changed = true; }   // arState мутируется → сохраним
+            catch (e) { log(`${acc.name}: авто-ответ ошибка: ${e.message}`); }
+            await new Promise(r => setTimeout(r, 800));
+        }
+        if (changed) saveData(data);   // persist arState (lastSeen/greeted/seeded)
+    } finally { _arRunning = false; }
+}
+
 // ── HTTP API ────────────────────────────────────────────────────────────────
 function send(res, code, body) {
     res.writeHead(code, {
@@ -146,10 +170,15 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/accounts' && req.method === 'GET') {
         return send(res, 200, { accounts: publicAccounts() });
     }
+    if (url.pathname === '/log' && req.method === 'GET') {
+        return send(res, 200, { log: LOG.slice(-80) });
+    }
     if (url.pathname === '/accounts' && req.method === 'POST') {
         const b = await readBody(req);
-        if (!b.golden_key && !b.id) return send(res, 400, { error: 'нужен golden_key' });
-        let acc = b.id ? data.accounts.find(a => a.id === b.id) : null;
+        // ключ для апдейта: id, иначе имя (расширение работает по имени аккаунта).
+        let acc = b.id ? data.accounts.find(a => a.id === b.id)
+                       : (b.name ? data.accounts.find(a => a.name === b.name) : null);
+        if (!acc && !b.golden_key) return send(res, 400, { error: 'нужен golden_key' });
         if (acc) {                                  // обновление
             if (b.name != null) acc.name = b.name;
             if (b.golden_key) acc.golden_key = b.golden_key;
@@ -192,9 +221,12 @@ function selftest() {
 
 if (process.argv.includes('--selftest')) {
     selftest();
+    _arSelftest();
 } else {
     refreshAll();
     setInterval(refreshAll, REFRESH_MS);
+    setTimeout(autoReplyAll, 15000);          // первый проход — засев lastSeen (без спама)
+    setInterval(autoReplyAll, AR_MS);
     server.listen(PORT, () => {
         console.log(`FP Tools VPS на порту ${PORT}`);
         console.log(`ТОКЕН: ${data.token}`);

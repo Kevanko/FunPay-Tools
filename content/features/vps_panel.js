@@ -127,6 +127,28 @@ function _vpsStripImgs(ar) {
     return a;
 }
 
+// Онгоинг авто-синк: текст авто-ответов активного аккаунта едет на VPS при каждом
+// изменении (если этот аккаунт отдан на VPS). Работает и при закрытой панели.
+let _vpsSyncTimer = null;
+async function _vpsSyncActiveAutoReplies() {
+    try {
+        const cfg = await _vpsCfg();
+        if (!cfg.url || !cfg.token) return;
+        const name = document.querySelector('.user-link-name')?.textContent.trim();
+        if (!name) return;
+        const { fptVpsManaged = [], fpToolsAutoReplies = {} } = await chrome.storage.local.get(['fptVpsManaged', 'fpToolsAutoReplies']);
+        if (!fptVpsManaged.includes(name)) return;
+        await _vpsApi('/accounts', 'POST', { name, autoReplies: _vpsStripImgs(fpToolsAutoReplies) });
+    } catch (_) { /* повторим при следующем изменении */ }
+}
+if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+    chrome.storage.onChanged.addListener((changes, area) => {
+        if (area !== 'local' || !changes.fpToolsAutoReplies) return;
+        clearTimeout(_vpsSyncTimer);
+        _vpsSyncTimer = setTimeout(_vpsSyncActiveAutoReplies, 1500);   // дебаунс серии правок
+    });
+}
+
 async function fptVpsInitUI() {
     const connectBtn = document.getElementById('fpt-vps-connect');
     if (!connectBtn) return;

@@ -55,6 +55,7 @@ NPM="$APP_DIR/node/bin/npm"
 
 log "скачиваю сервис…"
 curl -fsSL "$RAW/server.js"    -o "$APP_DIR/server.js"
+curl -fsSL "$RAW/autoreply.js" -o "$APP_DIR/autoreply.js"
 curl -fsSL "$RAW/package.json" -o "$APP_DIR/package.json"
 
 log "ставлю зависимость undici (локально)…"
