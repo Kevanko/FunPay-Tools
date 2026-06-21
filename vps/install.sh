@@ -58,7 +58,9 @@ curl -fsSL "$RAW/server.js"    -o "$APP_DIR/server.js"
 curl -fsSL "$RAW/package.json" -o "$APP_DIR/package.json"
 
 log "ставлю зависимость undici (локально)…"
-( cd "$APP_DIR" && "$NPM" install --omit=dev --no-audit --no-fund --loglevel=error )
+# npm — JS со своим shebang '#!/usr/bin/env node'; node у нас локальный и не в PATH,
+# поэтому даём его npm через PATH (иначе 'env: node: No such file or directory').
+( cd "$APP_DIR" && PATH="$APP_DIR/node/bin:$PATH" "$NPM" install --omit=dev --no-audit --no-fund --loglevel=error )
 
 chown -R fptvps:fptvps "$APP_DIR"
 
