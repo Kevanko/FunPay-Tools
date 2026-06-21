@@ -901,8 +901,16 @@ async function runOnlineHeartbeat() {
     if (fpIsRateLimited()) return;            // FunPay под бэк-оффом — пропускаем пинг
     _fptOnlineRunning = true;
     try {
-        const { fpToolsAccounts = [] } = await chrome.storage.local.get('fpToolsAccounts');
-        const online = fpToolsAccounts.filter(a => a && a.key && a.online !== false);
+        const { fpToolsAccounts = [], fptMultiAccountAR } = await chrome.storage.local.get(['fpToolsAccounts', 'fptMultiAccountAR']);
+        let online = fpToolsAccounts.filter(a => a && a.key && a.online !== false);
+        // Без мульти-аккаунт режима активность держим ТОЛЬКО на активном аккаунте —
+        // остальные «оживают» лишь когда явно включён фоновый мульти-аккаунт (будущий
+        // VPS-режим). Иначе все сохранённые ключи светились бы онлайн без ведома юзера.
+        if (!fptMultiAccountAR) {
+            const active = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
+            const activeKey = active?.value;
+            online = activeKey ? online.filter(a => a.key === activeKey) : [];
+        }
         const updates = {};   // name -> snapshot
         // Снимок идёт через declarativeNetRequest без подмены общей куки (см. fptSnapshotForKey),
         // поэтому сессия открытой вкладки не страдает и пинговать можно ВСЕ онлайн-аккаунты
