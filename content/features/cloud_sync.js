@@ -27,6 +27,18 @@ const FPT_CLOUD_KEYSET = new Set(FPT_CLOUD_KEYS);
 // при загрузке (theme.js) под лимит; легаси-фото сверх лимита не пройдёт пуш (413,
 // обрабатывается в _fptCloudPushCAS) и просто останется локальным.
 const FPT_CLOUD_THEME_STRIP = ['bgVideo', 'bgData', 'bgVideoData'];
+// fpToolsAutoReplies несёт картинки (base64 data URL) — они раздувают бандл за 256 КБ
+// и роняли весь пуш (413 → синхронизация аккаунта вставала, и даже ТЕКСТ ответов не
+// сохранялся). Картинки — локальные бинарники (как видео-обои): в облако шлём только
+// текст ответов/шаблонов/ключевых слов, картинки остаются на устройстве.
+const FPT_CLOUD_AR_IMG_FIELDS = ['greetingImages', 'newOrderReplyImages', 'orderConfirmReplyImages', 'reviewTemplateImages'];
+function _fptCloudStripAR(ar) {
+    if (!ar || typeof ar !== 'object') return ar;
+    const a = { ...ar };
+    FPT_CLOUD_AR_IMG_FIELDS.forEach(f => delete a[f]);
+    if (Array.isArray(a.keywords)) a.keywords = a.keywords.map(r => (r && typeof r === 'object' && 'images' in r) ? (() => { const c = { ...r }; delete c.images; return c; })() : r);
+    return a;
+}
 // Ключи, эффект которых применяется только при (пере)загрузке страницы — для них
 // показываем подсказку «обновите страницу». Тема/обои применяются ВЖИВУЮ через
 // theme.js (storage.onChanged), поэтому при их смене с другого устройства ни
@@ -72,6 +84,7 @@ function _fptCloudHash(str) { let h = 0x811c9dc5; for (let i = 0; i < str.length
 function _fptCloudStrip(settings) {
     const o = { ...(settings || {}) };
     if (o.fpToolsTheme && typeof o.fpToolsTheme === 'object') { const t = { ...o.fpToolsTheme }; FPT_CLOUD_THEME_STRIP.forEach(f => delete t[f]); o.fpToolsTheme = t; }
+    if (o.fpToolsAutoReplies && typeof o.fpToolsAutoReplies === 'object') o.fpToolsAutoReplies = _fptCloudStripAR(o.fpToolsAutoReplies);
     return o;
 }
 function _fptCloudCanonHash(settings) { return _fptCloudHash(_fptCloudStable(_fptCloudStrip(settings))); }
@@ -130,6 +143,19 @@ async function _fptCloudApply(mergedS, delKeys) {
         const { fpToolsTheme: localTheme = {} } = await chrome.storage.local.get('fpToolsTheme');
         incoming.fpToolsTheme = { ...incoming.fpToolsTheme };
         FPT_CLOUD_THEME_STRIP.forEach(f => { if (localTheme && localTheme[f] !== undefined) incoming.fpToolsTheme[f] = localTheme[f]; });
+    }
+    // картинки авто-ответов в облако не уходят — при применении облачного бандла
+    // возвращаем локальные, иначе текст из облака затёр бы их на этом устройстве.
+    if (incoming.fpToolsAutoReplies && typeof incoming.fpToolsAutoReplies === 'object') {
+        const { fpToolsAutoReplies: localAR = {} } = await chrome.storage.local.get('fpToolsAutoReplies');
+        incoming.fpToolsAutoReplies = { ...incoming.fpToolsAutoReplies };
+        FPT_CLOUD_AR_IMG_FIELDS.forEach(f => { if (localAR && localAR[f] !== undefined) incoming.fpToolsAutoReplies[f] = localAR[f]; });
+        if (Array.isArray(incoming.fpToolsAutoReplies.keywords) && Array.isArray(localAR.keywords)) {
+            incoming.fpToolsAutoReplies.keywords = incoming.fpToolsAutoReplies.keywords.map((r, i) => {
+                const li = localAR.keywords[i];
+                return (r && typeof r === 'object' && li && li.images !== undefined) ? { ...r, images: li.images } : r;
+            });
+        }
     }
     const toRemove = (delKeys || []).filter(k => FPT_CLOUD_KEYSET.has(k));
     _fptCloudApplied = {}; _fptCloudAppliedUntil = Date.now() + 6000;
