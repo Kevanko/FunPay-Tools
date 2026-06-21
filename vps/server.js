@@ -10,6 +10,7 @@
 // КЛЮЧИ: golden_key'и аккаунтов лежат в data.json на ЭТОМ сервере и в гит не попадают.
 
 import http from 'node:http';
+import https from 'node:https';
 import { readFileSync, writeFileSync, existsSync, renameSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -158,7 +159,7 @@ function publicAccounts() {   // без golden_key наружу
     return data.accounts.map(a => ({ id: a.id, name: a.name, proxy: a.proxy ? a.proxy.replace(/:[^:@/]+@/, ':***@') : '', autoReply: !!a.autoReply }));
 }
 
-const server = http.createServer(async (req, res) => {
+const handler = async (req, res) => {
     const url = new URL(req.url, 'http://x');
     if (req.method === 'OPTIONS') return send(res, 204, {});
     if (url.pathname === '/health') return send(res, 200, { ok: true });
@@ -201,7 +202,20 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, { ok: true });
     }
     return send(res, 404, { error: 'not found' });
-});
+};
+
+// HTTPS, если есть сертификат (FPT_CERT_DIR/{fullchain,privkey}.pem) — иначе http.
+// Так golden_key'и идут по TLS. Сертификат можно переиспользовать от nginx/Let's Encrypt.
+let server, scheme = 'http';
+try {
+    const certDir = process.env.FPT_CERT_DIR || join(DIR, 'certs');
+    const key = readFileSync(join(certDir, 'privkey.pem'));
+    const cert = readFileSync(join(certDir, 'fullchain.pem'));
+    server = https.createServer({ key, cert }, handler);
+    scheme = 'https';
+} catch (_) {
+    server = http.createServer(handler);
+}
 
 // ── selftest ────────────────────────────────────────────────────────────────
 function selftest() {
@@ -228,7 +242,7 @@ if (process.argv.includes('--selftest')) {
     setTimeout(autoReplyAll, 15000);          // первый проход — засев lastSeen (без спама)
     setInterval(autoReplyAll, AR_MS);
     server.listen(PORT, () => {
-        console.log(`FP Tools VPS на порту ${PORT}`);
+        console.log(`FP Tools VPS на порту ${PORT} (${scheme})`);
         console.log(`ТОКЕН: ${data.token}`);
     });
 }
