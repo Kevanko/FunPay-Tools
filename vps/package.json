@@ -1,0 +1,14 @@
+{
+  "name": "fpt-vps",
+  "version": "1.0.0",
+  "description": "FP Tools VPS service — keeps FunPay accounts online via per-account proxy and serves live stats.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "selftest": "node server.js --selftest"
+  },
+  "dependencies": {
+    "undici": "^6.21.0"
+  }
+}
