@@ -488,9 +488,14 @@ async function handleReview(msg, auth, settings) {
 
         const stars   = typeof orderData === 'object' ? orderData.stars   : orderData;
         const lotName = typeof orderData === 'object' ? (orderData.lotName || '') : '';
+        const existingReply = (typeof orderData === 'object' ? (orderData.existingReply || '') : '').trim();
         const vars = { buyerName: msg.buyerName, lotName, orderId };
 
-        if (settings.autoReviewEnabled && settings.reviewTemplates?.[stars]?.trim()) {
+        // Не перезаписываем ответ, написанный продавцом ВРУЧНУЮ: бот метит свои ответы
+        // невидимым BOT_MARKER. Есть ответ без метки → его оставил человек, не трогаем.
+        const replyIsManual = existingReply && !existingReply.includes(BOT_MARKER) && !existingReply.includes(OLD_BOT_MARKER);
+
+        if (!replyIsManual && settings.autoReviewEnabled && settings.reviewTemplates?.[stars]?.trim()) {
             const text = applyVariables(settings.reviewTemplates[stars], vars);
             try {
                 await sendReviewReply(orderId, text, auth, stars);
