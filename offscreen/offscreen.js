@@ -724,7 +724,13 @@ function parseOrderPageForReview(html) {
             lotName = doc.querySelector('.order-desc-title, .tc-desc-text, .order-title')?.textContent.trim() || '';
         }
 
-        return { stars, lotName };
+        // --- Existing seller reply (to avoid overwriting a manually-written one) ---
+        // FunPay предзаполняет textarea формы ответа текущим сохранённым ответом
+        // продавца (тот же селектор, что и для AI-кнопки в content_script). Пусто = ответа нет.
+        const replyTa = doc.querySelector('.review-item-answer-form textarea[name="text"], .review-editor-reply textarea[name="text"]');
+        const existingReply = replyTa ? (replyTa.textContent || '') : '';
+
+        return { stars, lotName, existingReply };
     } catch (e) {
         console.error("FP Tools Offscreen: Error in parseOrderPageForReview", e);
         return null;
