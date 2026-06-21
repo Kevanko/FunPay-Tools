@@ -1032,7 +1032,7 @@ function createMainPopup() {
                     <p class="template-info">Свой сервер держит аккаунты онлайн (каждый через свой прокси), собирает статистику и отвечает за них — даже когда браузер закрыт. Аккаунт, отданный на VPS, в браузере перестаёт пинговаться и авто-отвечать (чтобы не было дублей).</p>
                     <p class="template-info">Установка одной командой на VPS (от root):</p>
                     <pre style="background:var(--fpt-bg-deep,#0e0f16);border:1px solid var(--fpt-line,rgba(255,255,255,.08));border-radius:6px;padding:8px 10px;font-size:11px;overflow:auto;white-space:pre-wrap;">curl -fsSL https://raw.githubusercontent.com/Kevanko/FunPay-Tools/main/vps/install.sh | bash</pre>
-                    <p class="template-info">Команда напечатает URL и токен. VPS должен быть доступен по <strong>HTTPS</strong> (по http браузер заблокирует запрос, и ключи нельзя слать открыто).</p>
+                    <p class="template-info">Команда напечатает <strong>URL и токен</strong> — просто вставьте их ниже и нажмите «Подключить». Работает по обычному <code>http://IP:8787</code> (запросы идут через расширение, без mixed-content). Для приватности можно поставить за HTTPS, но не обязательно.</p>
 
                     <div class="fpt-cloud-card">
                         <div class="fpt-cloud-card-head">
@@ -1043,7 +1043,7 @@ function createMainPopup() {
                             </div>
                         </div>
                         <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px;">
-                            <input type="text" id="fpt-vps-url" placeholder="https://ваш-домен или https://IP:8787" style="background:var(--fpt-bg-deep,#0e0f16);border:1px solid var(--fpt-line-strong,#22253a);border-radius:6px;padding:8px;color:var(--fpt-text,#d8dae8);font-size:13px;outline:none;">
+                            <input type="text" id="fpt-vps-url" placeholder="http://IP:8787 (из вывода установщика)" style="background:var(--fpt-bg-deep,#0e0f16);border:1px solid var(--fpt-line-strong,#22253a);border-radius:6px;padding:8px;color:var(--fpt-text,#d8dae8);font-size:13px;outline:none;">
                             <input type="text" id="fpt-vps-token" placeholder="Токен" style="background:var(--fpt-bg-deep,#0e0f16);border:1px solid var(--fpt-line-strong,#22253a);border-radius:6px;padding:8px;color:var(--fpt-text,#d8dae8);font-size:13px;outline:none;">
                             <button id="fpt-vps-connect" class="btn"><span class="material-symbols-rounded" style="font-size:16px;vertical-align:-3px;margin-right:5px;">link</span>Подключить</button>
                             <p class="template-info" id="fpt-vps-status" style="margin:2px 0 0;"></p>
