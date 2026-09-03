@@ -10,6 +10,22 @@
     }, PING_MS);
 })();
 
+// Memory leak fix: this document used to stay open for the entire browser session once
+// created (nothing ever called chrome.offscreen.closeDocument), which meant its keepalive
+// ping above kept the background service worker alive forever too - defeating Chrome's
+// normal MV3 idle-kill memory reclaim for as long as the browser stayed open. Any consumer
+// (autoresponder engine, auto-bump, sales parsing, ...) can create this document, so it
+// self-closes after a period with no real parse requests instead. `lastActivityAt` is
+// bumped only by genuine incoming work below, not by the outgoing keepalive ping, so the
+// active auto-responder loop (which polls every few seconds) keeps it alive as needed.
+let lastActivityAt = Date.now();
+const IDLE_CLOSE_MS = 90000; // no parse requests for 90s -> nothing needs us, let go
+setInterval(() => {
+    if (Date.now() - lastActivityAt > IDLE_CLOSE_MS) {
+        chrome.offscreen.closeDocument().catch(() => {});
+    }
+}, 30000);
+
 function fptCleanDescriptionHtml(rawHtml) {
     if (!rawHtml) return '';
     let html = String(rawHtml);
@@ -1106,7 +1122,8 @@ function parseTicketDetails(html) {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.target !== 'offscreen') return true;
-    
+    lastActivityAt = Date.now();
+
     switch (message.action) {
         case 'parseSalesPage':
             sendResponse(parseSalesPage(message.html));

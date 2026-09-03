@@ -407,6 +407,7 @@ async function handleGreeting(msg, auth, settings) {
         await atomicUpdate(s => {
             const arr = s.greetedUsers || [];
             if (!arr.includes(msg.chatId)) arr.push(msg.chatId);
+            if (arr.length > 500) arr.splice(0, arr.length - 500);
             s.greetedUsers = arr;
         });
         console.log(`FP Tools AR: приветствие пропущено (продавец уже писал) → ${msg.chatId}`);
@@ -420,9 +421,13 @@ async function handleGreeting(msg, auth, settings) {
         await atomicUpdate(s => {
             const arr = s.greetedUsers || [];
             if (!arr.includes(msg.chatId)) arr.push(msg.chatId);
+            if (arr.length > 500) arr.splice(0, arr.length - 500);
             s.greetedUsers = arr;
             const ts = s.greetedTimestamps || {};
             ts[msg.chatId] = Date.now();
+            // Keep timestamps in sync with the capped greetedUsers list - otherwise this
+            // object (unlike arr above) grows forever, one entry per chat ever greeted.
+            for (const id of Object.keys(ts)) { if (!arr.includes(id)) delete ts[id]; }
             s.greetedTimestamps = ts;
         });
         console.log(`FP Tools AR: приветствие → ${msg.chatId}`);
