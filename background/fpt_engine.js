@@ -31,6 +31,14 @@ const MIN_CYCLE_GAP_MS = 2500;        // never hammer runner/ faster than this
 const MULTI_GAP_MS = 60000;           // мульти-аккаунт реже (свап куки = нагрузка на активную сессию + щадим API)
 const ERROR_BACKOFF_MS = 5000;        // FP Tools sleeps 5s after a runner error
 const STALL_MS = 90000;               // if no successful cycle in 90s -> force restart
+// While automation is on, the offscreen doc never goes idle long enough to hit its own
+// 90s self-close (see offscreen.js) - every 3s tick keeps it "active". Chromium doesn't
+// reliably GC the DOMParser documents that pile up from parsing the chat list every
+// cycle for hours on end (this is what was still eating gigabytes after the idle-close
+// fix - confirmed via Chrome's own Task Manager showing it on "Расширение: FunPay Tools",
+// not a tab). Recycling the whole document periodically is the only guaranteed reset:
+// destroying it frees everything at once instead of hoping V8 gets around to it.
+const OFFSCREEN_RECYCLE_MS = 10 * 60 * 1000;
 
 let loopTimer = null;
 let watchdogTimer = null;
@@ -38,6 +46,7 @@ let running = false;
 let lastCycleStart = 0;
 let lastCycleOk = 0;
 let lastMultiRun = 0;
+let lastOffscreenRecycle = Date.now();
 
 // FP Tools: utils.random_tag() -> 8 hex chars. Fresh tag per cycle keeps FunPay returning data.
 export function randomTag() {
@@ -135,6 +144,12 @@ function startWatchdog() {
             console.warn('FP Tools engine: watchdog detected stall, restarting loop');
             lastCycleStart = 0;
             scheduleNext(0);
+        }
+        if (Date.now() - lastOffscreenRecycle > OFFSCREEN_RECYCLE_MS) {
+            lastOffscreenRecycle = Date.now();
+            try { await chrome.offscreen.closeDocument(); } catch (_) {}
+            // next parseViaOffscreen call recreates it on demand (autoresponder.js already
+            // guards for "document doesn't exist yet"), no automation is lost.
         }
     }, 30000);
 }
