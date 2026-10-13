@@ -2,80 +2,48 @@
 
 # FunPay Tools
 
-Браузерное расширение для продавцов FunPay: аналитика продаж, автоматизация рутины,<br>массовые операции с лотами и единый строгий интерфейс в графитовой гамме.
+**Browser extension for FunPay sellers** — sales analytics, auto-bump, auto-replies, auto-delivery and bulk lot editing in one clean graphite UI.
 
-[![Релиз](https://img.shields.io/github/v/release/Kevanko/FunPay-Tools?style=flat-square&color=5b86d8&label=Релиз)](https://github.com/Kevanko/FunPay-Tools/releases/latest)
-[![Лицензия](https://img.shields.io/badge/Лицензия-MIT-3f9e7c?style=flat-square)](LICENSE)
+**English** · [Русский](README.ru.md)
+
+[![License](https://img.shields.io/badge/license-MIT-3f9e7c?style=flat-square)](LICENSE)
 [![Manifest V3](https://img.shields.io/badge/Chrome-Manifest_V3-444a57?style=flat-square)](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3)
-[![Форк](https://img.shields.io/badge/Форк-XaviersDev%2FFunPay--Tools-444a57?style=flat-square)](https://github.com/XaviersDev/FunPay-Tools)
+[![Fork](https://img.shields.io/badge/fork_of-XaviersDev%2FFunPay--Tools-444a57?style=flat-square)](https://github.com/XaviersDev/FunPay-Tools)
+
+![FunPay Tools](assets/funpay-tools.gif)
 
 </div>
 
-Это форк проекта [XaviersDev/FunPay-Tools](https://github.com/XaviersDev/FunPay-Tools) (автор оригинала — XaviersDev) с полностью переработанным дизайном и доработанной логикой: графитовая тема с единым акцентным цветом, мгновенное применение оформления без вспышек, честная статистика продаж, новая панель массовых действий с лотами.
+## Quick start
 
-![Главная страница с командным центром](assets/screen_home.png)
+1. [Download the ZIP](https://github.com/Kevanko/FunPay-Tools/archive/refs/heads/main.zip) and unpack it.
+2. Open `chrome://extensions` and turn on **Developer mode**.
+3. Click **Load unpacked** and select the folder with `manifest.json`.
+4. Open [funpay.com](https://funpay.com/) — the **FP Tools** button appears in the site header.
 
-## Возможности
+Works in Chrome, Edge, Opera, Yandex Browser and other Chromium browsers.
 
-### Аналитика продаж
+## Features
 
-- Статистика по всем заказам: выручка по валютам, средний чек, статусы (закрыт, в ожидании, возврат), уникальные покупатели.
-- Пять режимов отображения: карточки, графики выручки и заказов по дням, круговые диаграммы по категориям, статусам и валютам, топы покупателей и товаров, полный отчёт.
-- Периоды от «сегодня» до «всё время», поиск по заказам, фильтры по статусу и сортировка; клик по любой цифре открывает список конкретных заказов.
-- Статусы заказов синхронизируются с сервером — возвраты и закрытия учитываются корректно.
+- **Analytics** — revenue by currency, average order, statuses, top buyers and products, charts by day, any period.
+- **Automation** — auto-bump with per-second timer, auto-replies and review replies by templates, auto-delivery with stock tracking, Telegram/Discord notifications.
+- **Lots** — bulk price edit, pin, duplicate, disable, delete; export/import, clone to other categories, inline price edit.
+- **Chat** — multi-image messages, search in dialog, templates and slash commands, buyer history, AI assistant.
+- **UI** — four themes (graphite, obsidian, blue-gray, light), custom accent, no flash on page load.
 
-### Автоматизация
+![Command center](assets/screen_home.png)
 
-- Авто-поднятие лотов: расширение читает ответ сервера и ставит таймер с точностью до секунды, есть фильтр по категориям и наличию авто-выдачи.
-- Автоответчик: приветствие новым покупателям, ответы на оплату и подтверждение заказа, ответы на отзывы по шаблонам для каждой оценки, переменные и изображения в шаблонах.
-- Авто-выдача товаров: лоты группируются по категориям, виден остаток; пустой лот отключается сам и включается обратно после пополнения.
-- Уведомления в Telegram и Discord, настраиваемые звуки уведомлений и собственная мелодия.
+## Support the fork author
 
-### Работа с лотами
+USDT / TON. Transfers from sanctioned exchanges (HTX, EXMO, etc.) may not arrive.
 
-- Командный центр на главной странице: сводка, последние заказы со статусами, быстрые переключатели автоматизации.
-- Массовые действия: выделение лотов (в том числе диапазоном через Shift), изменение цен, закрепление, дублирование, отключение, удаление.
-- Экспорт и импорт лотов одним файлом, клонирование в другие категории, поиск по лотам, редактирование цены прямо на странице.
-- Уникальные шрифты и символы для оформления описаний.
-
-### Чат
-
-- Отправка нескольких изображений с подписью одним сообщением, встроенный фоторедактор, альбомы и полноэкранная галерея.
-- Поиск по открытому диалогу, черновики, шаблоны и слэш-команды, история покупок собеседника.
-- ИИ-помощник: приведение черновика к вежливому виду, генерация ответов на отзывы, перевод входящих сообщений.
-
-### Интерфейс
-
-- Четыре темы — графит, обсидиан, сине-серый и светлая — плюс обои и пользовательский акцентный цвет.
-- Тема применяется мгновенно при загрузке страницы: без вспышек, перестроений и сдвигов раскладки.
-- Панель инструментов на сайте и попап расширения выполнены в едином стиле.
-
-| Настройки оформления | Попап расширения |
-| :---: | :---: |
-| ![Панель оформления](assets/screen_panel_theme.png) | ![Попап расширения](assets/screen_popup.png) |
-
-## Установка
-
-1. Скачайте архив расширения со страницы [последнего релиза](https://github.com/Kevanko/FunPay-Tools/releases/latest) и распакуйте его.
-2. Откройте `chrome://extensions` и включите **Режим разработчика** (переключатель в правом верхнем углу).
-3. Нажмите **Загрузить распакованное расширение** и укажите распакованную папку (в ней лежит `manifest.json`).
-4. Откройте [funpay.com](https://funpay.com/) — в шапке сайта появится кнопка **FP Tools**.
-
-Работает в Chrome и других браузерах на Chromium (Edge, Opera, Яндекс Браузер).
-
-## Поддержка автора форка
-
-Если расширение оказалось полезным — можно поддержать автора форка. USDT в разных сетях.
-
-> **Не принимаю переводы с бирж под санкциями (HTX, EXMO и т.п.)** — они могут не дойти.
-
-| Сеть | Адрес |
+| Network | Address |
 | :--- | :--- |
 | **TON** | `UQB-SA6hyUZ0nse40I8LvHqJFShZ443MO1lRqGNbxZp1Kl30` |
 | **USDT · TRON (TRC20)** | `TUZjiFiDi1XScM4DDhqBRg9fbjRuWgc9tH` |
 | **USDT · Ethereum (ERC20)** | `0x8EBe92e82E92BFC24BAF5471015bfc5077684eFb` |
 | **USDT · Solana (SPL)** | `xnB1k5ZAp8XzqrjWSpd6AagxwHizUpspFqF12LWxbTf` |
 
-## Лицензия
+## License
 
-MIT — см. [LICENSE](LICENSE). Основано на проекте [FunPay Tools](https://github.com/XaviersDev/FunPay-Tools) автора XaviersDev.
+MIT — see [LICENSE](LICENSE). Fork of [FunPay Tools](https://github.com/XaviersDev/FunPay-Tools) by XaviersDev, with a reworked design and logic.
