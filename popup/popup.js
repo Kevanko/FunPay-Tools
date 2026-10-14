@@ -90,6 +90,7 @@
   ];
   const PAGES = {
     home: ["Главная", "general"],
+    phone: ["На телефон", "general"],
     lots: ["Лоты", "lot_io"],
     autobump: ["Авто-поднятие", "autobump"],
     delivery: ["Авто-выдача", "auto_delivery"],
@@ -222,7 +223,7 @@
             '" ' +
             (state.page === id ? 'aria-current="page"' : "") +
             ">" +
-            FPTIcons.svg(({home:"home",lots:"lots",autobump:"bump",delivery:"bolt",templates:"document",replies:"reply",commands:"terminal",blacklist:"block",currency:"exchange",piggy:"wallet",calc:"calculator",appearance:"palette",accounts:"users",settings:"bell"})[id],19) + "<span>" + esc(name) +
+            FPTIcons.svg(({home:"home",phone:"qr",lots:"lots",autobump:"bump",delivery:"bolt",templates:"document",replies:"reply",commands:"terminal",blacklist:"block",currency:"exchange",piggy:"wallet",calc:"calculator",appearance:"palette",accounts:"users",settings:"bell"})[id],19) + "<span>" + esc(name) +
             "</span></button>",
         )
         .join("") || '<p class="fpt-navempty">Ничего не найдено</p>';
@@ -444,6 +445,7 @@
           : "Прослушать") +
         "</button>" +
         editButton(id, "Все настройки уведомлений") + '<hr><button class="btn btn-soft" id="check-app-update">'+FPTIcons.svg("refresh")+'Проверить обновления</button><p id="app-update-result" class="fpt-desc" role="status"></p>';
+    else if(id === "phone")body="";
     else
       body =
         '<p class="fpt-desc">' +
@@ -503,6 +505,7 @@
     if (focusId) document.getElementById(focusId)?.focus?.();
     else if (focusToggle)
       root.querySelector?.('[data-toggle="' + focusToggle + '"]')?.focus?.();
+    if(id === "phone"){const area=document.createElement("div");area.id="phone-transfer";root.appendChild(area);FPTPhoneTransfer.mount(area,state.data);}
     if (id === "calc") {
       ["price", "fee"].forEach(
         (k) => (document.getElementById(k).oninput = calculate),

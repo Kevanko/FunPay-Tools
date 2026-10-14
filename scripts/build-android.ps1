@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$OutputDirectory = (Join-Path $env:USERPROFILE 'FunPayTools_build'),
     [string]$AndroidSdk = $env:ANDROID_HOME
 )
@@ -19,6 +19,8 @@ Copy-Item -LiteralPath (Join-Path $SourceDirectory 'app\src') -Destination (Join
 $env:ANDROID_HOME = $AndroidSdk
 & (Join-Path $StageDirectory 'gradlew.bat') -p $StageDirectory --no-daemon testDebugUnitTest lintDebug assembleDebug
 if ($LASTEXITCODE -ne 0) { throw 'Android verification or build failed' }
-$Apk = Join-Path $OutputDirectory 'FunPay-Pocket-1.0.0.apk'
+$GradleText = Get-Content -LiteralPath (Join-Path $SourceDirectory 'app\build.gradle') -Raw
+$Version = [regex]::Match($GradleText, "versionName '([^']+)'").Groups[1].Value
+$Apk = Join-Path $OutputDirectory ("FunPay-Pocket-$Version.apk")
 Copy-Item -LiteralPath (Join-Path $StageDirectory 'app\build\outputs\apk\debug\app-debug.apk') -Destination $Apk -Force
 Write-Output $Apk

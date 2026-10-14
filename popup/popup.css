@@ -574,3 +574,5 @@ button:disabled { opacity: .55; cursor: wait; }
 .fp-brand-logo{width:38px;height:38px;object-fit:contain;flex:none}.fpt-navitem{display:flex;align-items:center;gap:12px}.fpt-navitem .ic{flex:none;opacity:.75}.fpt-navitem.is-active .ic{opacity:1}.fpt-vector-wrap{display:inline-flex;align-items:center;justify-content:center;font-family:inherit!important}
 
 @font-face{font-family:'Manrope';font-style:normal;font-weight:200 800;font-display:swap;src:url('../fonts/Manrope.ttf') format('truetype')}
+
+#phone-transfer canvas{display:block;width:min(280px,100%);height:auto;border-radius:12px;margin:16px 0;background:white}.fpt-qr-controls{display:flex;gap:8px;flex-wrap:wrap}

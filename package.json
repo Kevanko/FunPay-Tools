@@ -1,14 +1,19 @@
 {
   "name": "funpay-tools",
-  "version": "3.14.4",
+  "version": "3.15.0",
   "private": true,
   "scripts": {
     "test": "node --test tests/*.test.mjs tests/*.test.cjs",
     "check": "node scripts/check.mjs",
-    "package": "node scripts/package.mjs"
+    "package": "node scripts/package.mjs",
+    "build:qr": "node scripts/build-phone-transfer.mjs"
   },
   "devDependencies": {
+    "@zxing/library": "^0.21.3",
+    "esbuild": "^0.25.12",
     "fflate": "^0.8.2",
-    "jsdom": "26.1.0"
+    "jsdom": "26.1.0",
+    "pngjs": "^7.0.0",
+    "qrcode": "^1.5.4"
   }
 }

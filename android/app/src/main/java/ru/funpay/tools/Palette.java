@@ -20,12 +20,13 @@ final class Palette {
         bg=Color.parseColor(p[0]); surface=Color.parseColor(p[1]); text=Color.parseColor(p[2]); muted=Color.parseColor(p[3]); accent=Color.parseColor(p[4]); line=Color.parseColor(p[5]);
         dark=id.equals("forest")||id.equals("ink");
     }
-    private static Typeface manrope;
+    private static Typeface manrope,manropeMedium,manropeSemibold;
     static Typeface weight(Typeface font,int weight){
+        if(font==manrope)return weight>=600?manropeSemibold:weight>=500?manropeMedium:manrope;
         return android.os.Build.VERSION.SDK_INT>=28?Typeface.create(font,weight,false):Typeface.create(font,weight>=600?Typeface.BOLD:Typeface.NORMAL);
     }
     static Typeface typeface(android.content.Context context,int i) {
-        if(i==0){if(manrope==null)manrope=context.getResources().getFont(R.font.manrope);return manrope;}
+        if(i==0){if(manrope==null){manrope=context.getResources().getFont(R.font.manrope);manropeMedium=context.getResources().getFont(R.font.manrope_medium);manropeSemibold=context.getResources().getFont(R.font.manrope_semibold);}return manrope;}
         return Typeface.create(FONTS[Math.max(0, Math.min(FONTS.length-1,i))], Typeface.NORMAL);
     }
 }

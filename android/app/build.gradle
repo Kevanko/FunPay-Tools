@@ -2,13 +2,14 @@ plugins { id 'com.android.application' }
 android {
     namespace 'ru.funpay.tools'
     compileSdk 35
-    defaultConfig { applicationId 'ru.funpay.tools'; minSdk 26; targetSdk 35; versionCode 3; versionName '1.0.2'; testInstrumentationRunner 'ru.funpay.tools.TypographyChecks' }
+    defaultConfig { applicationId 'ru.funpay.tools'; minSdk 26; targetSdk 35; versionCode 4; versionName '1.1.0'; testInstrumentationRunner 'ru.funpay.tools.TypographyChecks' }
     signingConfigs { release { storeFile file(System.getenv('FPT_KEYSTORE') ?: 'missing-release-key'); storePassword System.getenv('FPT_STORE_PASSWORD'); keyAlias 'funpay-pocket'; keyPassword System.getenv('FPT_KEY_PASSWORD') } }
     buildTypes { release { signingConfig signingConfigs.release } }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     testOptions { unitTests.returnDefaultValues = true }
 }
 dependencies {
+    implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
     implementation 'org.jsoup:jsoup:1.18.3'
     implementation 'androidx.work:work-runtime:2.10.1'
     testImplementation 'junit:junit:4.13.2'

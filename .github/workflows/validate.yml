@@ -8,6 +8,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '22', cache: npm }
       - run: npm ci --ignore-scripts
+      - run: npm run build:qr
       - run: npm run check
       - run: npm test
       - run: npm ci --ignore-scripts && npm run selftest
