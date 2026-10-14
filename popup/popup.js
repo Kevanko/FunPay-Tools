@@ -513,7 +513,7 @@
       document.getElementById("font").onchange = (e) =>
         saveTheme({ font: e.target.value });
     if (id === "settings") {
-      document.getElementById("check-app-update").onclick=async()=>{let out=document.getElementById("app-update-result");out.textContent="Проверяю…";try{const r=await chrome.runtime.sendMessage({action:"checkAppUpdate"});out=document.getElementById("app-update-result");if(!out)return;if(!r?.ok)throw Error(r?.error||"Нет ответа расширения");out.textContent=r.update.available?"Доступна версия "+r.update.version+". Распакуйте ZIP и обновите папку расширения, затем нажмите «Обновить» в chrome://extensions.":"Установлена актуальная версия "+r.update.version;if(r.update.available){const a=document.createElement("a");a.href=r.update.url;a.textContent=" Скачать ZIP";a.target="_blank";a.rel="noopener noreferrer";out.appendChild(a);}}catch(e){out=document.getElementById("app-update-result");if(out)out.textContent="Проверка не завершена: "+e.message;}};
+      document.getElementById("check-app-update").onclick=async()=>{let out=document.getElementById("app-update-result");out.textContent="Проверяю…";try{const r=await chrome.runtime.sendMessage({action:"checkAppUpdate"});out=document.getElementById("app-update-result");if(!out)return;if(!r?.ok)throw Error(r?.error||"Нет ответа расширения");out.textContent=r.update.available?"Доступна версия "+r.update.version+". Распакуйте ZIP и обновите папку расширения, затем нажмите «Обновить» в chrome://extensions.":"Установлена актуальная версия "+chrome.runtime.getManifest().version;if(r.update.available){const a=document.createElement("a");a.href=r.update.url;a.textContent=" Скачать ZIP";a.target="_blank";a.rel="noopener noreferrer";out.appendChild(a);}}catch(e){out=document.getElementById("app-update-result");if(out)out.textContent="Проверка не завершена: "+e.message;}};
       document.getElementById("sound").onchange = (e) =>
         save({ notificationSound: e.target.value });
       document.getElementById("volume").oninput = (e) =>
@@ -707,6 +707,7 @@
             if (v.newValue === undefined) delete state.data[k];
             else state.data[k] = v.newValue;
           });
+          if(Object.keys(ch).every(k=>k==="fptAppUpdate"))return;
           applyAppearance();
           render();
         }
