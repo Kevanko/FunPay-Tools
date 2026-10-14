@@ -35,12 +35,7 @@ function escapeHtml(value) {
 }
 
 function loadRedesignFonts() {
-    if (document.getElementById('fpt-home-redesign-fonts')) return;
-    const link = document.createElement('link');
-    link.id = 'fpt-home-redesign-fonts';
-    link.rel = 'stylesheet';
-    link.href = 'https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=optional';
-    document.head.appendChild(link);
+    // Системные шрифты доступны без внешнего запроса и задержки первой отрисовки.
 }
 
 function getSellerDisplayName() {
@@ -109,16 +104,11 @@ async function getHomepageRealData() {
 
     // Orders + automation toggle states from chrome.storage
     try {
-        // продажи берём ПО ТЕКУЩЕМУ аккаунту (ключ с userId), чтобы на главной не
-        // показывалась статистика другого аккаунта. Фолбэк — общий ключ.
-        let salesKey = 'fpToolsSalesData';
-        try { const d = JSON.parse(document.body.dataset.appData); const u = Array.isArray(d) ? d[0] : d; if (u && u.userId) salesKey = `fpToolsSalesData__${u.userId}`; } catch (_) {}
         const store = await chrome.storage.local.get([
-            salesKey, 'fpToolsSalesData', 'autoBumpEnabled', 'fpToolsSmartBumpEnabled', 'fpToolsAutoReplies', 'fpToolsSlashCommands'
+            'autoBumpEnabled', 'fpToolsSmartBumpEnabled', 'fpToolsAutoReplies', 'fpToolsSlashCommands'
         ]);
-        const fpToolsSalesData = store[salesKey] || store.fpToolsSalesData;
-        if (fpToolsSalesData && typeof fpToolsSalesData === 'object') {
-            const all = Object.values(fpToolsSalesData);
+        const all = await FPTAnalytics.read('sales');
+        if (Array.isArray(all)) {
             result.salesCount = all.length;
             result.ordersActive = all.filter(o => ['new', 'paid'].includes(o.orderStatus)).length;
             result.recentOrders = [...all]
@@ -129,14 +119,14 @@ async function getHomepageRealData() {
                     return {
                         id: '#' + (o.orderId || '—'),
                         name: clean.length > 64 ? clean.slice(0, 63) + '…' : clean,
-                        amt: o.price != null ? Math.round(o.price).toLocaleString('ru-RU') + ' ₽' : '—',
+                        amt: o.price != null ? Number(o.price).toLocaleString('ru-RU', {maximumFractionDigits: 2}) + ' ' + ({RUB:'₽',USD:'$',EUR:'€'}[o.currency] || o.currency || '₽') : '—',
                         status: o.orderStatus === 'paid' ? 'Оплачен' : o.orderStatus === 'closed' ? 'Закрыт' : o.orderStatus === 'refunded' ? 'Возврат' : 'Новый',
                         tone: o.orderStatus === 'paid' ? 'ok' : o.orderStatus === 'closed' ? 'done' : o.orderStatus === 'refunded' ? 'ref' : 'new',
                     };
                 });
         }
         result.toggles = fptHomeTogglesFrom(store);
-    } catch(e) {}
+    } catch(e) { result.salesCount = null; result.ordersActive = null; }
 
     return result;
 }
@@ -497,14 +487,14 @@ function createRedesignedUI(allGamesData, yourGamesData, realData) {
     `;
 
     const actionsHTML = automationActions.map(a => `
-        <button type="button" class="cc-action" data-open-page="${a.page}" data-auto-key="${a.key}">
+        <div class="cc-action" data-open-page="${a.page}" data-auto-key="${a.key}">
             <span class="cc-action-ic">${hic(a.icon, 17)}</span>
-            <span class="cc-action-txt">
+            <button type="button" class="cc-action-txt cc-action-open" aria-label="Настроить: ${escapeHtml(a.label)}">
                 <span class="cc-action-label">${escapeHtml(a.label)}</span>
                 <span class="cc-action-meta faint">${a.on ? 'включено' : 'выключено'}</span>
-            </span>
-            <span class="tgl" data-on="${String(a.on)}" role="switch" aria-checked="${String(a.on)}" tabindex="0"></span>
-        </button>`).join('');
+            </button>
+            <button type="button" class="tgl" data-on="${String(a.on)}" role="switch" aria-label="${escapeHtml(a.label)}" aria-checked="${String(a.on)}"></button>
+        </div>`).join('');
 
     const ordersHTML = recentOrders
         ? recentOrders.map(o => `
@@ -537,7 +527,7 @@ function createRedesignedUI(allGamesData, yourGamesData, realData) {
                             <div class="cc-badge">${hic('Activity', 17)}</div>
                             <div>
                                 <div class="cc-title">Командный центр</div>
-                                <div class="cc-sub faint">Сводка · обновлено только что</div>
+                                <div class="cc-sub faint">Сводка из сохранённых данных</div>
                             </div>
                         </div>
                         <button type="button" class="btn btn-soft btn-sm" data-home-open-tools>Открыть FP Tools ${hic('ArrowUpRight', 15)}</button>
@@ -660,7 +650,12 @@ function createRedesignedUI(allGamesData, yourGamesData, realData) {
                 tgl.setAttribute('aria-checked', String(next));
                 const meta = b.querySelector('.cc-action-meta');
                 if (meta) meta.textContent = next ? 'включено' : 'выключено';
-                setHomeAutomation(b.getAttribute('data-auto-key'), next);
+                tgl.disabled = true;
+                setHomeAutomation(b.getAttribute('data-auto-key'), next).catch(() => {
+                    tgl.setAttribute('data-on', String(!next));
+                    tgl.setAttribute('aria-checked', String(!next));
+                    if (meta) meta.textContent = 'Не сохранено. Повторите действие.';
+                }).finally(() => { tgl.disabled = false; });
                 return;
             }
             const page = b.getAttribute('data-open-page');

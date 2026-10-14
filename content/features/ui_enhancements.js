@@ -151,11 +151,12 @@ async function calculateSalesStats(allOrders, startDate, endDate) {
         averageCheck: { RUB: 0, USD: 0, EUR: 0 },
         uniqueBuyers: new Set(), mostPopularProduct: "", mostPopularCategory: "",
         mostActiveBuyer: { username: "", id: 0, count: 0 },
-        mostExpensiveSale: { price: 0, currency: "RUB", orderId: "" }
+        mostExpensiveSale: { price: 0, currency: "RUB", orderId: "" },
+        topByCurrency: {},
+        currencyCounts: { RUB: 0, USD: 0, EUR: 0 }
     };
     const productCount = new Map(), categoryCount = new Map(), buyerCount = new Map();
     const validCurrencies = new Set(["RUB", "USD", "EUR"]);
-    const exchangeRates = { RUB: 0.011, USD: 1, EUR: 1.08 };
 
     // Учитываем глобальные фильтры статусов (общие со статистикой/диаграммами).
     let flt = { stClosed: true, stPaid: true, stRefunded: true };
@@ -169,7 +170,7 @@ async function calculateSalesStats(allOrders, startDate, endDate) {
 
     for (const orderId in allOrders) {
         const order = allOrders[orderId];
-        if ((startDate && order.orderDate < startDate) || (endDate && order.orderDate > endDate)) continue;
+        if ((startDate && order.orderDate < startDate) || (endDate && order.orderDate >= endDate)) continue;
         if (!statusOk(order.orderStatus)) continue;
 
         stats.totalOrders++;
@@ -177,6 +178,7 @@ async function calculateSalesStats(allOrders, startDate, endDate) {
         
         if (validCurrencies.has(order.currency) && (order.orderStatus === "paid" || order.orderStatus === "closed")) {
             stats.totalRevenue[order.currency] += order.price;
+            stats.currencyCounts[order.currency]++;
         }
 
         productCount.set(order.description, (productCount.get(order.description) || 0) + 1);
@@ -190,17 +192,15 @@ async function calculateSalesStats(allOrders, startDate, endDate) {
         else if (order.orderStatus === "refunded") stats.totalRefunded++;
         
         if (validCurrencies.has(order.currency) && (order.orderStatus === "paid" || order.orderStatus === "closed")) {
-             const saleValueUSD = order.price * (exchangeRates[order.currency] || 0);
-             const topSaleValueUSD = stats.mostExpensiveSale.price * (exchangeRates[stats.mostExpensiveSale.currency] || 0);
-             if(saleValueUSD > topSaleValueUSD) {
-                 stats.mostExpensiveSale = { price: order.price, currency: order.currency, orderId: order.orderId };
-             }
+             const previous = stats.topByCurrency[order.currency];
+             if (!previous || order.price > previous.price)
+                 stats.topByCurrency[order.currency] = {price: order.price, currency: order.currency, orderId: order.orderId};
         }
     }
     
     const paidAndClosedCount = stats.totalClosed + stats.totalPending;
     if(paidAndClosedCount > 0) {
-        for(const currency of validCurrencies) stats.averageCheck[currency] = stats.totalRevenue[currency] / paidAndClosedCount;
+        for(const currency of validCurrencies) stats.averageCheck[currency] = stats.currencyCounts[currency] ? stats.totalRevenue[currency] / stats.currencyCounts[currency] : 0;
     }
 
     stats.uniqueBuyers = stats.uniqueBuyers.size;
@@ -230,7 +230,10 @@ function formatRevenue(revenue) {
 async function displaySalesStats() {
     if (!document.getElementById("fpTools-stats-period")) return;
     
-    const { fpToolsSalesData } = await chrome.storage.local.get('fpToolsSalesData');
+    let rows;
+    try { rows = await FPTAnalytics.read('sales'); }
+    catch (e) { document.getElementById('fpTools-stats-total-orders').textContent = 'История недоступна: ' + e.message; return; }
+    const fpToolsSalesData = Object.fromEntries(rows.map(o => [o.orderId, o]));
     if (!fpToolsSalesData || Object.keys(fpToolsSalesData).length === 0) {
         document.getElementById("fpTools-stats-total-orders").textContent = "Нет данных (Нажмите 'Обновить')";
         return;
@@ -262,7 +265,7 @@ async function displaySalesStats() {
     document.getElementById("fpTools-stats-unique-customers").textContent = stats.uniqueBuyers;
     document.getElementById("fpTools-stats-top-customer").textContent = stats.mostActiveBuyer.username || "-";
     document.getElementById("fpTools-stats-top-customer").onclick = () => { if(stats.mostActiveBuyer.id) window.open(`https://funpay.com/users/${stats.mostActiveBuyer.id}/`); };
-    document.getElementById("fpTools-stats-top-sale").textContent = formatCurrency(stats.mostExpensiveSale.price, stats.mostExpensiveSale.currency) || "-";
+    document.getElementById("fpTools-stats-top-sale").textContent = Object.values(stats.topByCurrency).map(o => formatCurrency(o.price, o.currency)).join(' · ') || '-';
     document.getElementById("fpTools-stats-top-sale").onclick = () => { if(stats.mostExpensiveSale.orderId) window.open(`https://funpay.com/orders/${stats.mostExpensiveSale.orderId}/`); };
     const _stripDeco = s => String(s || '').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2190}-\u{21FF}\u{2300}-\u{23FF}\u{2500}-\u{259F}\u{25A0}-\u{25FF}\u{FE00}-\u{FE0F}\u{200D}]/gu, '').replace(/\s{2,}/g, ' ').trim();
     document.getElementById("fpTools-stats-popular-product").textContent = _stripDeco(stats.mostPopularProduct) || "-";
@@ -356,7 +359,7 @@ function initializeSalesStatistics() {
         const statsBlock = document.getElementById('fpTools-stats-reset');
         if (!statsBlock) return; // И если блока статистики больше нет на странице
 
-        if (changes.fpToolsSalesData) {
+        if (changes.fpToolsSalesLastUpdate) {
             console.log("FP Tools: Sales data updated, refreshing stats display.");
             displaySalesStats();
         }

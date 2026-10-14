@@ -10,33 +10,7 @@ const FP_CONFIG_MAGIC    = 'FPTCONFIG';
 // 'headerPositionSelect'/'sendTemplatesImmediately'/'templatePos' → тема, шаблоны и
 // заметки молча НЕ экспортировались/НЕ импортировались. Позиция шапки и настройки
 // шаблонов лежат ВНУТРИ fpToolsTheme / fpToolsTemplateSettings и едут вместе с ними.
-const EXPORT_KEYS = [
-    'fpToolsAutoReplies',
-    'fpToolsTheme',
-    'enableCustomTheme',
-    'enableRedesignedHomepage',
-    'showSalesStats',
-    'hideBalance',
-    'viewSellersPromo',
-    'notificationSound',
-    'fpToolsDiscord',
-    'autoBumpEnabled',
-    'autoBumpCooldown',
-    'fpToolsSelectiveBumpEnabled',
-    'fpToolsSelectedBumpCategories',
-    'fpToolsBumpOnlyAutoDelivery',
-    'fpToolsBumpNotifyEnabled',
-    'fpToolsSmartBumpEnabled',
-    'fpToolsTemplateSettings',
-    'fpToolsCursorFx',
-    'fpToolsCustomCursor',
-    'fpToolsPiggyBanks',
-    'fpToolsUserNotes',
-    'fpToolsPinnedLots',
-    'fpToolsIdentifierEnabled',
-    'fpToolsPopupPosition',
-    'fpToolsPopupSize',
-];
+const EXPORT_KEYS = FPTSettingsSchema.keys;
 
 async function exportSettings() {
     try {
@@ -50,7 +24,7 @@ async function exportSettings() {
             settings: data
         };
 
-        const json     = JSON.stringify(exportObj, null, 2);
+        const json     = FPTSettingsSchema.encode(data, chrome.runtime.getManifest().version);
         const blob     = new Blob([json], { type: 'application/json' });
         const url      = URL.createObjectURL(blob);
         const dateStr  = new Date().toISOString().slice(0, 10);
@@ -71,25 +45,15 @@ async function exportSettings() {
 async function importSettings(file) {
     try {
         const text = await file.text();
-        const obj  = JSON.parse(text);
+        const obj = FPTSettingsSchema.decode(text);
+        const safe = obj.settings;
+        // Portable settings do not overwrite local delivery stock, bonuses or sent-state.
+        if (safe.fpToolsAutoReplies) {
+            const local = await chrome.storage.local.get('fpToolsAutoReplies');
+            safe.fpToolsAutoReplies = { ...(local.fpToolsAutoReplies || {}), ...safe.fpToolsAutoReplies };
+        }        await chrome.storage.local.set(safe);
 
-        if (obj._magic !== FP_CONFIG_MAGIC) {
-            throw new Error('Неверный формат файла. Выберите файл .fpconfig от FunPay Tools.');
-        }
-
-        if (!obj.settings || typeof obj.settings !== 'object') {
-            throw new Error('Файл не содержит настроек.');
-        }
-
-        // Strip unknown keys for safety
-        const safe = {};
-        EXPORT_KEYS.forEach(k => {
-            if (k in obj.settings) safe[k] = obj.settings[k];
-        });
-
-        await chrome.storage.local.set(safe);
-
-        const fromVer = obj._extVer ? ` (из v${obj._extVer})` : '';
+        const fromVer = obj.extVer ? ` (из v${obj.extVer})` : '';
         showNotification(`Настройки импортированы${fromVer} - перезагрузите страницу ✓`);
 
         // Reload after 1.5s

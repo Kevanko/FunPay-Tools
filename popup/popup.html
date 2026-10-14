@@ -2,9 +2,8 @@
 <html lang="ru" data-theme="graphite">
 <head>
   <meta charset="UTF-8">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FP Tools — настройки</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
@@ -13,7 +12,7 @@
     <!-- Titlebar -->
     <div class="fpt-titlebar">
       <div class="fpt-titlebar-l">
-        <span class="fp-mark"><span>F</span><span>P</span></span>
+        <img class="fp-brand-logo" src="../icons/brand-mark.png" alt="">
         <span class="fpt-titlebar-name">FP Tools</span>
         <span class="badge badge-muted" id="version-badge">v2.8</span>
       </div>
@@ -35,7 +34,7 @@
       <nav class="fpt-nav fpx-scroll" id="fpt-nav">
         <div class="fpt-search" id="search-wrap">
           <span class="search-ic" id="search-icon-slot"></span>
-          <input class="fpt-search-input" type="text" placeholder="Поиск по функциям" id="nav-search" autocomplete="off" spellcheck="false">
+          <input class="fpt-search-input" type="text" aria-label="Поиск по функциям" placeholder="Поиск по функциям" id="nav-search" autocomplete="off" spellcheck="false">
         </div>
         <div id="nav-groups"></div>
       </nav>
@@ -43,6 +42,8 @@
     </div>
 
   </div>
+  <script src="../content/theme_core.js"></script>
+  <script src="../content/ui/icons.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

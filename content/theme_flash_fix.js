@@ -120,8 +120,7 @@
                 const l = document.createElement('link');
                 l.id = 'fpt-home-redesign-fonts';
                 l.rel = 'stylesheet';
-                l.href = 'https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=optional';
-                document.documentElement.appendChild(l);
+                // Интерфейс использует выбранный системный шрифт без внешней загрузки.
                 // Шрифт редизайна сразу: правило body.funpay-redesigned { Geist }
                 // включается только в idle вместе с классом — до того шапка
                 // рисуется Helvetica, и после смены шрифта бейджи счётчиков
@@ -129,7 +128,7 @@
                 if (!document.getElementById('fpt-home-early-font')) {
                     const fs = document.createElement('style');
                     fs.id = 'fpt-home-early-font';
-                    fs.textContent = "body { font-family: 'Geist', 'Segoe UI Variable', 'Segoe UI', sans-serif; }";
+                    fs.textContent = `body { font-family: ${fptFontStack(settings.font)}; }`;
                     document.documentElement.appendChild(fs);
                 }
             }
@@ -156,7 +155,7 @@
         if (!rightNav) return false;
         const li = document.createElement('li');
         li.className = 'dropdown fp-tools-header-item';
-        li.innerHTML = '<a role="button" tabindex="0" style="font-weight: 650; cursor: pointer; user-select: none;" id="fpToolsButton" data-fpt-location="header">FP Tools<span></span></a>';
+        li.innerHTML = '<a role="button" tabindex="0" style="font-weight: 650; cursor: pointer; user-select: none;" id="fpToolsButton" data-fpt-location="header"><img class="fpt-launcher-logo" src="' + chrome.runtime.getURL('icons/brand-mark.png') + '" alt="">FP Tools<span></span></a>';
         const userMenuItem = rightNav.querySelector('li.dropdown.hidden-sm.hidden-xs');
         if (userMenuItem) rightNav.insertBefore(li, userMenuItem);
         else rightNav.appendChild(li);

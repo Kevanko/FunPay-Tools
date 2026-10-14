@@ -5,7 +5,8 @@ function renderSalesChart(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    chrome.storage.local.get(['fpToolsSalesData', 'fpToolsSalesChartPeriod'], ({ fpToolsSalesData, fpToolsSalesChartPeriod }) => {
+        Promise.all([FPTAnalytics.read('sales'), chrome.storage.local.get('fpToolsSalesChartPeriod')]).then(([rows, { fpToolsSalesChartPeriod }]) => {
+        const fpToolsSalesData = Object.fromEntries(rows.map(o => [o.orderId,o]));
         if (!fpToolsSalesData || !Object.keys(fpToolsSalesData).length) {
             container.innerHTML = '<p style="color:var(--fpt-text-muted);font-size:12px;text-align:center;padding:20px;">Нет данных о продажах</p>';
             return;
@@ -13,7 +14,7 @@ function renderSalesChart(containerId) {
 
         const period = fpToolsSalesChartPeriod || 30;
         const cutoff = Date.now() - period * 24 * 60 * 60 * 1000;
-        const orders = Object.values(fpToolsSalesData).filter(o => o.orderDate >= cutoff && o.orderStatus === 'closed');
+        const orders = Object.values(fpToolsSalesData).filter(o => o.orderDate >= cutoff && o.orderStatus === 'closed' && (!o.currency || o.currency === 'RUB'));
 
         if (!orders.length) {
             container.innerHTML = '<p style="color:var(--fpt-text-muted);font-size:12px;text-align:center;padding:20px;">Нет продаж за выбранный период</p>';
@@ -103,7 +104,7 @@ function renderSalesChart(containerId) {
                 <span>Пик: <strong style="color:var(--fpt-text);">${maxCount} заказов</strong></span>
             </div>
         `;
-    });
+    }).catch(() => { container.textContent = 'Данные недоступны для текущего аккаунта'; });
 }
 
 function initSalesChart() {

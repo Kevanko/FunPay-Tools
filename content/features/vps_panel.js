@@ -76,7 +76,15 @@ async function _vpsConnect() {
     let url = (document.getElementById('fpt-vps-url')?.value || '').trim();
     const token = (document.getElementById('fpt-vps-token')?.value || '').trim();
     if (!url || !token) { _vpsSay('Укажите URL и токен.', true); return; }
-    if (!/^https?:\/\//i.test(url)) url = 'http://' + url;   // голый IP:порт → http по умолчанию
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+    try {
+        const endpoint = new URL(url);
+        if (endpoint.protocol !== 'https:') throw new Error('Для VPS требуется HTTPS. Настройте сертификат до передачи аккаунта.');
+        if (endpoint.username || endpoint.password || endpoint.search || endpoint.hash) throw new Error('URL не должен содержать пароль, токен или параметры.');
+        const allowed = await chrome.permissions.request({ origins: [endpoint.origin + '/*'] });
+        if (!allowed) throw new Error('Доступ к выбранному VPS не разрешён.');
+        url = endpoint.origin;
+    } catch (e) { _vpsSay(e.message, true); return; }
     await chrome.storage.local.set({ fptVps: { url, token } });
     _vpsSay('Проверяю…');
     try {

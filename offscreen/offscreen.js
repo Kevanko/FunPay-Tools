@@ -10,19 +10,12 @@
     }, PING_MS);
 })();
 
-// Memory leak fix: this document used to stay open for the entire browser session once
-// created (nothing ever called chrome.offscreen.closeDocument), which meant its keepalive
-// ping above kept the background service worker alive forever too - defeating Chrome's
-// normal MV3 idle-kill memory reclaim for as long as the browser stayed open. Any consumer
-// (autoresponder engine, auto-bump, sales parsing, ...) can create this document, so it
-// self-closes after a period with no real parse requests instead. `lastActivityAt` is
-// bumped only by genuine incoming work below, not by the outgoing keepalive ping, so the
-// active auto-responder loop (which polls every few seconds) keeps it alive as needed.
+// Idle teardown is requested via runtime; only the worker owns offscreen lifecycle.
 let lastActivityAt = Date.now();
 const IDLE_CLOSE_MS = 90000; // no parse requests for 90s -> nothing needs us, let go
 setInterval(() => {
     if (Date.now() - lastActivityAt > IDLE_CLOSE_MS) {
-        chrome.offscreen.closeDocument().catch(() => {});
+        chrome.runtime.sendMessage({ target: 'background', action: 'fptOffscreenIdle', lastActivityAt }).catch(() => {});
     }
 }, 30000);
 
@@ -799,6 +792,68 @@ function parseBuyerHistory(html, buyerUsername) {
 }
 
 // 3.0: Parse order page for auto-delivery - get secrets, lotId, chatId
+function parseOwnChatTexts(html, userId) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return Array.from(doc.querySelectorAll('.chat-msg-item')).filter(item => {
+        const href = item.querySelector('.chat-msg-author-link')?.getAttribute('href') || '';
+        return href.match(/\/users\/(\d+)/)?.[1] === String(userId);
+    }).map(item => (item.querySelector('.chat-msg-text')?.textContent || '').trim());
+}
+
+function parseOrderParticipants(html) {
+    try {
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+
+        // текущий пользователь (я) - из data-app-data или из ссылки в шапке
+        let myId = null;
+        const appDataRaw = doc.querySelector('body')?.getAttribute('data-app-data');
+        if (appDataRaw) {
+            try {
+                const d = JSON.parse(appDataRaw.replace(/&quot;/g, '"'));
+                const u = Array.isArray(d) ? d[0] : d;
+                myId = String(u.userId || u.id || '') || null;
+            } catch (_) {}
+        }
+        if (!myId) {
+            const meLink = doc.querySelector('a.user-link-dropdown[href*="/users/"], .navbar-right a[href*="/users/"]');
+            const m = meLink?.getAttribute('href')?.match(/\/users\/(\d+)/);
+            if (m) myId = m[1];
+        }
+
+        // на странице заказа стороны размечены как «Продавец» и «Покупатель».
+        // Ищем блоки param-item с этими заголовками и тянем id из ссылки на профиль.
+        let sellerId = null, buyerId = null, sellerName = '', buyerName = '';
+        doc.querySelectorAll('.param-item').forEach(item => {
+            const h = item.querySelector('h5')?.textContent.trim().toLowerCase() || '';
+            const a = item.querySelector('a[href*="/users/"]');
+            if (!a) return;
+            const idm = a.getAttribute('href')?.match(/\/users\/(\d+)/);
+            const id = idm ? idm[1] : null;
+            const name = a.textContent.trim();
+            if (/продавец|seller/.test(h)) { sellerId = id; sellerName = name; }
+            else if (/покупатель|buyer/.test(h)) { buyerId = id; buyerName = name; }
+        });
+
+        // запасной вариант: ссылки с классами-маркерами
+        if (!sellerId) {
+            const sl = doc.querySelector('.order-seller a[href*="/users/"], [data-seller] a[href*="/users/"]');
+            const m = sl?.getAttribute('href')?.match(/\/users\/(\d+)/);
+            if (m) { sellerId = m[1]; sellerName = sl.textContent.trim(); }
+        }
+
+        // если знаем продавца и себя - однозначно. Если продавца не нашли, но нашли
+        // покупателя и это Я - значит я НЕ продавец (моя покупка).
+        let iAmSeller = null;
+        if (myId && sellerId) iAmSeller = (myId === sellerId);
+        else if (myId && buyerId === myId) iAmSeller = false;
+
+        return { myId, sellerId, buyerId, sellerName, buyerName, iAmSeller };
+    } catch (e) {
+        console.error("FP Tools Offscreen: Error in parseOrderParticipants", e);
+        return { iAmSeller: null };
+    }
+}
+
 function parseOrderPageForDelivery(html) {
     try {
         const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -1125,6 +1180,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     lastActivityAt = Date.now();
 
     switch (message.action) {
+        case 'parseOwnChatTexts':
+            sendResponse(parseOwnChatTexts(message.html, message.userId));
+            break;
+        case 'parsePurchasesPage':
+        case 'parseFinancePage':
+            try { sendResponse(FPTAnalyticsParsers.parse(message.html, message.action === 'parsePurchasesPage' ? 'purchases' : 'finance')); }
+            catch (e) { sendResponse({ error: e.message }); }
+            break;
+        case 'parseOrderParticipants':
+            sendResponse(parseOrderParticipants(message.html));
+            break;
         case 'parseSalesPage':
             sendResponse(parseSalesPage(message.html));
             break;

@@ -1,84 +1,26 @@
-// content/features/exact_price.js
-
 function initializeExactPrice() {
-    // Убедимся, что мы на странице редактирования или создания лота
-    const header = document.querySelector('h1.page-header');
-    if (!header || !(header.textContent.includes('Редактирование предложения') || header.textContent.includes('Добавление предложения'))) {
-        return;
-    }
-
-    // Проверяем, не была ли кнопка добавлена ранее
-    if (document.querySelector('.set-exact-price')) {
-        return;
-    }
-
-    const inputPrice = document.querySelector('input[name="price"]');
-    if (!inputPrice) {
-        return;
-    }
-
-    const exactPriceButton = createElement('div', { class: 'set-exact-price' }, {}, 'Рассчитать, чтобы получить эту сумму');
-    inputPrice.parentNode.insertBefore(exactPriceButton, inputPrice.nextSibling);
-
-    exactPriceButton.addEventListener("click", () => {
-        const desiredAmount = parseFloat(inputPrice.value); // Сумма, которую хотим получить
-        if (isNaN(desiredAmount) || desiredAmount <= 0) {
-            showNotification('Введите в поле сумму, которую хотите получить.', true);
-            return;
-        }
-
-        // --- ЭТАП 1: Получаем актуальный коэффициент комиссии ---
-        
-        // Для расчета нам нужна любая "тестовая" цена. Используем текущее значение в поле.
-        const testPrice = parseFloat(inputPrice.value);
-        if (isNaN(testPrice)) {
-             showNotification('Для расчета нужна любая цена в поле ввода (например, 100).', true);
-             return;
-        }
-
-        // Находим таблицу с ценами для покупателей
-        const calcTableBody = document.querySelector(".js-calc-table-body");
-        if (!calcTableBody) {
-            showNotification('Не найдена таблица с расчетами FunPay. Измените цену, чтобы она появилась.', true);
-            return;
-        }
-
-        // Берем самую последнюю (обычно СБП с меньшей комиссией) цену для покупателя
-        const lastBuyerPriceRow = calcTableBody.querySelector('tr:last-child td:last-child');
-        if (!lastBuyerPriceRow) {
-            showNotification('Не удалось найти цену для покупателя.', true);
-            return;
-        }
-        
-        const buyerPaysPrice = parseFloat(lastBuyerPriceRow.textContent.replace(/ /g, ''));
-        if (isNaN(buyerPaysPrice)) {
-            showNotification('Не удалось прочитать цену для покупателя.', true);
-            return;
-        }
-
-        // --- ЭТАП 2: Применяем правильную формулу ---
-
-        // Формула основана на пропорции.
-        // Если при установленной цене `testPrice` покупатель платит `buyerPaysPrice`,
-        // то какую цену `X` нужно установить, чтобы покупатель заплатил `desiredAmount`?
-        // Пропорция: X / desiredAmount = testPrice / buyerPaysPrice
-        // Отсюда: X = (testPrice / buyerPaysPrice) * desiredAmount
-
-        // Коэффициент, который показывает, какая часть от денег покупателя доходит до поля "Цена".
-        const priceRatio = testPrice / buyerPaysPrice;
-        
-        if (isNaN(priceRatio) || priceRatio <= 0 || priceRatio >= 1) {
-            showNotification('Ошибка расчета коэффициента. Попробуйте ввести другую цену.', true);
-            return;
-        }
-
-        // Рассчитываем итоговую цену, которую нужно установить
-        const finalPriceToSet = desiredAmount * priceRatio;
-
-        // --- ЭТАП 3: Обновляем значение и уведомляем ---
-        
-        inputPrice.value = finalPriceToSet.toFixed(2);
-        inputPrice.dispatchEvent(new Event('input', { bubbles: true }));
-        showNotification(`Установлена цена ${finalPriceToSet.toFixed(2)}`, false);
+    const price=document.querySelector('input[name="price"]');
+    const node=document.querySelector('input[name="node_id"]')?.value || new URLSearchParams(location.search).get('node');
+    if(!price||!/^\d+$/.test(node||'')||document.getElementById('fpt-buyer-price-group'))return;
+    const uid=FPTAnalytics.accountId();if(!uid)return;
+    const box=document.createElement('section');box.id='fpt-buyer-price-group';box.className='form-group';
+    const heading=document.createElement('strong');heading.textContent='Цена покупателю и комиссия';
+    const methods=document.createElement('select');methods.className='form-control';methods.setAttribute('aria-label','Способ оплаты и валюта');
+    const target=document.createElement('input');target.type='text';target.inputMode='decimal';target.placeholder='Желаемая сумма покупателя';target.className='form-control';target.setAttribute('aria-label','Желаемая сумма покупателя');
+    const status=document.createElement('p');status.setAttribute('aria-live','polite');status.textContent='Расчёт по текущей цене и конкретному способу оплаты; без пересчёта валют.';
+    const refresh=document.createElement('button');refresh.type='button';refresh.className='btn btn-default';refresh.textContent='Показать цены покупателя';
+    const calculate=document.createElement('button');calculate.type='button';calculate.className='btn btn-default';calculate.textContent='Подобрать цену';calculate.disabled=true;
+    const apply=document.createElement('button');apply.type='button';apply.className='btn btn-primary';apply.textContent='Применить к форме';apply.hidden=true;
+    box.append(heading,methods,target,refresh,calculate,status,apply);(price.closest('.form-group')||price.parentElement).after(box);
+    let solved=null,sourcePrice='',busy=false;
+    async function quote(net){if(FPTAnalytics.accountId()!==uid)throw Error('Аккаунт изменился');const r=await chrome.runtime.sendMessage({action:'fptMoneyQuote',accountId:uid,nodeId:node,price:net});if(!r?.ok||r.accountId!==uid)throw Error(r?.error||'Расчёт недоступен');return r.methods;}
+    async function perform(fn){if(busy)return;busy=true;refresh.disabled=calculate.disabled=true;apply.hidden=true;try{await fn();}catch(e){status.textContent=e.message;solved=null;}finally{busy=false;refresh.disabled=false;calculate.disabled=!methods.options.length;}}
+    refresh.onclick=()=>perform(async()=>{
+      const rows=await quote(FPTMoney.amount(price.value));methods.replaceChildren();
+      for(const m of rows){const option=document.createElement('option');option.value=m.key;option.textContent=m.name+': '+m.buyer+' '+m.unit;methods.append(option);}
+      status.textContent=rows.length?'Цены получены от FunPay. Выберите способ оплаты.':'Нет доступных способов оплаты';
     });
+    calculate.onclick=()=>perform(async()=>{sourcePrice=price.value;status.textContent='Подбираю по фактическим ответам FunPay…';solved=await FPTMoney.solve(target.value,methods.value,quote);status.textContent='Цена формы: '+solved.net+'; покупатель: '+solved.buyer+' '+solved.unit+' ('+solved.name+'). Сохранение лота выполняется отдельно.';apply.hidden=false;});
+    apply.onclick=()=>{if(!solved||price.value!==sourcePrice||FPTAnalytics.accountId()!==uid){status.textContent='Форма изменилась. Повторите расчёт.';apply.hidden=true;return;}price.value=solved.net.toFixed(2);price.dispatchEvent(new Event('input',{bubbles:true}));apply.hidden=true;};
+    methods.onchange=target.oninput=()=>{solved=null;apply.hidden=true;};
 }

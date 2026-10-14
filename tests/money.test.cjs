@@ -1,0 +1,3 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),money=require('../content/money_service.js');
+test('buyer price uses actual rounded nonlinear quote rather than fixed commission ratio',async()=>{const r=await money.solve('125,00','card',async price=>[{key:'card',unit:'₽',name:'Карта',buyer:Math.round((price*1.1+5)*100)/100}]);assert.ok(r.buyer<=125);assert.ok(r.buyer>=124.98);assert.equal(r.unit,'₽');});
+test('invalid amount and vanished payment method are rejected',async()=>{assert.throws(()=>money.amount('Infinity'));assert.throws(()=>money.amount('-1'));await assert.rejects(money.solve(100,'missing',async()=>[]),/Способ оплаты изменился/);});

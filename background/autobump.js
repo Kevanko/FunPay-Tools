@@ -1,3 +1,4 @@
+import { parseOffscreen } from './offscreen_client.js';
 // background/autobump.js
 import { withCookieLock, fpIsRateLimited, fpFetch, notifyRaised } from './autoresponder.js';
 
@@ -23,21 +24,7 @@ async function logToConsole(message) {
 }
 
 // --- НОВЫЙ БЛОК: Скопированная функция для связи с offscreen.js ---
-async function parseHtmlViaOffscreen(html, action) {
-    const OFFSCREEN_DOCUMENT_PATH = 'offscreen/offscreen.html';
-    const existingContexts = await chrome.runtime.getContexts({
-        contextTypes: ['OFFSCREEN_DOCUMENT'],
-        documentUrls: [chrome.runtime.getURL(OFFSCREEN_DOCUMENT_PATH)]
-    });
-    if (!existingContexts.length) {
-        await chrome.offscreen.createDocument({
-            url: OFFSCREEN_DOCUMENT_PATH,
-            reasons: ['DOM_PARSER'],
-            justification: 'Parsing FunPay page HTML for autobump',
-        });
-    }
-    return await chrome.runtime.sendMessage({ target: 'offscreen', action, html });
-}
+const parseHtmlViaOffscreen = parseOffscreen;
 // --- КОНЕЦ НОВОГО БЛОКА ---
 // Уведомление «Лоты подняты» — общая notifyRaised импортируется из autoresponder.js.
 

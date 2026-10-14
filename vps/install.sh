@@ -15,7 +15,8 @@ set -euo pipefail
 
 APP_DIR=/opt/fpt-vps
 PORT="${FPT_PORT:-8787}"
-REF="${FPT_REF:-main}"
+REF="${FPT_REF:?Укажите FPT_REF как полный проверенный commit SHA}"
+[[ "$REF" =~ ^[a-f0-9]{40}$ ]] || { echo "FPT_REF должен быть commit SHA" >&2; exit 1; }
 RAW="https://raw.githubusercontent.com/Kevanko/FunPay-Tools/${REF}/vps"
 NODE_VER="v20.18.0"
 
@@ -45,10 +46,14 @@ fi
 if [ ! -x "$APP_DIR/node/bin/node" ]; then
     log "ставлю локальный Node ${NODE_VER} (${NARCH})…"
     TARBALL="node-${NODE_VER}-linux-${NARCH}.tar.xz"
-    curl -fsSL "https://nodejs.org/dist/${NODE_VER}/${TARBALL}" -o "/tmp/${TARBALL}"
+    TMP_DIR="$(mktemp -d)"
+    trap 'rm -rf "$TMP_DIR"' EXIT
+    curl -fsSL "https://nodejs.org/dist/${NODE_VER}/${TARBALL}" -o "${TMP_DIR}/${TARBALL}"
+    curl -fsSL "https://nodejs.org/dist/${NODE_VER}/SHASUMS256.txt" -o "$TMP_DIR/SHASUMS256.txt"
+    ( cd "$TMP_DIR" && grep "  ${TARBALL}$" SHASUMS256.txt | sha256sum -c - )
     rm -rf "$APP_DIR/node" && mkdir -p "$APP_DIR/node"
-    tar -xJf "/tmp/${TARBALL}" -C "$APP_DIR/node" --strip-components=1
-    rm -f "/tmp/${TARBALL}"
+    tar -xJf "${TMP_DIR}/${TARBALL}" -C "$APP_DIR/node" --strip-components=1
+    rm -f "${TMP_DIR}/${TARBALL}"
 fi
 NODE="$APP_DIR/node/bin/node"
 NPM="$APP_DIR/node/bin/npm"
@@ -57,11 +62,12 @@ log "скачиваю сервис…"
 curl -fsSL "$RAW/server.js"    -o "$APP_DIR/server.js"
 curl -fsSL "$RAW/autoreply.js" -o "$APP_DIR/autoreply.js"
 curl -fsSL "$RAW/package.json" -o "$APP_DIR/package.json"
+curl -fsSL "$RAW/package-lock.json" -o "$APP_DIR/package-lock.json"
 
 log "ставлю зависимость undici (локально)…"
 # npm — JS со своим shebang '#!/usr/bin/env node'; node у нас локальный и не в PATH,
 # поэтому даём его npm через PATH (иначе 'env: node: No such file or directory').
-( cd "$APP_DIR" && PATH="$APP_DIR/node/bin:$PATH" "$NPM" install --omit=dev --no-audit --no-fund --loglevel=error )
+( cd "$APP_DIR" && PATH="$APP_DIR/node/bin:$PATH" "$NPM" ci --omit=dev --no-audit --no-fund --loglevel=error )
 
 chown -R fptvps:fptvps "$APP_DIR"
 
@@ -77,6 +83,7 @@ Type=simple
 User=fptvps
 WorkingDirectory=$APP_DIR
 Environment=FPT_PORT=$PORT
+Environment=FPT_HOST=127.0.0.1
 ExecStart=$NODE $APP_DIR/server.js
 Restart=always
 RestartSec=5
@@ -108,15 +115,7 @@ IP="$(curl -fsSL --max-time 5 https://api.ipify.org 2>/dev/null || hostname -I 2
 echo
 log "готово. Сервис работает (systemctl status fpt-vps)."
 echo "──────────────────────────────────────────────"
-echo "  URL:   http://${IP:-<IP-сервера>}:${PORT}"
+echo "  URL:   http://127.0.0.1:${PORT} (через SSH-туннель или HTTPS reverse proxy)"
 echo "  ТОКЕН: ${TOKEN:-<смотри: cat $APP_DIR/data.json>}"
 echo "──────────────────────────────────────────────"
-echo "Вставь URL и ТОКЕН в расширении: Настройки → VPS — и всё."
-
-# Открываем порт в firewall (добавление правила — не трогает существующие сервисы).
-if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
-    ufw allow "${PORT}/tcp" comment "fpt-vps" >/dev/null 2>&1 && log "ufw: открыт порт ${PORT}/tcp"
-fi
-if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
-    firewall-cmd --permanent --add-port="${PORT}/tcp" >/dev/null 2>&1 && firewall-cmd --reload >/dev/null 2>&1 && log "firewalld: открыт порт ${PORT}/tcp"
-fi
+echo "Публичный HTTP запрещён. Настройте HTTPS reverse proxy либо SSH-туннель до localhost."

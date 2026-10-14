@@ -5,11 +5,10 @@ to Workers Paid; never add R2/KV. A card on the account does **not** cause charg
 while you stay on the free plan and under free limits.
 
 ## What it stores
-- Key: a random `syncId` (UUID-ish) generated per FunPay account on the client.
-  The id *is* the capability — whoever holds it can read/write that one record.
-- Value: `base64(gzip(JSON))` of the copyable settings subset only.
-- **Never** golden_key / PHPSESSID / cookies. Those stay local.
-
+- `/v2/s/p_<random64hex>` requires an independent 256-bit Bearer token. D1 stores only its SHA-256 hash.
+- Portable settings only; account credentials, responder runtime, delivery stock and bonus codes remain local.
+- Device transfer uses an explicit `.fptsync` secret backup, separate from `.fpconfig` settings.
+- Legacy public records are retained, with their HTTP routes locked. Follow [SECURITY.md](SECURITY.md) before deployment and migration.
 ## Free-tier safety
 - D1 free: 5 GB storage, 100k row writes/day, 5M row reads/day. Our usage: a few
   reads + writes per active user per day (client debounces + skips unchanged).

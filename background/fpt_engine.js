@@ -1,3 +1,4 @@
+import { ensureParser } from './offscreen_client.js';
 // background/fpt_engine.js - FunPay Tools 2.8
 // MV3-safe persistent polling engine with multiple redundancy layers.
 //
@@ -24,29 +25,19 @@
 import { runAutoResponderCycle, runMultiAccountAutoReply, fpIsRateLimited } from './autoresponder.js';
 
 export const ENGINE_HEARTBEAT_ALARM = 'fpToolsEngineHeartbeat';
-const OFFSCREEN_PATH = 'offscreen/offscreen.html';
 
 const POLL_INTERVAL_MS = 3000;        // active-loop cadence while worker is awake
 const MIN_CYCLE_GAP_MS = 2500;        // never hammer runner/ faster than this
 const MULTI_GAP_MS = 60000;           // мульти-аккаунт реже (свап куки = нагрузка на активную сессию + щадим API)
 const ERROR_BACKOFF_MS = 5000;        // FP Tools sleeps 5s after a runner error
 const STALL_MS = 90000;               // if no successful cycle in 90s -> force restart
-// While automation is on, the offscreen doc never goes idle long enough to hit its own
-// 90s self-close (see offscreen.js) - every 3s tick keeps it "active". Chromium doesn't
-// reliably GC the DOMParser documents that pile up from parsing the chat list every
-// cycle for hours on end (this is what was still eating gigabytes after the idle-close
-// fix - confirmed via Chrome's own Task Manager showing it on "Расширение: FunPay Tools",
-// not a tab). Recycling the whole document periodically is the only guaranteed reset:
-// destroying it frees everything at once instead of hoping V8 gets around to it.
-const OFFSCREEN_RECYCLE_MS = 10 * 60 * 1000;
-
 let loopTimer = null;
 let watchdogTimer = null;
 let running = false;
 let lastCycleStart = 0;
 let lastCycleOk = 0;
 let lastMultiRun = 0;
-let lastOffscreenRecycle = Date.now();
+let tickBusy = false;
 
 // FP Tools: utils.random_tag() -> 8 hex chars. Fresh tag per cycle keeps FunPay returning data.
 export function randomTag() {
@@ -78,30 +69,14 @@ async function anyAutomationEnabled() {
 }
 
 // Layer 2 enabler: make sure the offscreen document exists so its keepalive interval runs.
-async function ensureOffscreen() {
-    try {
-        const existing = await chrome.runtime.getContexts({
-            contextTypes: ['OFFSCREEN_DOCUMENT'],
-            documentUrls: [chrome.runtime.getURL(OFFSCREEN_PATH)]
-        });
-        if (!existing.length) {
-            await chrome.offscreen.createDocument({
-                url: OFFSCREEN_PATH,
-                reasons: ['DOM_PARSER'],
-                justification: 'Background polling, HTML parsing and keepalive for FunPay automation'
-            });
-        }
-    } catch (e) {
-        if (!String(e && e.message || '').includes('Only a single offscreen')) {
-            console.warn('FP Tools engine: ensureOffscreen', e && e.message || e);
-        }
-    }
-}
+const ensureOffscreen = ensureParser;
 
 // One iteration of the active loop.
 async function tick() {
-    if (!running) return;
+    if (!running || tickBusy) return;
+    tickBusy = true;
     try {
+        await ensureOffscreen();
         const activeOn = await activeAutomationEnabled();
         const multiOn = await multiAccountEnabled();
         if (!activeOn && !multiOn) { running = false; loopTimer = null; return; }
@@ -125,7 +100,7 @@ async function tick() {
     } catch (e) {
         console.error('FP Tools engine: tick error', e && e.message || e);
         scheduleNext(ERROR_BACKOFF_MS);
-    }
+    } finally { tickBusy = false; }
 }
 
 function scheduleNext(delayMs) {
@@ -145,17 +120,12 @@ function startWatchdog() {
             lastCycleStart = 0;
             scheduleNext(0);
         }
-        if (Date.now() - lastOffscreenRecycle > OFFSCREEN_RECYCLE_MS) {
-            lastOffscreenRecycle = Date.now();
-            try { await chrome.offscreen.closeDocument(); } catch (_) {}
-            // next parseViaOffscreen call recreates it on demand (autoresponder.js already
-            // guards for "document doesn't exist yet"), no automation is lost.
-        }
     }, 30000);
 }
 
 // Start (or confirm) the active loop. Safe to call repeatedly.
 export async function startEngine() {
+    if (!(await anyAutomationEnabled())) return;
     await ensureHeartbeat();
     await ensureOffscreen();
     startWatchdog();

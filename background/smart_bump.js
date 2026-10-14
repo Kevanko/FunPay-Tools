@@ -1,3 +1,4 @@
+import { parseOffscreen } from './offscreen_client.js';
 // background/smart_bump.js - FunPay Tools 2.8
 // "Smart" auto-raise mode, ported from FP Tools's FP Tools.raise_lots().
 //
@@ -26,7 +27,6 @@ export const SMART_BUMP_ALARM = 'fpToolsSmartBump';
 // (nextRaiseAt), поэтому лишних запросов нет. Просто и надёжно — как обычное авто-поднятие.
 const SMART_BUMP_PERIOD_MIN = 10;
 const STATE_KEY = 'fpToolsSmartBumpState'; // { [categoryUrl]: { nextRaiseAt, name } }
-const OFFSCREEN_PATH = 'offscreen/offscreen.html';
 
 // Ported from FP Tools utils.parse_wait_time - returns seconds to wait.
 function parseWaitTime(msg) {
@@ -41,16 +41,7 @@ function parseWaitTime(msg) {
     return 10;
 }
 
-async function parseHtmlViaOffscreen(html, action) {
-    const existing = await chrome.runtime.getContexts({
-        contextTypes: ['OFFSCREEN_DOCUMENT'],
-        documentUrls: [chrome.runtime.getURL(OFFSCREEN_PATH)]
-    });
-    if (!existing.length) {
-        await chrome.offscreen.createDocument({ url: OFFSCREEN_PATH, reasons: ['DOM_PARSER'], justification: 'parse' });
-    }
-    return chrome.runtime.sendMessage({ target: 'offscreen', action, html });
-}
+const parseHtmlViaOffscreen = parseOffscreen;
 
 async function getAuth() {
     // Авторизация идёт ambient-кукой активного аккаунта (credentials:'include'). Ручной

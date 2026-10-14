@@ -73,11 +73,13 @@ function createMainPopup() {
 
     const toolsPopup = document.createElement('div');
     toolsPopup.className = 'fp-tools-popup';
+    toolsPopup.setAttribute('role', 'dialog');
+    toolsPopup.setAttribute('aria-label', 'Настройки FP Tools');
     toolsPopup.innerHTML = `
         <div class="fp-tools-header">
             <h2>
                 <a href="https://funpay.tools" target="_blank" class="fp-tools-site-link">
-                    <span class="fpt-brand-mark">FP</span>
+                    <img class="fpt-brand-logo" src="${chrome.runtime.getURL("icons/brand-mark.png")}" alt="">
                     <span class="fpt-brand-copy">
                         <span class="fpt-brand-title">FP Tools</span>
                         <span class="fpt-brand-subtitle">Командный центр</span>
@@ -88,7 +90,7 @@ function createMainPopup() {
                 <span class="fpt-window-dot"></span>
                 <span class="fpt-window-dot"></span>
             </div>
-            <button class="close-btn" aria-label="Закрыть"></button>
+            <button class="close-btn" aria-label="Закрыть">${FPTIcons.svg("close",18)}</button>
         </div>
         <div class="fp-tools-body">
             <nav class="fp-tools-nav">
@@ -756,6 +758,10 @@ function createMainPopup() {
                         <button type="button" class="fpt-theme-sw" data-fpt-theme="obsidian"><span class="fpt-theme-prev" data-t="obsidian"></span><span class="fpt-theme-sw-label">Обсидиан</span></button>
                         <button type="button" class="fpt-theme-sw" data-fpt-theme="slate"><span class="fpt-theme-prev" data-t="slate"></span><span class="fpt-theme-sw-label">Сине-серый</span></button>
                         <button type="button" class="fpt-theme-sw" data-fpt-theme="light"><span class="fpt-theme-prev" data-t="light"></span><span class="fpt-theme-sw-label">Светлая</span></button>
+                        <button type="button" class="fpt-theme-sw" data-fpt-theme="clay"><span class="fpt-theme-prev" data-t="clay"></span><span class="fpt-theme-sw-label">Глина</span></button>
+                        <button type="button" class="fpt-theme-sw" data-fpt-theme="paper"><span class="fpt-theme-prev" data-t="paper"></span><span class="fpt-theme-sw-label">Бумага</span></button>
+                        <button type="button" class="fpt-theme-sw" data-fpt-theme="forest"><span class="fpt-theme-prev" data-t="forest"></span><span class="fpt-theme-sw-label">Лес</span></button>
+                        <button type="button" class="fpt-theme-sw" data-fpt-theme="ink"><span class="fpt-theme-prev" data-t="ink"></span><span class="fpt-theme-sw-label">Чернила</span></button>
                     </div>
 
                     <div class="fpt-eyebrow fpt-blocklabel">Акцент</div>
@@ -1267,6 +1273,32 @@ function setupPopupNavigation() {
     const navItems = toolsPopup.querySelectorAll('.fp-tools-nav li, .fp-tools-header-tab');
     const contentPages = toolsPopup.querySelectorAll('.fp-tools-page-content');
 
+    navItems.forEach(item => {
+        if (!item.dataset.page) return;
+        item.setAttribute('role', 'button');
+        item.tabIndex = 0;
+        item.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); item.click(); }
+        });
+    });
+    const openRequestedPage = () => {
+        const match = location.hash.match(/^#fpt-page=([a-z_]+)$/);
+        if (!match) return;
+        const item = Array.from(navItems).find(node => node.dataset.page === match[1]);
+        if (!item) return;
+        toolsPopup.classList.add('active');
+        item.click(); item.focus();
+        history.replaceState(null, '', location.pathname + location.search);
+    };
+    window.addEventListener('hashchange', openRequestedPage);
+    setTimeout(openRequestedPage, 0);
+    toolsPopup.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && event.target.id !== 'fpToolsMenuSearch' && !document.querySelector('.fp-tools-modal-overlay[style*="display: flex"]')) {
+            toolsPopup.querySelector('.close-btn')?.click();
+            document.getElementById('fpToolsButton')?.focus();
+        }
+    });
+
     navItems.forEach(li => {
         if (!li.dataset.page) return;
         li.addEventListener('click', (e) => {
@@ -1446,15 +1478,15 @@ async function loadLastActivePage() {
 }
 
 function makePopupInteractive(popupEl) {
-    const header = popupEl.querySelector('.fp-tools-header h2');
+    const header = popupEl.querySelector('.fp-tools-header');
     if (!header) return;
 
     let isDragging = false;
     let offset = { x: 0, y: 0 };
     let hasBeenDragged = false;
 
-    header.addEventListener('mousedown', (e) => {
-        if (e.target !== header) return;
+    header.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0 || e.target.closest('a, button, input, select')) return;
         isDragging = true;
         if (!hasBeenDragged) {
             const rect = popupEl.getBoundingClientRect();
@@ -1469,7 +1501,7 @@ function makePopupInteractive(popupEl) {
         document.body.style.userSelect = 'none';
     });
 
-    window.addEventListener('mousemove', (e) => {
+    window.addEventListener('pointermove', (e) => {
         if (isDragging) {
             let left = e.clientX - offset.x;
             let top = e.clientY - offset.y;
@@ -1484,7 +1516,7 @@ function makePopupInteractive(popupEl) {
         }
     });
 
-    window.addEventListener('mouseup', async () => {
+    window.addEventListener('pointerup', async () => {
         if (isDragging) {
             isDragging = false;
             document.body.style.userSelect = '';
@@ -1493,6 +1525,10 @@ function makePopupInteractive(popupEl) {
                 fpToolsPopupDragged: true 
             });
         }
+    });
+    window.addEventListener('pointercancel', () => {
+        isDragging = false;
+        document.body.style.userSelect = '';
     });
 
     // 3.0.6.2: the observer used to fire chrome.storage.local.set on EVERY inline-style

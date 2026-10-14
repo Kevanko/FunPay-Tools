@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 // FP Tools VPS — авто-ответ за аккаунт (порт браузерной логики runMultiAccountAutoReply).
 // Каждый аккаунт ходит через СВОЙ прокси, под своим golden_key (+PHPSESSID из Set-Cookie).
 // Зеркалит браузер: на первом проходе только засеваем lastSeen (не спамим старое),
@@ -12,14 +13,19 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 function randomTag() { return Math.floor(Math.random() * 0xffffffff).toString(16).padStart(8, '0'); }
 
 let _ProxyAgent = null;
+const proxyDispatchers = new Map();
 async function dispatcherFor(proxy) {
     if (!proxy) return undefined;
     if (!_ProxyAgent) ({ ProxyAgent: _ProxyAgent } = await import('undici'));
-    return new _ProxyAgent(proxy);
+    if (!proxyDispatchers.has(proxy)) {
+        if (proxyDispatchers.size >= 128) { const first = proxyDispatchers.keys().next().value; await proxyDispatchers.get(first).close(); proxyDispatchers.delete(first); }
+        proxyDispatchers.set(proxy, new _ProxyAgent(proxy));
+    }
+    return proxyDispatchers.get(proxy);
 }
 async function fpFetch(acc, url, opts = {}) {
     const dispatcher = await dispatcherFor(acc.proxy);
-    return fetch(url, { ...opts, dispatcher, headers: { 'user-agent': UA, ...(opts.headers || {}) } });
+    return fetch(url, { ...opts, signal: opts.signal || AbortSignal.timeout(30000), dispatcher, headers: { 'user-agent': UA, ...(opts.headers || {}) } });
 }
 
 // ── системные сообщения FunPay (как RX в autoresponder.js) ──────────────────
@@ -125,8 +131,9 @@ async function sendMessage(acc, auth, chatId, text) {
     });
     const res = await fpFetch(acc, 'https://funpay.com/runner/', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8', 'x-requested-with': 'XMLHttpRequest', cookie: cookieOf(auth) }, body });
     if (!res.ok) throw new Error(`send HTTP ${res.status}`);
-    const json = await res.json().catch(() => null);
-    if (json?.error) throw new Error(json.error);
+    const json = await res.json();
+    if (!json || typeof json !== 'object') throw new Error('Нет подтверждения отправки');
+    if (json?.error) throw new Error('FunPay runner error: ' + json.error);
 }
 
 // Один проход авто-ответа по аккаунту. Мутирует acc.arState (caller сохраняет data.json).
@@ -135,6 +142,7 @@ export async function runAutoReply(acc, log = () => {}) {
     const s = acc.autoReplies || {};
     if (!s.greetingEnabled && !s.keywordsEnabled) return 0;
     const auth = await accountAuth(acc);
+    if (auth && acc.name && auth.username !== acc.name) throw new Error('Авторизован другой аккаунт');
     if (!auth) { log(`${acc.name}: авторизация не удалась (ключ/прокси?)`); return 0; }
 
     const chats = await fetchChats(acc, auth);
@@ -160,10 +168,26 @@ export async function runAutoReply(acc, log = () => {}) {
         if (kind === 'greeting') {
             const w = await sellerWrote(acc, auth, chat.chatId);
             if (w === 'wrote') { greeted.add(chat.chatId); continue; }
-            if (w === 'error') continue;
+            if (w === 'error') { lastSeen[chat.chatId] = prev; continue; }
         }
-        try { await sendMessage(acc, auth, chat.chatId, reply); if (kind === 'greeting') greeted.add(chat.chatId); sent++; await sleep(800); }
-        catch (e) { log(`${acc.name}/${chat.chatId}: ${e.message}`); }
+        try {
+            const pending = st.pending || (st.pending = {});
+            const eventId = chat.chatId + ':' + chat.nodeMsg;
+            if (pending[eventId]) {
+                const page = await fpFetch(acc, `https://funpay.com/chat/?node=${chat.chatId}`, { headers: { cookie: cookieOf(auth) } });
+                if (!page.ok) throw new Error('Не удалось проверить отправку');
+                const root = parse(await page.text());
+                const found = root.querySelectorAll('.chat-msg-item').some(item => (item.querySelector('.chat-msg-author-link')?.getAttribute('href') || '').includes('/users/' + auth.userId + '/') && (item.querySelector('.chat-msg-text')?.textContent || '').trim() === BOT_MARKER + reply);
+                if (!found) throw new Error('Предыдущая отправка не подтверждена: требуется проверка чата');
+            } else {
+                pending[eventId] = true;
+                await acc.persistState?.();
+                await sendMessage(acc, auth, chat.chatId, reply);
+            }
+            delete pending[eventId]; if (kind === 'greeting') greeted.add(chat.chatId); sent++; await sleep(800); }
+        catch (e) {
+            if (/send HTTP (400|401|403|429)|runner error/.test(e.message) && st.pending) delete st.pending[chat.chatId + ':' + chat.nodeMsg];
+            lastSeen[chat.chatId] = prev; log(`${acc.name}/${chat.chatId}: ${e.message}`); }
     }
     st.lastSeen = lastSeen; st.greeted = [...greeted]; st.seeded = true;
     if (sent) log(`${acc.name}: отправлено ответов: ${sent}`);
@@ -175,11 +199,11 @@ export function _selftest() {
     const html = `<a class="contact-item unread" data-id="55" data-node-msg="120"><div class="media-user-name">Petya</div><div class="contact-item-message">привет, есть в наличии?</div></a>
         <a class="contact-item" data-id="56" data-node-msg="80"><div class="media-user-name">Vasya</div><div class="contact-item-message">⁡уже ответил</div></a>`;
     const list = parseChatList(html);
-    console.assert(list.length === 2, 'chat count', list);
-    console.assert(list[0].chatId === '55' && list[0].nodeMsg === 120 && list[0].isUnread === true, 'chat0', list[0]);
-    console.assert(list[0].lastByBot === false && list[1].lastByBot === true, 'lastByBot', list);
-    console.assert(getMessageType('Покупатель оплатил заказ #ABCD1234') === 'ORDER_PURCHASED', 'sys type');
-    console.assert(getMessageType('привет') === 'NON_SYSTEM', 'non-sys');
-    console.assert(matchKeywordReply('Есть в наличии?', { keywordsEnabled: true, keywords: [{ keyword: 'наличии', matchMode: 'contains', response: 'да' }] })?.text === 'да', 'kw');
+    assert(list.length === 2, 'chat count', list);
+    assert(list[0].chatId === '55' && list[0].nodeMsg === 120 && list[0].isUnread === true, 'chat0', list[0]);
+    assert(list[0].lastByBot === false && list[1].lastByBot === true, 'lastByBot', list);
+    assert(getMessageType('Покупатель оплатил заказ #ABCD1234') === 'ORDER_PURCHASED', 'sys type');
+    assert(getMessageType('привет') === 'NON_SYSTEM', 'non-sys');
+    assert(matchKeywordReply('Есть в наличии?', { keywordsEnabled: true, keywords: [{ keyword: 'наличии', matchMode: 'contains', response: 'да' }] })?.text === 'да', 'kw');
     console.log('autoreply selftest OK');
 }

@@ -12,30 +12,15 @@ function _fptActiveUser() {
     try { const d = JSON.parse(document.body.dataset.appData); const u = Array.isArray(d) ? d[0] : d; return { id: u && u.userId ? String(u.userId) : '', name: (u && u.userName) || '' }; } catch (_) { return { id: '', name: '' }; }
 }
 
-// Продажи хранятся ПО АККАУНТУ: fpToolsSalesData__<userId>. Графики/главная читают
-// общий fpToolsSalesData — поэтому на КАЖДОЙ загрузке приводим общий ключ к данным
-// ТЕКУЩЕГО аккаунта, чтобы не показывать чужую статистику.
+// Источник продаж — account-scoped IndexedDB в worker. Старые ключи остаются backup.
 async function fptSyncActiveSales() {
     if (!_fptAlive()) return;
     const { id: uid } = _fptActiveUser();
     if (!uid) return;
     try {
-        const K = `fpToolsSalesData__${uid}`, KF = `fpToolsFirstOrderId__${uid}`, KL = `fpToolsLastOrderId__${uid}`;
-        const g = await chrome.storage.local.get([K, KF, KL, 'fpToolsSalesData']);
-        const mine = g[K];
-        const hasData = mine && typeof mine === 'object' && Object.keys(mine).length > 0;
-        if (hasData) {
-            // у аккаунта есть свои продажи — показываем ИХ (общий ключ читают графики/главная)
-            const same = JSON.stringify(mine) === JSON.stringify(g.fpToolsSalesData);
-            if (!same) await chrome.storage.local.set({ fpToolsSalesData: mine, fpToolsFirstOrderId: g[KF], fpToolsLastOrderId: g[KL] });
-        } else {
-            // нет своих данных: общий ключ чистим (чтобы не показать чужую статистику) и
-            // просим фон собрать ИМЕННО заказы этого аккаунта (funpay отдаёт только их —
-            // данные будут чистые, без смешивания).
-            await chrome.storage.local.set({ fpToolsSalesData: {} });
-            try { await chrome.storage.local.remove(['fpToolsFirstOrderId', 'fpToolsLastOrderId']); } catch (_) {}
-            try { chrome.runtime.sendMessage({ action: 'updateSales' }); } catch (_) {}
-        }
+        const response = await chrome.runtime.sendMessage({ action: 'fptGetAnalytics', accountId: uid, kind: 'sales' });
+        if (response?.ok && response.accountId === uid && response.rows?.length === 0)
+            await chrome.runtime.sendMessage({ action: 'fptUpdateAnalytics', accountId: uid, kind: 'sales' });
     } catch (_) {}
 }
 // запускаем как можно раньше
@@ -832,7 +817,7 @@ async function fptCopySection(pageId, srcName) {
     if (!keys || !srcName || !_fptAlive()) return;
     const profiles = await fptGetProfiles();
     const bundle = profiles[srcName] || {};
-    const subset = {};
+    let subset = {};
     keys.forEach(k => { if (bundle[k] !== undefined) subset[k] = bundle[k]; });
     if (!Object.keys(subset).length) {
         if (typeof showNotification === 'function') showNotification(`У «${srcName}» нет сохранённых настроек этого раздела (переключитесь на него один раз).`, true);
@@ -842,6 +827,8 @@ async function fptCopySection(pageId, srcName) {
     try {
         const cur = _fptCurName();
         if (cur) await fptSnapshotProfile(cur);
+        subset = FPTSettingsSchema.sanitize(subset);
+        if (subset.fpToolsAutoReplies) { const local = await chrome.storage.local.get('fpToolsAutoReplies'); subset.fpToolsAutoReplies = { ...(local.fpToolsAutoReplies || {}), ...subset.fpToolsAutoReplies }; }
         await chrome.storage.local.set(subset);
         if (cur) { const p = await fptGetProfiles(); p[cur] = { ...(p[cur] || {}), ...subset }; await chrome.storage.local.set({ fptProfiles: p }); }
         if (typeof showNotification === 'function') showNotification(`Раздел скопирован с «${srcName}». Перезагружаю…`, false);
@@ -896,7 +883,7 @@ function fptSetupProfileSettingsUI() {
         const bundle = profiles[src];
         // копируем ТОЛЬКО настройки (тема/авто-ответы/шаблоны/звуки), без личных
         // данных аккаунта (продажи, метки, копилки и т.п. — они не смешиваются).
-        const settingsOnly = {};
+        let settingsOnly = {};
         if (bundle) FPT_SETTINGS_KEYS.forEach(k => { if (bundle[k] !== undefined) settingsOnly[k] = bundle[k]; });
         if (!Object.keys(settingsOnly).length) {
             if (typeof showNotification === 'function') showNotification(`У «${src}» ещё нет сохранённых настроек. Переключитесь на него один раз — настройки запомнятся, потом копируйте.`, true);
@@ -906,6 +893,8 @@ function fptSetupProfileSettingsUI() {
         try {
             // текущий профиль перед заменой не теряем — фиксируем под его именем
             if (curName) await fptSnapshotProfile(curName);
+            settingsOnly = FPTSettingsSchema.sanitize(settingsOnly);
+            if (settingsOnly.fpToolsAutoReplies) { const local = await chrome.storage.local.get('fpToolsAutoReplies'); settingsOnly.fpToolsAutoReplies = { ...(local.fpToolsAutoReplies || {}), ...settingsOnly.fpToolsAutoReplies }; }
             await chrome.storage.local.set(settingsOnly);           // применяем только настройки
             // в бандле текущего аккаунта обновляем настройки, СОХРАНЯЯ его личные данные
             if (curName) { const p = await fptGetProfiles(); p[curName] = { ...(p[curName] || {}), ...settingsOnly }; await chrome.storage.local.set({ fptProfiles: p }); }

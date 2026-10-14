@@ -1,3 +1,4 @@
+import { parseOffscreen } from './offscreen_client.js';
 
 function randomTag() {
     return Math.floor(Math.random() * 0xffffffff).toString(16).padStart(8, '0');
@@ -37,6 +38,7 @@ function _fpEnqueue(fn) { const next = _fpReqChain.then(fn, fn); _fpReqChain = n
 // Единая точка запросов к FunPay: пауза при кулдауне + минимальный интервал +
 // фиксация rate-limit. Возвращает Response (вызывающий сам решает про ретрай).
 export async function fpFetch(url, options) {
+    if (typeof url === 'string' && new URL(url).origin === 'https://funpay.com') options = { credentials: 'include', ...(options || {}) };
     return _fpEnqueue(async () => {
         const waitRL = _fpRlUntil - Date.now();
         if (waitRL > 0) await _sleep(waitRL);
@@ -65,14 +67,15 @@ async function fetchWithRetry(url, options, { retries = 4, baseDelay = 800 } = {
     // В контексте мульти-аккаунта (_dnrCtx) идём по помеченному URL (?_fptar=1) + credentials:'omit',
     // чтобы Cookie ставило правило declarativeNetRequest, а общий jar не трогался. Маркер бьёт
     // только по нашим запросам, активный аккаунт (без _dnrCtx) — как раньше, по ambient-куке.
-    if (_dnrCtx && typeof url === 'string' && url.startsWith('https://funpay.com')) {
+    if (_dnrCtx && typeof url === 'string' && new URL(url).origin === 'https://funpay.com') {
         url += (url.includes('?') ? '&' : '?') + '_fptar=1';
         options = { ...(options || {}), credentials: 'omit' };
     }
+    if (options?.method && !['GET', 'HEAD'].includes(options.method.toUpperCase())) retries = 0;
     let lastErr;
     for (let attempt = 0; attempt <= retries; attempt++) {
         try {
-            const res = await fpFetch(url, options);   // через глобальный темп/бэк-офф
+            const res = await fpFetch(url, { ...(options || {}), signal: options?.signal || AbortSignal.timeout(30000) });   // через глобальный темп/бэк-офф
             // Retry on rate-limit / server errors; return everything else to caller.
             if (res.status === 429 || res.status >= 500) {
                 lastErr = new Error(`HTTP ${res.status}`);
@@ -91,7 +94,7 @@ async function fetchWithRetry(url, options, { retries = 4, baseDelay = 800 } = {
 }
 
 // ── Общий замок на подмену куки (heartbeat и мульти-аккаунт не свапят разом) ──
-let _cookieLock = Promise.resolve();
+let _cookieLock = chrome.declarativeNetRequest?.updateSessionRules({ removeRuleIds: [90218, 90217] }).catch(() => {}) || Promise.resolve();
 export function withCookieLock(fn) { const next = _cookieLock.then(fn, fn); _cookieLock = next.catch(() => {}); return next; }
 
 // Уведомление «Лоты подняты: …» на странице FunPay. Единая точка для обычного и умного
@@ -135,62 +138,9 @@ function getMessageType(text) {
     return 'NON_SYSTEM';
 }
 
-async function getAuth() {
-    const goldenKeyCookie = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
-    if (!goldenKeyCookie?.value) return {};
-    const golden_key = goldenKeyCookie.value;
+async function getAuth() { return (await _ambientAuth()) || {}; }
 
-    
-    
-    const phpSessIdCookie = await chrome.cookies.get({ url: 'https://funpay.com', name: 'PHPSESSID' });
-    const phpsessid = phpSessIdCookie?.value || '';
-
-    const tabs = await chrome.tabs.query({ url: 'https://funpay.com/*' });
-    for (const tab of tabs) {
-        if (tab.discarded) continue;
-        try {
-            const r = await chrome.tabs.sendMessage(tab.id, { action: 'getAppData' });
-            if (r?.success) {
-                const d = Array.isArray(r.data) ? r.data[0] : r.data;
-                if (d?.['csrf-token'] && d.userId)
-                    return { golden_key, phpsessid, csrf_token: d['csrf-token'], userId: d.userId, username: d.userName };
-            }
-        } catch (_) {}
-    }
-
-    try {
-        const cookieStr = phpsessid
-            ? `golden_key=${golden_key}; PHPSESSID=${phpsessid}`
-            : `golden_key=${golden_key}`;
-        const res = await fetch('https://funpay.com/', { headers: { cookie: cookieStr } });
-        const text = await res.text();
-        const m = text.match(/<body[^>]*data-app-data="([^"]+)"/);
-        if (m) {
-            const d = JSON.parse(m[1].replace(/&quot;/g, '"'));
-            const u = Array.isArray(d) ? d[0] : d;
-            if (u?.['csrf-token'] && u.userId)
-                return { golden_key, phpsessid, csrf_token: u['csrf-token'], userId: u.userId, username: u.userName };
-        }
-    } catch (e) {}
-    return { golden_key, phpsessid };
-}
-
-async function parseViaOffscreen(html, action) {
-    const OFFSCREEN_PATH = 'offscreen/offscreen.html';
-    const existing = await chrome.runtime.getContexts({
-        contextTypes: ['OFFSCREEN_DOCUMENT'],
-        documentUrls: [chrome.runtime.getURL(OFFSCREEN_PATH)]
-    });
-    if (!existing.length) {
-        // гонку с background.js (оба создают offscreen-документ) не считаем ошибкой
-        try {
-            await chrome.offscreen.createDocument({ url: OFFSCREEN_PATH, reasons: ['DOM_PARSER'], justification: 'parse' });
-        } catch (e) {
-            if (!String(e && e.message || '').includes('single offscreen')) throw e;
-        }
-    }
-    return chrome.runtime.sendMessage({ target: 'offscreen', action, html });
-}
+async function parseViaOffscreen(...args) { return parseOffscreen(...args); }
 
 // Писал ли продавец в этот чат сам. Возвращает 'wrote' | 'clean' | 'error'.
 // История чата отдаётся страницей server-side; автор каждого сообщения —
@@ -212,7 +162,47 @@ async function sellerWroteInChat(chatId, auth) {
     }
 }
 
+let _outgoingScope = '';
 async function sendChatMessage(chatId, text, auth) {
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(auth.userId) + ':' + _outgoingScope + ':' + chatId + ':' + text)));
+    const id = Array.from(digest, b => b.toString(16).padStart(2, '0')).join('');
+    const storeKey = 'fptOutbox__' + auth.userId;
+    const stored = await chrome.storage.local.get(storeKey);
+    const ledger = stored[storeKey] || {};
+    const prior = ledger[id];
+    if (prior?.status === 'sent') return;
+    if (prior) {
+        const check = await fetchWithRetry(`https://funpay.com/chat/?node=${chatId}`, {});
+        if (!check.ok) throw new Error('Не удалось проверить предыдущую отправку');
+        const ownTexts = await parseViaOffscreen(await check.text(), 'parseOwnChatTexts', { userId: String(auth.userId) });
+        if (!Array.isArray(ownTexts)) throw new Error('Не удалось проверить историю отправки');
+        if (ownTexts.includes(markOutgoing(text))) {
+            ledger[id] = { status: 'sent', ts: Date.now() };
+            await chrome.storage.local.set({ [storeKey]: ledger });
+            return;
+        }
+        // A request without an acknowledgement is not automatically replayed: user sees
+        // the uncertain outbox item and can retry after checking the chat themselves.
+        if (prior.status === 'uncertain') throw new Error('Отправка не подтверждена; проверьте чат перед ручным повтором');
+    }
+    ledger[id] = { status: 'uncertain', ts: Date.now(), chatId, event: _outgoingScope };
+    await chrome.storage.local.set({ [storeKey]: ledger });
+    try {
+        await sendChatMessageRaw(chatId, text, auth);
+        ledger[id] = { status: 'sent', ts: Date.now() };
+        // Keep unfinished entries; age out only completed entries after 30 days.
+        for (const k of Object.keys(ledger)) if (ledger[k].status === 'sent' && Date.now() - ledger[k].ts > 30 * 86400000) delete ledger[k];
+        await chrome.storage.local.set({ [storeKey]: ledger });
+    } catch (e) {
+        if (/HTTP (400|401|403|429)|runner error/.test(e.message)) {
+            ledger[id].status = 'retry';
+            await chrome.storage.local.set({ [storeKey]: ledger });
+        }
+        throw e;
+    }
+}
+
+async function sendChatMessageRaw(chatId, text, auth) {
     // FIX: FunPay runner requires BOTH golden_key AND PHPSESSID cookies.
     // Without PHPSESSID the request returns 200 but message is silently dropped.
     const cookieStr = auth.phpsessid
@@ -236,13 +226,31 @@ async function sendChatMessage(chatId, text, auth) {
         body: new URLSearchParams(payload)
     });
     if (!res.ok) throw new Error(`sendMessage HTTP ${res.status}`);
-    const json = await res.json().catch(() => null);
+    const json = await res.json();
+    if (!json || typeof json !== 'object') throw new Error('Некорректное подтверждение отправки');
     if (json?.error) throw new Error(`FunPay runner error: ${json.error}`);
     console.log(`FP Tools AR: → чат ${chatId}`);
 }
 
 // 3.0: upload an image (data URL) to FunPay and send it to a chat, in the background.
 async function sendChatImage(chatId, dataUrl, auth) {
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(auth.userId + ':image:' + _outgoingScope + ':' + chatId + ':' + dataUrl)));
+    const id = Array.from(digest, b => b.toString(16).padStart(2, '0')).join('');
+    const key = 'fptOutbox__' + auth.userId;
+    const stored = await chrome.storage.local.get(key);
+    const ledger = stored[key] || {};
+    if (ledger[id]?.status === 'sent') return;
+    if (ledger[id]?.status === 'uncertain') throw new Error('Изображение не подтверждено; требуется проверка чата');
+    ledger[id] = { status: 'uncertain', ts: Date.now(), chatId, event: _outgoingScope, kind: 'image' };
+    await chrome.storage.local.set({ [key]: ledger });
+    try {
+        await sendChatImageRaw(chatId, dataUrl, auth);
+        ledger[id] = { status: 'sent', ts: Date.now() };
+        await chrome.storage.local.set({ [key]: ledger });
+    } catch (e) { throw e; }
+}
+
+async function sendChatImageRaw(chatId, dataUrl, auth) {
     const cookieStr = auth.phpsessid
         ? `golden_key=${auth.golden_key}; PHPSESSID=${auth.phpsessid}`
         : `golden_key=${auth.golden_key}`;
@@ -273,7 +281,8 @@ async function sendChatImage(chatId, dataUrl, auth) {
         body: new URLSearchParams(payload)
     });
     if (!res.ok) throw new Error(`sendImage HTTP ${res.status}`);
-    const json = await res.json().catch(() => null);
+    const json = await res.json();
+    if (!json || typeof json !== 'object') throw new Error('Нет подтверждения отправки');
     if (json?.error) throw new Error(`FunPay runner error: ${json.error}`);
     console.log(`FP Tools AR: 🖼 → чат ${chatId}`);
 }
@@ -402,7 +411,7 @@ async function handleGreeting(msg, auth, settings) {
     // приветствие не шлём. 'error' = временный сбой: пропускаем БЕЗ пометки,
     // чтобы повторить на следующем сообщении.
     const sellerStatus = await sellerWroteInChat(msg.chatId, auth);
-    if (sellerStatus === 'error') return;
+    if (sellerStatus === 'error') { _eventFailed = true; return; }
     if (sellerStatus === 'wrote') {
         await atomicUpdate(s => {
             const arr = s.greetedUsers || [];
@@ -432,7 +441,7 @@ async function handleGreeting(msg, auth, settings) {
         });
         console.log(`FP Tools AR: приветствие → ${msg.chatId}`);
     } catch (e) {
-        console.error('FP Tools AR: ошибка приветствия', e.message);
+        _eventFailed = true; console.error('FP Tools AR: ошибка приветствия', e.message);
     }
 }
 
@@ -466,10 +475,27 @@ async function handleKeywords(msg, auth, settings) {
                 await sendReplyContent(msg.chatId, text, auth, rule.images, rule.sendOrder);
                 return;
             } catch (e) {
-                console.error('FP Tools AR: ошибка keyword', e.message);
+                _eventFailed = true; console.error('FP Tools AR: ошибка keyword', e.message);
             }
         }
     }
+}
+
+let _eventFailed = false;
+const _sellerCheckCache = new Map();
+async function verifyIAmSeller(orderId, auth) {
+    if (!orderId || !auth.userId) throw new Error('Нет данных участников заказа');
+    const cacheKey = String(auth.userId) + ':' + orderId;
+    const cached = _sellerCheckCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < 60000) return cached.seller;
+    const res = await fetchWithRetry(`https://funpay.com/orders/${orderId}/`, {});
+    if (!res.ok) throw new Error('Проверка продавца: HTTP ' + res.status);
+    const info = await parseViaOffscreen(await res.text(), 'parseOrderParticipants');
+    if (!info?.sellerId || !info?.myId || String(info.myId) !== String(auth.userId)) throw new Error('Не удалось подтвердить участников заказа');
+    const seller = String(info.sellerId) === String(auth.userId);
+    if (_sellerCheckCache.size > 300) _sellerCheckCache.clear();
+    _sellerCheckCache.set(cacheKey, { seller, ts: Date.now() });
+    return seller;
 }
 
 async function handleReview(msg, auth, settings) {
@@ -482,14 +508,14 @@ async function handleReview(msg, auth, settings) {
     const orderId = orderMatch[1];
 
     const alreadyReplied = (settings.repliedOrderIds || []).includes(orderId);
-    if (alreadyReplied && msgType === 'NEW_FEEDBACK') return;
+
 
     try {
         const orderRes = await fetchWithRetry(`https://funpay.com/orders/${orderId}/`, { headers: { cookie: `golden_key=${auth.golden_key}` } });
         if (!orderRes.ok) throw new Error(`HTTP ${orderRes.status}`);
         const orderHtml = await orderRes.text();
         const orderData = await parseViaOffscreen(orderHtml, 'parseOrderPageForReview');
-        if (!orderData) return;
+        if (!orderData) throw new Error('Не удалось разобрать отзыв');
 
         const stars   = typeof orderData === 'object' ? orderData.stars   : orderData;
         const lotName = typeof orderData === 'object' ? (orderData.lotName || '') : '';
@@ -500,26 +526,28 @@ async function handleReview(msg, auth, settings) {
         // невидимым BOT_MARKER. Есть ответ без метки → его оставил человек, не трогаем.
         const replyIsManual = existingReply && !existingReply.includes(BOT_MARKER) && !existingReply.includes(OLD_BOT_MARKER);
 
-        if (!replyIsManual && settings.autoReviewEnabled && settings.reviewTemplates?.[stars]?.trim()) {
+        if (!replyIsManual && !(alreadyReplied && msgType === 'NEW_FEEDBACK') && settings.autoReviewEnabled && settings.reviewTemplates?.[stars]?.trim()) {
             const text = applyVariables(settings.reviewTemplates[stars], vars);
             try {
                 await sendReviewReply(orderId, text, auth, stars);
+                // attached review images go to the chat (the review endpoint can't carry images)
+                const rImgs = settings.reviewTemplateImages && settings.reviewTemplateImages[stars];
+                if (Array.isArray(rImgs) && rImgs.length) {
+                    for (const dataUrl of rImgs) {
+                        try { await sendChatImage(msg.chatId, dataUrl, auth); await new Promise(r => setTimeout(r, 400)); }
+                        catch (e) { _eventFailed = true; console.error('FP Tools AR: review image error', e.message); }
+                    }
+                }
+                if (!_eventFailed) {
                 await atomicUpdate(s => {
                     const ids = s.repliedOrderIds || [];
                     if (!ids.includes(orderId)) ids.push(orderId);
                     if (ids.length > 500) ids.splice(0, ids.length - 500);
                     s.repliedOrderIds = ids;
                 });
-                // attached review images go to the chat (the review endpoint can't carry images)
-                const rImgs = settings.reviewTemplateImages && settings.reviewTemplateImages[stars];
-                if (Array.isArray(rImgs) && rImgs.length) {
-                    for (const dataUrl of rImgs) {
-                        try { await sendChatImage(msg.chatId, dataUrl, auth); await new Promise(r => setTimeout(r, 400)); }
-                        catch (e) { console.error('FP Tools AR: review image error', e.message); }
-                    }
                 }
             } catch (e) {
-                console.error(`FP Tools AR: ошибка ответа на отзыв #${orderId}`, e.message);
+                _eventFailed = true; console.error(`FP Tools AR: ошибка ответа на отзыв #${orderId}`, e.message);
             }
         }
 
@@ -531,20 +559,28 @@ async function handleReview(msg, auth, settings) {
             else if (settings.bonusMode === 'random' && settings.randomBonuses?.length)
                 bonusText = settings.randomBonuses[Math.floor(Math.random() * settings.randomBonuses.length)];
             if (bonusText?.trim()) {
+                let chosen = bonusText;
+                await atomicUpdate(s => {
+                    s.pendingBonuses = s.pendingBonuses || {};
+                    if (!s.pendingBonuses[orderId]) s.pendingBonuses[orderId] = bonusText;
+                    chosen = s.pendingBonuses[orderId];
+                });
+                _outgoingScope = 'bonus:' + orderId;
                 try {
-                    await sendReplyContent(msg.chatId, applyVariables(bonusText, vars), auth);
+                    await sendReplyContent(msg.chatId, applyVariables(chosen, vars), auth);
                     await atomicUpdate(s => {
                         const ids = s.bonusSentOrderIds || [];
                         if (!ids.includes(orderId)) ids.push(orderId);
                         if (ids.length > 500) ids.splice(0, ids.length - 500);
                         s.bonusSentOrderIds = ids;
+                        if (s.pendingBonuses) delete s.pendingBonuses[orderId];
                     });
                 }
-                catch (e) { console.error(`FP Tools AR: ошибка бонуса #${orderId}`, e.message); }
+                catch (e) { _eventFailed = true; console.error(`FP Tools AR: ошибка бонуса #${orderId}`, e.message); }
             }
         }
     } catch (e) {
-        console.error(`FP Tools AR: ошибка обработки отзыва #${orderId}`, e.message);
+        _eventFailed = true; console.error(`FP Tools AR: ошибка обработки отзыва #${orderId}`, e.message);
     }
 }
 
@@ -575,7 +611,7 @@ async function handleOrderPurchased(msg, auth, settings) {
         }
         console.log(`FP Tools AR: ответ на новый заказ #${orderId} → чат ${msg.chatId}`);
     } catch (e) {
-        console.error('FP Tools AR: ошибка ответа на новый заказ', e.message);
+        _eventFailed = true; console.error('FP Tools AR: ошибка ответа на новый заказ', e.message);
     }
 }
 
@@ -605,8 +641,24 @@ async function handleOrderConfirmed(msg, auth, settings) {
         }
         console.log(`FP Tools AR: ответ на подтверждение заказа #${orderId}`);
     } catch (e) {
-        console.error('FP Tools AR: ошибка ответа на подтверждение', e.message);
+        _eventFailed = true; console.error('FP Tools AR: ошибка ответа на подтверждение', e.message);
     }
+}
+
+async function verifyPaidOrder(orderId) {
+    let cursor = null;
+    for (let page = 0; page < 60; page++) {
+        const url = 'https://funpay.com/orders/trade?state=paid' + (cursor ? '&continue=' + encodeURIComponent(cursor) : '');
+        const res = await fetchWithRetry(url, {});
+        if (!res.ok) throw new Error('Не удалось проверить оплату заказа');
+        const result = await parseViaOffscreen(await res.text(), 'parseSalesPage');
+        if (!Array.isArray(result?.orders)) throw new Error('Не удалось разобрать оплаченные заказы');
+        const order = result.orders.find(o => String(o.orderId) === String(orderId));
+        if (order) return order.orderStatus === 'paid';
+        if (!result.nextOrderId || result.nextOrderId === cursor) return false;
+        cursor = result.nextOrderId;
+    }
+    throw new Error('Проверка оплаты отложена: слишком много страниц');
 }
 
 async function handleAutoDelivery(msg, auth, settings) {
@@ -629,15 +681,17 @@ async function handleAutoDelivery(msg, auth, settings) {
     try {
         
         const orderRes = await fetchWithRetry(`https://funpay.com/orders/${orderId}/`, { headers: { cookie: `golden_key=${auth.golden_key}` } });
-        if (!orderRes.ok) return;
+        if (!orderRes.ok) throw new Error('Не удалось загрузить заказ');
         const orderHtml = await orderRes.text();
 
         
         const orderInfo = await parseViaOffscreen(orderHtml, 'parseOrderPageForDelivery');
-        if (!orderInfo) return;
+        if (!orderInfo) throw new Error('Не удалось разобрать заказ');
 
         const { secrets, lotId, nodeId, buyerChatId } = orderInfo;
-        const chatId = msg.chatId || buyerChatId;
+        if (!buyerChatId || String(msg.chatId) !== String(buyerChatId)) throw new Error('Чат покупателя не подтверждён');
+        if (!(await verifyPaidOrder(orderId))) throw new Error('Оплаченный статус заказа не подтверждён');
+        const chatId = buyerChatId;
 
         
         const { fpToolsAutoDeliveryLots = {} } = await chrome.storage.local.get('fpToolsAutoDeliveryLots');
@@ -660,12 +714,14 @@ async function handleAutoDelivery(msg, auth, settings) {
         if (!deliveryText?.trim() || !chatId) return;
 
         
+        const deliveryScope = 'delivery:' + orderId;
         const parts = deliveryText.split(/\$sleep=(\d+\.?\d*)/i);
         for (let i = 0; i < parts.length; i++) {
             if (/^\d+\.?\d*$/.test(parts[i])) {
                 const sleepSec = parseFloat(parts[i]);
                 await new Promise(r => setTimeout(r, sleepSec * 1000));
             } else if (parts[i].trim()) {
+                _outgoingScope = deliveryScope + ':' + i;
                 await sendChatMessage(chatId, parts[i].trim(), auth);
                 if (i < parts.length - 1) await new Promise(r => setTimeout(r, 500));
             }
@@ -680,7 +736,7 @@ async function handleAutoDelivery(msg, auth, settings) {
         console.log(`FP Tools AR: авто-выдача → заказ #${orderId}, чат ${chatId}`);
 
     } catch (e) {
-        console.error(`FP Tools AR: ошибка авто-выдачи #${orderId}`, e.message);
+        _eventFailed = true; console.error(`FP Tools AR: ошибка авто-выдачи #${orderId}`, e.message);
     }
 }
 
@@ -702,7 +758,7 @@ export async function runAutoResponderCycle() {
     if (__arCycleRunning) return;          // a cycle is already in flight - skip this trigger
     __arCycleRunning = true;
     try {
-        await _runAutoResponderCycleInner();
+        await withCookieLock(() => _runAutoResponderCycleInner());
     } finally {
         __arCycleRunning = false;
     }
@@ -730,7 +786,9 @@ async function _runAutoResponderCycleInner() {
         const { fpToolsAccounts = [], fptVpsManaged = [] } = await chrome.storage.local.get(['fpToolsAccounts', 'fptVpsManaged']);
         if (fptVpsManaged.length) {
             const me = fpToolsAccounts.find(a => a && (a.key === auth.golden_key || String(a.userId) === String(auth.userId)));
-            if (me && fptVpsManaged.includes(me.name)) return;
+            if (me && fptVpsManaged.includes(me.name)) {
+                fpToolsAutoReplies.greetingEnabled = false; fpToolsAutoReplies.keywordsEnabled = false;
+            }
         }
     } catch (_) {}
 
@@ -768,23 +826,37 @@ async function _runAutoResponderCycleInner() {
         const chatObj = data.objects?.find(o => o.type === 'chat_bookmarks');
         if (!chatObj || !chatObj.data?.html) return;
 
-        const chats = await parseViaOffscreen(chatObj.data.html, 'parseChatList');
+        const discovered = await parseViaOffscreen(chatObj.data.html, 'parseChatList');
         const { fpToolsAutoReplies: fresh = {} } = await chrome.storage.local.get('fpToolsAutoReplies');
 
+        if (!fpToolsAutoReplies.greetingEnabled) fresh.greetingEnabled = false;
+        if (!fpToolsAutoReplies.keywordsEnabled) fresh.keywordsEnabled = false;
         const lastSeen = fresh.lastSeenMsgIds || {};
         const isFirstRun = !fresh.autoResponderSeeded;
 
         const updates = {}; // chatId -> newest msgId to persist
         const textUpdates = {}; // chatId -> last handled message text 
 
+        const pending = fresh.pendingEvents || {};
+        for (const chat of discovered) {
+            if (!isFirstRun && !chat.lastByBot && (chat.nodeMsg != null ? chat.nodeMsg > (lastSeen[chat.chatId] || 0) : chat.isUnread)) {
+                const id = chat.chatId + ':' + (chat.nodeMsg ?? chat.msgId);
+                if (!pending[id]) pending[id] = { ...chat, retryAt: 0 };
+            }
+        }
+        await atomicUpdate(s => { s.pendingEvents = pending; });
+        const chats = isFirstRun ? discovered : Object.values(pending).filter(c => (c.retryAt || 0) <= Date.now());
         for (const chat of chats) {
+            const eventId = chat.chatId + ':' + (chat.nodeMsg ?? chat.msgId);
+            _eventFailed = false;
+            _outgoingScope = eventId;
             const nodeMsg = chat.nodeMsg;            // last message id in the chat
             const userMsg = chat.userMsg;            // last id the account has read
             const prevSeen = lastSeen[chat.chatId] || 0;
 
             let hasNew;
             if (nodeMsg != null) {
-                hasNew = nodeMsg > prevSeen;
+                hasNew = nodeMsg > prevSeen || !!pending[eventId];
             } else {
                 hasNew = chat.isUnread && !( (fresh.processedMessageIds || []).includes(chat.msgId) );
             }
@@ -811,25 +883,43 @@ async function _runAutoResponderCycleInner() {
                 msgType
             };
 
+            try {
+            if (['ORDER_PURCHASED', 'ORDER_CONFIRMED', 'NEW_FEEDBACK', 'FEEDBACK_CHANGED'].includes(msgType)) {
+                const oid = (msg.messageText.match(RX.ORDER_ID) || [])[1];
+                if (!(await verifyIAmSeller(oid, auth))) { delete pending[eventId]; continue; }
+            }
             if (msgType === 'DEAR_VENDORS') {
                 await notifyDearVendors(msg);
             } else if (msgType === 'ORDER_PURCHASED') {
+                _outgoingScope = eventId + ':neworder';
                 await handleOrderPurchased(msg, auth, fresh);
+                _outgoingScope = eventId + ':delivery';
                 await handleAutoDelivery(msg, auth, fresh);
             } else if (msgType === 'ORDER_CONFIRMED') {
+                _outgoingScope = eventId + ':confirm';
                 await handleOrderConfirmed(msg, auth, fresh);
             } else if (msgType === 'NEW_FEEDBACK' || msgType === 'FEEDBACK_CHANGED') {
+                _outgoingScope = eventId + ':review';
                 await handleReview(msg, auth, fresh);
             } else if (msgType === 'NON_SYSTEM' && !isSameText) {
+                _outgoingScope = eventId + ':greeting';
                 await handleGreeting(msg, auth, fresh);
+                _outgoingScope = eventId + ':keywords';
                 await handleKeywords(msg, auth, fresh);
             }
 
+            } catch (e) { _eventFailed = true; console.warn('FP Tools: событие отложено', e.message); }
+            if (_eventFailed) {
+                pending[eventId] = { ...chat, retryAt: Date.now() + 30000 };
+                delete updates[chat.chatId];
+                continue;
+            }
+            delete pending[eventId];
             // remember the text we just handled for this chat (text guard above)
             textUpdates[chat.chatId] = chat.messageText;
         }
 
-        if (Object.keys(updates).length > 0 || Object.keys(textUpdates).length > 0 || isFirstRun) {
+        if (Object.keys(updates).length > 0 || Object.keys(textUpdates).length > 0 || isFirstRun || Object.keys(pending).length > 0) {
             await atomicUpdate(s => {
                 const m = s.lastSeenMsgIds || {};
                 for (const [cid, id] of Object.entries(updates)) {
@@ -853,6 +943,7 @@ async function _runAutoResponderCycleInner() {
                 s.lastHandledText = t;
 
                 s.autoResponderSeeded = true;
+                s.pendingEvents = pending;
             });
         }
 
@@ -878,17 +969,26 @@ const _phpCache = {};            // golden_key -> { ts, php }
 let _dnrCtx = '';                // активный golden_key контекста (для маркер-фетчей и кэша)
 const FPT_DNR_AR_RULE = 90218;
 
+const _arRequestAccounts = new Map();
 try {
-    chrome.webRequest.onHeadersReceived.addListener((d) => {
-        if (!_dnrCtx) return;
-        for (const h of (d.responseHeaders || [])) {
-            if ((h.name || '').toLowerCase() === 'set-cookie') {
-                const m = (h.value || '').match(/PHPSESSID=([^;]+)/);
-                if (m) _phpCache[_dnrCtx] = { ts: Date.now(), php: m[1] };
-            }
+    chrome.webRequest.onBeforeRequest.addListener(d => {
+        if (!_dnrCtx || d.initiator !== chrome.runtime.getURL('').replace(/\/$/, '')) return;
+        const u = new URL(d.url);
+        if (u.origin === 'https://funpay.com' && u.searchParams.get('_fptar') === '1') _arRequestAccounts.set(d.requestId, _dnrCtx);
+    }, { urls: ['https://funpay.com/*'] });
+    chrome.webRequest.onHeadersReceived.addListener(d => {
+        const key = _arRequestAccounts.get(d.requestId);
+        if (!key) return;
+        for (const h of d.responseHeaders || []) {
+            if (h.name.toLowerCase() !== 'set-cookie') continue;
+            const m = (h.value || '').match(/PHPSESSID=([^;]+)/);
+            if (m) _phpCache[key] = { ts: Date.now(), php: m[1] };
         }
-    }, { urls: ['https://funpay.com/*'], types: ['main_frame', 'xmlhttprequest', 'other'] }, ['responseHeaders', 'extraHeaders']);
-} catch (_) {}
+    }, { urls: ['https://funpay.com/*'] }, ['responseHeaders', 'extraHeaders']);
+    for (const event of [chrome.webRequest.onCompleted, chrome.webRequest.onErrorOccurred]) {
+        event.addListener(d => _arRequestAccounts.delete(d.requestId), { urls: ['https://funpay.com/*'] });
+    }
+} catch (e) { console.warn('FP Tools: session tracking unavailable', e.message); }
 
 async function _setArRule(key) {
     const c = _phpCache[key];
@@ -899,10 +999,10 @@ async function _setArRule(key) {
             addRules: [{
                 id: FPT_DNR_AR_RULE, priority: 1,
                 action: { type: 'modifyHeaders', requestHeaders: [{ header: 'cookie', operation: 'set', value: cookie }] },
-                condition: { urlFilter: '_fptar=1', resourceTypes: ['main_frame', 'xmlhttprequest', 'other'] }
+                condition: { requestDomains: ['funpay.com'], initiatorDomains: [chrome.runtime.id], regexFilter: '^https://funpay\\.com/.*[?&]_fptar=1(?:&|$)', resourceTypes: ['xmlhttprequest', 'other'] }
             }]
         });
-    } catch (_) {}
+    } catch (e) { throw new Error('Не удалось изолировать аккаунт: ' + e.message); }
 }
 
 let _maChain = Promise.resolve();
@@ -922,7 +1022,7 @@ async function withAccountCookie(key, fn) {
         await _setArRule(key);                               // стартовое правило (golden_key [+ кэш PHPSESSID])
         try {
             const auth = await _ambientAuth();               // прогрев: csrf/userId + PHPSESSID в кэш
-            if (!auth) return null;
+            if (!auth || (auth.golden_key && auth.golden_key !== key)) throw new Error('Неверный контекст аккаунта');
             await _setArRule(key);                           // теперь правило с PHPSESSID — для раннера
             return await fn(auth);
         } finally {
@@ -943,7 +1043,7 @@ async function _ambientAuth() {
     if (!u || !u['csrf-token'] || !u.userId) return null;
     const gk = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
     const php = await chrome.cookies.get({ url: 'https://funpay.com', name: 'PHPSESSID' });
-    return { csrf_token: u['csrf-token'], userId: u.userId, username: u.userName, golden_key: gk?.value || '', phpsessid: php?.value || '' };
+    return { csrf_token: u['csrf-token'], userId: u.userId, username: u.userName, golden_key: _dnrCtx || gk?.value || '', phpsessid: _dnrCtx ? (_phpCache[_dnrCtx]?.php || '') : (php?.value || '') };
 }
 
 // Чаты аккаунта через runner (ambient-кука = целевой аккаунт).
@@ -962,6 +1062,13 @@ async function _ambientChats(auth) {
     const chatObj = data.objects?.find(o => o.type === 'chat_bookmarks');
     if (!chatObj?.data?.html) return [];
     return await parseViaOffscreen(chatObj.data.html, 'parseChatList');
+}
+
+export async function fetchAccountPage(key, accountId, url, options = {}) {
+    return withAccountCookie(key, async auth => {
+        if (String(auth.userId) !== String(accountId)) throw new Error('Изменился аккаунт сбора истории');
+        return fetchWithRetry(url, options);
+    });
 }
 
 // Подбор ответа по ключевым словам (как handleKeywords, но чистая функция).
@@ -1012,6 +1119,7 @@ export async function runMultiAccountAutoReply(opts = {}) {
                     for (const chat of chats) {
                         const nodeMsg = chat.nodeMsg;
                         const prev = lastSeen[chat.chatId] || 0;
+                        _outgoingScope = chat.chatId + ':' + nodeMsg;
                         const isNew = nodeMsg != null ? nodeMsg > prev : !!chat.isUnread;
                         const needsReply = (chat.isUnread || isNew) && !chat.lastByBot;
 
@@ -1050,13 +1158,13 @@ export async function runMultiAccountAutoReply(opts = {}) {
                         if (kind === 'greeting') {
                             const w = await sellerWroteInChat(chat.chatId, auth);
                             if (w === 'wrote') { greeted.add(chat.chatId); continue; }
-                            if (w === 'error') continue;   // не отмечаем — повторим в следующем проходе
+                            if (w === 'error') { lastSeen[chat.chatId] = prev; continue; }   // не отмечаем — повторим в следующем проходе
                         }
                         try {
                             await sendReplyContent(chat.chatId, reply, auth, images, order);
                             if (kind === 'greeting') greeted.add(chat.chatId);
                             acc.sent.push({ chatId: chat.chatId, kind });
-                        } catch (e) { report.errors.push(`${account.name}/${chat.chatId}: ${e.message}`); }
+                        } catch (e) { lastSeen[chat.chatId] = prev; report.errors.push(`${account.name}/${chat.chatId}: ${e.message}`); }
                     }
 
                     if (!dryRun) { state.lastSeen = lastSeen; state.greeted = [...greeted]; state.seeded = true; stateMap[account.key] = state; }

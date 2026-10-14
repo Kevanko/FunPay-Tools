@@ -1,7 +1,7 @@
 // FPT cloud sync — Cloudflare Worker + D1 (free tier only).
 //
-// Model A: a record is keyed by the FunPay userId (id looks like "u_15703254") — settings
-// load automatically on login, no codes. Open by design (these settings carry no secrets).
+// Private random profile address + independent Bearer capability. Public legacy profiles are locked.
+// Existing legacy rows are retained for verified administrator-assisted recovery.
 //
 // Updates use OPTIMISTIC CONCURRENCY: every record has a monotonic `version`. A PUT must
 // declare the `baseVersion` it last saw; the server commits only if it still matches
@@ -17,7 +17,7 @@ const ID_RE = /^[A-Za-z0-9_-]{3,64}$/;        // "u_<userId>"
 const cors = (origin) => ({
   'Access-Control-Allow-Origin': origin || '*',
   'Access-Control-Allow-Methods': 'GET,PUT,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type,Authorization',
   'Access-Control-Max-Age': '86400',
 });
 const json = (obj, status, origin) =>
@@ -41,6 +41,9 @@ export default {
       for (const r of (rows.results || [])) { if (r.nick && r.style && map[r.nick] === undefined) map[r.nick] = r.style; }
       return json(map, 200, origin);
     }
+    // Public user IDs are not proof of ownership. Keep old rows, disable unverified writes.
+    if (/^\/nick\//.test(url.pathname) && req.method !== 'GET') return json({ error: 'identity_verification_required' }, 403, origin);
+    if (/^\/s\//.test(url.pathname)) return json({ error: 'legacy_profile_locked', message: 'Legacy data retained. Administrator-assisted migration required.' }, 410, origin);
     const nm = url.pathname.match(/^\/nick\/([^/]+)$/);
     if (nm) {
       const uid = nm[1];
@@ -57,15 +60,20 @@ export default {
       return json({ error: 'method' }, 405, origin);
     }
 
-    const m = url.pathname.match(/^\/s\/([^/]+)$/);
+    const m = url.pathname.match(/^\/v2\/s\/(p_[a-f0-9]{64})$/);
     if (!m) return json({ error: 'not_found' }, 404, origin);
     const id = m[1];
-    if (!ID_RE.test(id)) return json({ error: 'bad_id' }, 400, origin);
+    if (!/^p_[a-f0-9]{64}$/.test(id)) return json({ error: 'bad_id' }, 400, origin);
+    const token = (req.headers.get('Authorization') || '').replace(/^Bearer /, '');
+    if (!/^[a-f0-9]{64}$/.test(token)) return json({ error: 'unauthorized' }, 401, origin);
+    const tokenHash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token)))).map(b => b.toString(16).padStart(2,'0')).join('');
 
     try {
+      const owner = await env.DB.prepare('SELECT token_hash FROM private_profiles WHERE id = ?').bind(id).first();
+      if (owner && owner.token_hash !== tokenHash) return json({ error: 'unauthorized' }, 401, origin);
       if (req.method === 'GET') {
         const row = await env.DB.prepare(
-          'SELECT bundle, updated_at, version FROM profiles WHERE id = ?'
+          'SELECT bundle, updated_at, version FROM private_profiles WHERE id = ?'
         ).bind(id).first();
         if (!row) return json({ exists: false }, 404, origin);
         return json({ exists: true, bundle: row.bundle, updated_at: row.updated_at, version: row.version }, 200, origin);
@@ -82,32 +90,33 @@ export default {
         if (baseVersion === 0) {
           // expect to CREATE a fresh record; ON CONFLICT means it already exists
           const ins = await env.DB.prepare(
-            'INSERT INTO profiles (id, bundle, updated_at, bytes, version) VALUES (?, ?, ?, ?, 1) ON CONFLICT(id) DO NOTHING'
-          ).bind(id, body.bundle, body.updated_at, bytes).run();
+            'INSERT INTO private_profiles (id, token_hash, bundle, updated_at, bytes, version) VALUES (?, ?, ?, ?, ?, 1) ON CONFLICT(id) DO NOTHING'
+          ).bind(id, tokenHash, body.bundle, body.updated_at, bytes).run();
           if (ins.meta.changes > 0) return json({ ok: true, version: 1 }, 200, origin);
           // heal a legacy version-0 row (left by the pre-versioning migration) so it is writable
           const heal = await env.DB.prepare(
-            'UPDATE profiles SET bundle = ?, updated_at = ?, bytes = ?, version = 1 WHERE id = ? AND version = 0'
-          ).bind(body.bundle, body.updated_at, bytes, id).run();
+            'UPDATE private_profiles SET bundle = ?, updated_at = ?, bytes = ?, version = 1 WHERE id = ? AND version = 0 AND token_hash = ?'
+          ).bind(body.bundle, body.updated_at, bytes, id, tokenHash).run();
           if (heal.meta.changes > 0) return json({ ok: true, version: 1 }, 200, origin);
-          const cur = await env.DB.prepare('SELECT bundle, updated_at, version FROM profiles WHERE id = ?').bind(id).first();
+          const cur = await env.DB.prepare('SELECT bundle, updated_at, version FROM private_profiles WHERE id = ? AND token_hash = ?').bind(id, tokenHash).first();
+          if (!cur) return json({ error: 'unauthorized' }, 401, origin);
           return json({ conflict: true, bundle: cur.bundle, updated_at: cur.updated_at, version: cur.version }, 409, origin);
         }
 
         // atomic compare-and-swap: only bump if version still equals baseVersion
         const upd = await env.DB.prepare(
-          'UPDATE profiles SET bundle = ?, updated_at = ?, bytes = ?, version = version + 1 WHERE id = ? AND version = ?'
-        ).bind(body.bundle, body.updated_at, bytes, id, baseVersion).run();
+          'UPDATE private_profiles SET bundle = ?, updated_at = ?, bytes = ?, version = version + 1 WHERE id = ? AND version = ? AND token_hash = ?'
+        ).bind(body.bundle, body.updated_at, bytes, id, baseVersion, tokenHash).run();
         if (upd.meta.changes > 0) return json({ ok: true, version: baseVersion + 1 }, 200, origin);
 
-        const cur = await env.DB.prepare('SELECT bundle, updated_at, version FROM profiles WHERE id = ?').bind(id).first();
+        const cur = await env.DB.prepare('SELECT bundle, updated_at, version FROM private_profiles WHERE id = ? AND token_hash = ?').bind(id, tokenHash).first();
         if (!cur) return json({ conflict: true, exists: false, version: 0 }, 409, origin);
         return json({ conflict: true, bundle: cur.bundle, updated_at: cur.updated_at, version: cur.version }, 409, origin);
       }
 
       return json({ error: 'method' }, 405, origin);
     } catch (e) {
-      return json({ error: 'server', detail: String((e && e.message) || e) }, 500, origin);
+      return json({ error: 'server' }, 500, origin);
     }
   },
 };

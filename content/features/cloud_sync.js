@@ -1,10 +1,8 @@
 // content/features/cloud_sync.js — FunPay Tools cloud settings sync (Model A, hardened).
 // Backend: Cloudflare Worker + D1 (https://fpt-sync.vidalifete.workers.dev).
 //
-// Keyed per FunPay account: the storage key is derived from the userId (read from app-data)
-// via SHA-256(salt:userId) so it is not the raw public id — settings load automatically on
-// login, no codes. Open-ish by design (no secrets synced); see notes on the residual write
-// trust in the project memo.
+// Account-bound random private capability is held by the service worker.
+// Transfer to another device uses an explicit secret .fptsync backup.
 //
 // Updates: optimistic concurrency (monotonic `version` + server compare-and-swap, 409 on
 // stale baseVersion) with FIELD-LEVEL merge by per-key timestamp (strictly-newer wins, ties
@@ -32,14 +30,7 @@ const FPT_CLOUD_THEME_STRIP = ['bgVideo', 'bgData', 'bgVideoData'];
 // сохранялся). Картинки — локальные бинарники (как видео-обои): в облако шлём только
 // текст ответов/шаблонов/ключевых слов, картинки остаются на устройстве.
 const FPT_CLOUD_AR_IMG_FIELDS = ['greetingImages', 'newOrderReplyImages', 'orderConfirmReplyImages', 'reviewTemplateImages'];
-function _fptCloudStripAR(ar) {
-    if (!ar || typeof ar !== 'object') return ar;
-    const a = { ...ar };
-    FPT_CLOUD_AR_IMG_FIELDS.forEach(f => delete a[f]);
-    if (Array.isArray(a.keywords)) a.keywords = a.keywords.map(r => (r && typeof r === 'object' && 'images' in r) ? (() => { const c = { ...r }; delete c.images; return c; })() : r);
-    return a;
-}
-// Ключи, эффект которых применяется только при (пере)загрузке страницы — для них
+function _fptCloudStripAR(ar) { return FPTSettingsSchema.sanitizeAutoReplies(ar, { cloud: true }); }// Ключи, эффект которых применяется только при (пере)загрузке страницы — для них
 // показываем подсказку «обновите страницу». Тема/обои применяются ВЖИВУЮ через
 // theme.js (storage.onChanged), поэтому при их смене с другого устройства ни
 // перезагрузка, ни подсказка не нужны — перекрашивается само.
@@ -67,13 +58,11 @@ function _fptCloudUser() {
     try { const d = JSON.parse(document.body.dataset.appData); const u = Array.isArray(d) ? d[0] : d; return { id: u && u.userId ? String(u.userId) : '', name: (u && u.userName) || '' }; } catch (_) { return { id: '', name: '' }; }
 }
 async function _fptCloudDeriveKey(uid) {
-    try {
-        const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(FPT_CLOUD_SALT + ':' + uid));
-        const hex = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-        return 'u' + hex.slice(0, 40);
-    } catch (_) { return 'u_' + uid; }
-}
-async function _fptCloudEnabled() { const { fptCloudSyncEnabled = false } = await chrome.storage.local.get('fptCloudSyncEnabled'); return !!fptCloudSyncEnabled; }
+    // Capability lives in the service worker; no public user-ID-derived address.
+    const r = await chrome.runtime.sendMessage({ action: 'fptCloudIdentity', accountId: String(uid) });
+    if (!r || !r.ok || !r.id) throw new Error('Приватное облако недоступно. Локальные настройки сохранены.');
+    return r.id;
+}async function _fptCloudEnabled() { const { fptCloudSyncEnabled = false } = await chrome.storage.local.get('fptCloudSyncEnabled'); return !!fptCloudSyncEnabled; }
 
 function _fptCloudStable(v) {
     if (Array.isArray(v)) return '[' + v.map(_fptCloudStable).join(',') + ']';
@@ -82,7 +71,7 @@ function _fptCloudStable(v) {
 }
 function _fptCloudHash(str) { let h = 0x811c9dc5; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = (h * 0x01000193) >>> 0; } return h.toString(16); }
 function _fptCloudStrip(settings) {
-    const o = { ...(settings || {}) };
+    const o = FPTSettingsSchema.sanitize(settings || {}, { cloud: true });
     if (o.fpToolsTheme && typeof o.fpToolsTheme === 'object') { const t = { ...o.fpToolsTheme }; FPT_CLOUD_THEME_STRIP.forEach(f => delete t[f]); o.fpToolsTheme = t; }
     if (o.fpToolsAutoReplies && typeof o.fpToolsAutoReplies === 'object') o.fpToolsAutoReplies = _fptCloudStripAR(o.fpToolsAutoReplies);
     return o;
@@ -148,11 +137,11 @@ async function _fptCloudApply(mergedS, delKeys) {
     // возвращаем локальные, иначе текст из облака затёр бы их на этом устройстве.
     if (incoming.fpToolsAutoReplies && typeof incoming.fpToolsAutoReplies === 'object') {
         const { fpToolsAutoReplies: localAR = {} } = await chrome.storage.local.get('fpToolsAutoReplies');
-        incoming.fpToolsAutoReplies = { ...incoming.fpToolsAutoReplies };
+        incoming.fpToolsAutoReplies = { ...localAR, ...incoming.fpToolsAutoReplies };
         FPT_CLOUD_AR_IMG_FIELDS.forEach(f => { if (localAR && localAR[f] !== undefined) incoming.fpToolsAutoReplies[f] = localAR[f]; });
         if (Array.isArray(incoming.fpToolsAutoReplies.keywords) && Array.isArray(localAR.keywords)) {
             incoming.fpToolsAutoReplies.keywords = incoming.fpToolsAutoReplies.keywords.map((r, i) => {
-                const li = localAR.keywords[i];
+                const li = localAR.keywords.find(local => local && r && local.keyword === r.keyword && (local.matchMode || 'exact') === (r.matchMode || 'exact'));
                 return (r && typeof r === 'object' && li && li.images !== undefined) ? { ...r, images: li.images } : r;
             });
         }
@@ -189,8 +178,8 @@ async function _fptCloudPersist() {
     } catch (_) {}
 }
 
-function _fptCloudPushNet(key, payload, baseVersion) { return chrome.runtime.sendMessage({ action: 'fptCloudPush', id: key, settings: payload, updatedAt: Date.now(), baseVersion: baseVersion || 0 }); }
-function _fptCloudPullNet(key) { return chrome.runtime.sendMessage({ action: 'fptCloudPull', id: key }); }
+function _fptCloudPushNet(key, payload, baseVersion) { return chrome.runtime.sendMessage({ action: 'fptCloudPush', accountId: _fptC.uid, settings: payload, updatedAt: Date.now(), baseVersion: baseVersion || 0 }); }
+function _fptCloudPullNet(key) { return chrome.runtime.sendMessage({ action: 'fptCloudPull', accountId: _fptC.uid }); }
 
 // push with compare-and-swap + merge-on-conflict. Re-collects each attempt so a concurrent
 // edit is never sent under a stale snapshot. Returns a result object the UI can inspect.
@@ -342,7 +331,7 @@ async function fptCloudSetSync(on) {
         await _fptCloudRun(() => _fptCloudReconcile('focus'));
         _fptCloudStartInterval();
         await _fptCloudRefreshUI();
-        _fptCloudSay('Готово ✓ Настройки привязаны к аккаунту и подтягиваются автоматически.');
+        _fptCloudSay('Готово ✓ Приватная синхронизация включена. Для другого устройства перенесите ключ доступа.');
         return { ok: true };
     }
     _fptCloudOn = false;
@@ -358,6 +347,36 @@ function fptCloudInitUI() {
     if (!t) return;
     if (!t.dataset.wired) {
         t.dataset.wired = '1';
+        const panel = document.getElementById('fpt-cloud-panel');
+        if (panel && !document.getElementById('fpt-cloud-key-export')) {
+            const help = document.createElement('p');
+            help.textContent = 'Для другого устройства сохраните и импортируйте ключ доступа. Файл даёт доступ к настройкам; храните его отдельно от обычной резервной копии.';
+            help.className = 'template-info'; panel.append(help);
+            const save = document.createElement('button'); save.type = 'button'; save.className = 'btn'; save.id = 'fpt-cloud-key-export'; save.textContent = 'Сохранить ключ доступа';
+            const load = document.createElement('button'); load.type = 'button'; load.className = 'btn btn-default'; load.textContent = 'Импортировать ключ доступа';
+            const input = document.createElement('input'); input.type = 'file'; input.accept = '.fptsync'; input.hidden = true;
+            save.onclick = async () => {
+                try {
+                    const r = await chrome.runtime.sendMessage({action:'fptCloudExportCapability',accountId:_fptC.uid});
+                    if (!r || !r.ok) throw new Error('Не удалось сохранить ключ');
+                    const url = URL.createObjectURL(new Blob([JSON.stringify({schema:1,accountId:r.accountId,id:r.id,token:r.token})],{type:'application/json'}));
+                    const a = document.createElement('a'); a.href = url; a.download = `FunPay_sync_${r.accountId}.fptsync`; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+                } catch(e) { _fptCloudSay(e.message); }
+            };
+            load.onclick = () => input.click();
+            input.onchange = async () => {
+                try {
+                    const file = input.files[0]; if (!file) return; if (file.size > 4096) throw new Error('Неверный файл ключа');
+                    const capability = JSON.parse(await file.text());
+                    if (!confirm('Подключить этот аккаунт к облаку из файла ключа? Текущие локальные настройки будут сохранены.')) return;
+                    const r = await chrome.runtime.sendMessage({action:'fptCloudImportCapability',accountId:_fptC.uid,capability});
+                    if (!r || !r.ok) throw new Error(r && r.error || 'Не удалось импортировать ключ');
+                    _fptC.key = r.id; _fptC.ver = 0; _fptC.lastHash = ''; await _fptCloudPersist();
+                    _fptCloudSay('Ключ подключён. Нажмите «Загрузить», чтобы получить настройки другого устройства.');
+                } catch(e) { _fptCloudSay(e.message); } finally { input.value = ''; }
+            };
+            panel.append(save,load,input);
+        }
         t.addEventListener('change', async () => { await fptCloudSetSync(t.checked); });
         document.getElementById('fpt-cloud-push-btn')?.addEventListener('click', async () => {
             if (!(await _fptCloudEnabled())) { _fptCloudSay('Сначала включите синхронизацию.'); return; }

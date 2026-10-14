@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 // FP Tools — VPS-сервис. Держит несколько аккаунтов FunPay онлайн (каждый через
 // свой прокси) и отдаёт по ним актуальную статистику расширению по HTTP+токену.
 //
@@ -19,6 +20,7 @@ import { runAutoReply, _selftest as _arSelftest } from './autoreply.js';
 
 const DIR = dirname(fileURLToPath(import.meta.url));
 const DATA_FILE = join(DIR, 'data.json');
+const HOST = process.env.FPT_HOST || '127.0.0.1';
 const PORT = parseInt(process.env.FPT_PORT || '8787', 10);
 const REFRESH_MS = 3 * 60 * 1000;      // как онлайн-heartbeat в расширении
 const AR_MS = 2 * 60 * 1000;           // цикл авто-ответа
@@ -29,10 +31,15 @@ function log(msg) { const line = `${new Date().toISOString().slice(11, 19)} ${ms
 
 // undici подгружаем лениво (selftest не требует сети/зависимостей).
 let ProxyAgent = null;
+const proxyDispatchers = new Map();
 async function getProxyAgent(url) {
     if (!url) return undefined;
     if (!ProxyAgent) ({ ProxyAgent } = await import('undici'));
-    return new ProxyAgent(url);
+    if (!proxyDispatchers.has(url)) {
+        if (proxyDispatchers.size >= 128) { const first = proxyDispatchers.keys().next().value; await proxyDispatchers.get(first).close(); proxyDispatchers.delete(first); }
+        proxyDispatchers.set(url, new ProxyAgent(url));
+    }
+    return proxyDispatchers.get(url);
 }
 
 // ── конфиг ──────────────────────────────────────────────────────────────────
@@ -44,12 +51,12 @@ function loadData() {
 }
 function saveData(d) {
     const tmp = DATA_FILE + '.tmp';
-    writeFileSync(tmp, JSON.stringify(d, null, 2));
+    writeFileSync(tmp, JSON.stringify(d, null, 2), { mode: 0o600 });
     renameSync(tmp, DATA_FILE);     // атомарно
 }
 
-const data = loadData();
-saveData(data);                     // зафиксировать токен при первом запуске
+const data = process.argv.includes('--selftest') ? { token: 'selftest', accounts: [] } : loadData();
+if (!process.argv.includes('--selftest')) saveData(data); // не менять конфиг при selftest
 
 // ── парсер снимка аккаунта (регэксп, без DOM) ───────────────────────────────
 // Источник истины — data-app-data на <body> (JSON, кавычки внутри = &quot;).
@@ -92,7 +99,7 @@ async function refreshAccount(acc) {
         const dispatcher = await getProxyAgent(acc.proxy);
         const res = await fetch('https://funpay.com/', {
             headers: { cookie: `golden_key=${acc.golden_key}`, 'user-agent': 'Mozilla/5.0' },
-            dispatcher, redirect: 'follow'
+            signal: AbortSignal.timeout(30000), dispatcher, redirect: 'follow'
         });
         const html = await res.text();
         const snap = parseSnapshot(html);
@@ -110,11 +117,16 @@ async function refreshAccount(acc) {
 }
 
 const statsCache = new Map();   // id -> stat
+let _refreshRunning = false;
 async function refreshAll() {
+    if (_refreshRunning) return;
+    _refreshRunning = true;
+    try {
     for (const acc of data.accounts) {
         statsCache.set(acc.id, await refreshAccount(acc));
         await new Promise(r => setTimeout(r, 500));   // не долбим разом
     }
+    } finally { _refreshRunning = false; }
 }
 
 // Цикл авто-ответа: по аккаунтам с включёнными авто-ответами в их профиле.
@@ -127,7 +139,10 @@ async function autoReplyAll() {
         for (const acc of data.accounts) {
             const s = acc.autoReplies || {};
             if (!s.greetingEnabled && !s.keywordsEnabled) continue;
-            try { await runAutoReply(acc, log); changed = true; }   // arState мутируется → сохраним
+            try {
+                Object.defineProperty(acc, 'persistState', { value: async () => saveData(data), configurable: true, enumerable: false });
+                await runAutoReply(acc, log); changed = true;
+            }   // arState мутируется → сохраним
             catch (e) { log(`${acc.name}: авто-ответ ошибка: ${e.message}`); }
             await new Promise(r => setTimeout(r, 800));
         }
@@ -147,12 +162,12 @@ function send(res, code, body) {
 }
 function authed(req, url) {
     const h = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-    const t = h || url.searchParams.get('token');
+    const t = h;
     return t && t === data.token;
 }
 function readBody(req) {
     return new Promise((resolve) => {
-        let b = ''; req.on('data', c => b += c); req.on('end', () => { try { resolve(JSON.parse(b || '{}')); } catch (_) { resolve({}); } });
+        let b = ''; req.on('data', c => { b += c; if (b.length > 1024 * 1024) req.destroy(); }); req.on('end', () => { try { resolve(JSON.parse(b || '{}')); } catch (_) { resolve({}); } });
     });
 }
 function publicAccounts() {   // без golden_key наружу
@@ -162,7 +177,7 @@ function publicAccounts() {   // без golden_key наружу
 const handler = async (req, res) => {
     const url = new URL(req.url, 'http://x');
     if (req.method === 'OPTIONS') return send(res, 204, {});
-    if (url.pathname === '/health') return send(res, 200, { ok: true });
+    if (url.pathname === '/health') return send(res, 200, { ok: true, capabilities: ['greeting', 'keywords'], transport: scheme });
     if (!authed(req, url)) return send(res, 401, { error: 'bad token' });
 
     if (url.pathname === '/stats' && req.method === 'GET') {
@@ -213,7 +228,8 @@ try {
     const cert = readFileSync(join(certDir, 'fullchain.pem'));
     server = https.createServer({ key, cert }, handler);
     scheme = 'https';
-} catch (_) {
+} catch (e) {
+    if (!['127.0.0.1', '::1', 'localhost'].includes(HOST)) throw new Error('Для публичного VPS необходим действительный TLS-сертификат');
     server = http.createServer(handler);
 }
 
@@ -222,14 +238,14 @@ function selftest() {
     const html = `<body data-app-data="{&quot;userId&quot;:777,&quot;userName&quot;:&quot;Vidali&quot;,&quot;counters&quot;:{&quot;chat&quot;:3}}">
         <span class="badge-balance">Финансы 1 234,50 ₽</span></body>`;
     const s = parseSnapshot(html);
-    console.assert(s.username === 'Vidali', 'username', s);
-    console.assert(s.userId === '777', 'userId', s);
-    console.assert(s.unread === 3, 'unread', s);
-    console.assert(s.balance === '1 234,50 ₽', 'balance', s);
-    console.assert(s.loggedIn === true, 'loggedIn', s);
+    assert(s.username === 'Vidali', 'username', s);
+    assert(s.userId === '777', 'userId', s);
+    assert(s.unread === 3, 'unread', s);
+    assert(s.balance === '1 234,50 ₽', 'balance', s);
+    assert(s.loggedIn === true, 'loggedIn', s);
     // не залогинен → пустой снимок
     const empty = parseSnapshot('<body data-app-data="{&quot;userId&quot;:0}"><div></div></body>');
-    console.assert(empty.loggedIn === false, 'logged-out', empty);
+    assert(empty.loggedIn === false, 'logged-out', empty);
     console.log('selftest OK');
 }
 
@@ -241,8 +257,8 @@ if (process.argv.includes('--selftest')) {
     setInterval(refreshAll, REFRESH_MS);
     setTimeout(autoReplyAll, 15000);          // первый проход — засев lastSeen (без спама)
     setInterval(autoReplyAll, AR_MS);
-    server.listen(PORT, () => {
+    server.listen(PORT, HOST, () => {
         console.log(`FP Tools VPS на порту ${PORT} (${scheme})`);
-        console.log(`ТОКЕН: ${data.token}`);
+        console.log('Токен хранится в закрытом data.json; не публикуйте его.');
     });
 }

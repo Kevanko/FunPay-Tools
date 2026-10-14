@@ -10,6 +10,16 @@ CREATE TABLE IF NOT EXISTS profiles (
 --   ALTER TABLE profiles ADD COLUMN version INTEGER NOT NULL DEFAULT 0;
 
 -- Shared custom-nickname registry (epic nicknames visible to all extension users).
+-- Legacy profiles remain intact and are inaccessible through public HTTP routes.
+CREATE TABLE IF NOT EXISTS private_profiles (
+  id TEXT PRIMARY KEY,
+  token_hash TEXT NOT NULL,
+  bundle TEXT NOT NULL,
+  updated_at INTEGER NOT NULL,
+  bytes INTEGER NOT NULL DEFAULT 0,
+  version INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS nicks (
   uid        TEXT PRIMARY KEY,        -- "u_<funpayUserId>" of the publisher
   nick       TEXT NOT NULL,           -- FunPay nickname this style applies to

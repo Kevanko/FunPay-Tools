@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "FunPay Tools",
-    "version": "3.13.4",
+    "version": "3.14.2",
     "description": "Инструменты продавца для FunPay: статистика продаж, автоматизация, авто-выдача, массовые действия с лотами, темы оформления.",
     "permissions": [
         "storage",
@@ -30,7 +30,12 @@
         "https://fonts.gstatic.com/*",
         "https://support.funpay.com/*",
         "https://api.telegram.org/*",
-        "http://*/*"
+        "http://*/*",
+        "https://github.com/*",
+        "https://release-assets.githubusercontent.com/*"
+    ],
+    "optional_host_permissions": [
+        "https://*/*"
     ],
     "action": {
         "default_popup": "popup/popup.html",
@@ -71,8 +76,12 @@
                 "https://funpay.com/*"
             ],
             "js": [
+                "content/ui/icons.js",
                 "content/scripts/jquery.js",
                 "content/utils.js",
+                "content/settings_schema.js",
+                "content/money_service.js",
+                "content/features/analytics_tools.js",
                 "content/features/feature_registry.js",
                 "content/features/feature_disabler.js",
                 "content/features/cursor_fx.js",
@@ -133,6 +142,7 @@
                 "content/content_script.js",
                 "content/features/auto_restore_lots.js",
                 "content/features/order_page_enhancements.js",
+                "content/features/lot_tools.js",
                 "content/features/sales_chart.js",
                 "content/features/sales_modes.js",
                 "content/features/slash_commands.js",
@@ -158,7 +168,9 @@
                 "background/remake.js",
                 "icons/magic.png",
                 "icons/icon128.png",
-                "fonts/*.woff2"
+                "fonts/*.woff2",
+                "icons/brand-mark.png",
+                "fonts/Manrope.ttf"
             ],
             "matches": [
                 "https://funpay.com/*",

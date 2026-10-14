@@ -6,8 +6,8 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
-  width: 720px;
-  height: 544px;
+  width: min(720px, 100vw);
+  height: min(544px, 100vh);
   overflow: hidden;
   background: #0e0f12;
 }
@@ -96,8 +96,8 @@ html, body {
    BASE
    ================================================================ */
 .fpt-window {
-  width: 720px;
-  height: 544px;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -547,3 +547,30 @@ svg.ic { stroke-width: 1.6; vertical-align: -0.13em; flex-shrink: 0; }
 .gap-2 { gap: 8px; }
 .gap-3 { gap: 12px; }
 .spread { justify-content: space-between; }
+
+/* Общие состояния пульта настроек. */
+.fpt-page { display: flex; flex-direction: column; gap: 14px; }
+.fpt-page label { display: flex; flex-direction: column; gap: 7px; font-size: 13px; }
+.fpt-pagehead { margin-bottom: 0; }
+.fpt-card { padding: 12px 14px; }
+.tgl { padding: 0; }
+:where(button, a, input, select):focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+.fpt-search:focus-within { outline: 2px solid var(--text); outline-offset: 2px; }
+button:disabled { opacity: .55; cursor: wait; }
+#ui-error:empty { display: none; }
+#ui-error { color: var(--text); border-left: 3px solid var(--accent); padding: 8px; font-size: 13px; }
+.fpt-theme[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 1px; }
+.inp { font-family: var(--font-ui); font-size: 14px; }
+@media (max-width: 600px) {
+  .fpt-nav { width: 160px; }
+  .fpt-content { padding: 14px; }
+  .fpt-themes { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .fpt-status-wrap { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+.fp-brand-logo{width:38px;height:38px;object-fit:contain;flex:none}.fpt-navitem{display:flex;align-items:center;gap:12px}.fpt-navitem .ic{flex:none;opacity:.75}.fpt-navitem.is-active .ic{opacity:1}.fpt-vector-wrap{display:inline-flex;align-items:center;justify-content:center;font-family:inherit!important}
+
+@font-face{font-family:'Manrope';font-style:normal;font-weight:200 800;font-display:swap;src:url('../fonts/Manrope.ttf') format('truetype')}

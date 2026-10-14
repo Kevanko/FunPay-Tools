@@ -4,12 +4,12 @@ let _bhCache = {};
 
 async function loadBuyerHistory(buyerUsername) {
     if (!buyerUsername) return [];
-    const cached = _bhCache[buyerUsername];
+    const cacheKey = FPTAnalytics.accountId() + ':' + buyerUsername;
+    const cached = _bhCache[cacheKey];
     if (cached && Date.now() - cached.t < 5 * 60 * 1000) return cached.orders;
 
     try {
-        const data = await chrome.storage.local.get('fpToolsSalesData');
-        const allOrders = data.fpToolsSalesData ? Object.values(data.fpToolsSalesData) : [];
+        const allOrders = await FPTAnalytics.read('sales');
         const localOrders = allOrders
             .filter(o => o.buyerUsername && o.buyerUsername.toLowerCase() === buyerUsername.toLowerCase())
             .sort((a, b) => (b.orderDate || 0) - (a.orderDate || 0))
@@ -21,40 +21,25 @@ async function loadBuyerHistory(buyerUsername) {
                 date: o.orderDateText || o.orderDate || ''
             }));
         if (localOrders.length > 0) {
-            _bhCache[buyerUsername] = { orders: localOrders, t: Date.now() };
+            _bhCache[cacheKey] = { orders: localOrders, t: Date.now() };
             return localOrders;
         }
     } catch (_) {}
 
-    try {
-        const url = `https://funpay.com/orders/trade?buyer=${encodeURIComponent(buyerUsername)}`;
-        const res = await fetch(url, { method: 'GET', credentials: 'include' });
-        if (!res.ok) return [];
-        const html = await res.text();
-
-        const orders = await Promise.race([
-            new Promise(r => chrome.runtime.sendMessage(
-                { target: 'offscreen', action: 'parseBuyerHistory', html, buyerUserId: buyerUsername },
-                d => r(d || [])
-            )),
-            new Promise(r => setTimeout(() => r([]), 8000))
-        ]);
-
-        if (orders.length > 0) {
-            _bhCache[buyerUsername] = { orders, t: Date.now() };
-        }
-        return orders;
-    } catch (_) { return []; }
+    return []; // All history reads are mediated by the account-bound worker.
 }
 
 function renderHistoryPanel(orders, name, anchor) {
     document.getElementById('fp-buyer-hist-panel')?.remove();
 
-    const total = orders.reduce((s, o) => {
-        const num = parseFloat((o.price || '').replace(/[^\d.]/g, ''));
-        return s + (isNaN(num) ? 0 : num);
-    }, 0);
-
+    const sums = {};
+    for (const o of orders) {
+        const raw = String(o.price || '');
+        const amount = Number.parseFloat(raw.replace(/\s/g, '').replace(',', '.'));
+        const currency = /USD|\$/i.test(raw) ? 'USD' : /EUR|€/i.test(raw) ? 'EUR' : 'RUB';
+        if (Number.isFinite(amount)) sums[currency] = (sums[currency] || 0) + amount;
+    }
+    const total = Object.entries(sums).map(([cur,value]) => `${value.toLocaleString('ru-RU', {maximumFractionDigits:2})} ${cur}`).join(' · ');
     const panel = document.createElement('div');
     panel.id = 'fp-buyer-hist-panel';
     panel.className = 'fp-buyer-hist-panel';
@@ -67,7 +52,7 @@ function renderHistoryPanel(orders, name, anchor) {
             </div>
             <button class="fp-bh-close" title="Закрыть">✕</button>
         </div>
-        <div class="fp-bh-meta">${orders.length} заказ${orders.length === 1 ? '' : (orders.length < 5 ? 'а' : 'ов')} · ~${Math.round(total).toLocaleString('ru')} ₽</div>
+        <div class="fp-bh-meta">${orders.length} заказ${orders.length === 1 ? '' : (orders.length < 5 ? 'а' : 'ов')} · ${total}</div>
         <div class="fp-bh-list">
             ${orders.slice(0, 20).map(o => `
                 <a href="https://funpay.com/orders/${o.orderId}/" target="_blank" class="fp-bh-item">

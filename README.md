@@ -25,6 +25,10 @@ Works in Chrome, Edge, Opera, Yandex Browser and other Chromium browsers.
 
 ## Features
 
+Version 3.14 adds account-scoped IndexedDB history, purchases and balance history, CSV/JSON exports, lot notes, a new-chat entry point and public order-to-lot drafts. Currency totals stay separate. Eight themes and system fonts share one palette between the popup and site panel.
+
+[FunPay Pocket for Android](android/README.md) runs chats and lot raising locally without a VPS. Continuous background work follows Android limits; see the app guide. [Private cloud migration](cloud/SECURITY.md) requires a separate Worker/database rollout.
+
 - **Analytics** — revenue by currency, average order, statuses, top buyers and products, charts by day, any period.
 - **Automation** — auto-bump with per-second timer, auto-replies and review replies by templates, auto-delivery with stock tracking, Telegram/Discord notifications.
 - **Lots** — bulk price edit, pin, duplicate, disable, delete; export/import, clone to other categories, inline price edit.

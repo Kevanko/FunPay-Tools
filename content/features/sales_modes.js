@@ -33,7 +33,7 @@
         const today = new Date(); const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
         switch (period) {
             case 'today': return { start: todayStart, end: null, label: 'сегодня' };
-            case 'yesterday': return { start: todayStart - oneDay, end: todayStart, label: 'вчера' };
+            case 'yesterday': return { ...FPTAnalytics.range('yesterday', now), label: 'вчера' };
             case '24h': return { start: now - oneDay, end: null, label: '24 часа' };
             case '7d': return { start: now - 7 * oneDay, end: null, label: '7 дней' };
             case '30d': return { start: now - 30 * oneDay, end: null, label: '30 дней' };
@@ -74,31 +74,11 @@
         return a;
     }
 
-    function getOrders(range) {
-        return new Promise(resolve => {
-            chrome.storage.local.get('fpToolsSalesData', ({ fpToolsSalesData }) => {
-                const all = fpToolsSalesData ? Object.values(fpToolsSalesData) : [];
-                let filtered = all.filter(o => {
-                    if (range.start && o.orderDate < range.start) return false;
-                    if (range.end && o.orderDate > range.end) return false;
-                    if (!statusAllowed(o.orderStatus)) return false;
-                    return true;
-                });
-                filtered = sortOrders(filtered);
-                resolve(filtered);
-            });
-        });
+    async function getOrders(range) {
+        const all = await FPTAnalytics.read('sales');
+        return sortOrders(all.filter(o => (!range.start || o.orderDate >= range.start) && (!range.end || o.orderDate < range.end) && statusAllowed(o.orderStatus)));
     }
-
-    function countStoredOrders() {
-        return new Promise(resolve => {
-            try {
-                chrome.storage.local.get('fpToolsSalesData', ({ fpToolsSalesData }) => {
-                    resolve(fpToolsSalesData ? Object.keys(fpToolsSalesData).length : 0);
-                });
-            } catch (_) { resolve(0); }
-        });
-    }
+    async function countStoredOrders() { return (await FPTAnalytics.read('sales')).length; }
 
     let _salesUpdateTriggered = false;
     function triggerSalesUpdateOnce() {
@@ -115,7 +95,6 @@
 
     // ── агрегаты ──────────────────────────────────────────────────────────────
     function aggregate(orders) {
-        const rates = { RUB: 0.011, USD: 1, EUR: 1.08 }; // приблизит. к USD для сравнения
         const byDay = {};
         const byCategory = {};
         const byStatus = { closed: 0, paid: 0, refunded: 0 };
@@ -130,7 +109,7 @@
             const dayKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
             if (!byDay[dayKey]) byDay[dayKey] = { count: 0, revenue: 0 };
             byDay[dayKey].count++;
-            if (valid) byDay[dayKey].revenue += (o.price || 0) * (rates[o.currency] || 0) / rates.RUB; // в рублях прибл.
+            if (valid && (!o.currency || o.currency === 'RUB')) byDay[dayKey].revenue += (o.price || 0);
 
             const cat = o.subcategoryName || 'Без категории';
             byCategory[cat] = (byCategory[cat] || 0) + 1;
@@ -139,7 +118,7 @@
 
             if (valid) {
                 byCurrency[o.currency] = (byCurrency[o.currency] || 0) + (o.price || 0);
-                revenueUSD += (o.price || 0) * (rates[o.currency] || 0);
+                if (o.currency === 'USD') revenueUSD += (o.price || 0);
                 count++;
             }
 
@@ -214,7 +193,7 @@
         for (let d = new Date(keys[0] + 'T00:00:00'); d <= d1; d.setDate(d.getDate() + 1)) {
             days.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
         }
-        const revChart = singleChart('Выручка по дням, ₽', days, d => (agg.byDay[d] ? agg.byDay[d].revenue : 0), v => money(v, 'RUB'), 'var(--fpt-uacc, #5b86d8)');
+        const revChart = singleChart('Выручка в RUB по дням · остальные валюты отдельно', days, d => (agg.byDay[d] ? agg.byDay[d].revenue : 0), v => money(v, 'RUB'), 'var(--fpt-uacc, #5b86d8)');
         const cntChart = singleChart('Заказы по дням, шт.', days, d => (agg.byDay[d] ? agg.byDay[d].count : 0), v => v + ' заказ.', 'var(--fpt-uacc, #5b86d8)');
         return `<div class="fp-sm-charts-stack">${revChart}${cntChart}</div>`;
     }
@@ -534,6 +513,14 @@
     }
 
     async function render() {
+        try { await renderView(); } catch (e) {
+            const view = document.getElementById('fpTools-stats-modeview');
+            if (view) view.textContent = 'Статистика недоступна: ' + e.message;
+            const cards = document.getElementById('fpTools-stats-cards');
+            if (cards) cards.style.display = 'none';
+        }
+    }
+    async function renderView() {
         ensureStyles();
         currentView = null; // переход в режим/поиск всегда выходит из дрилл-дауна
         const view = document.getElementById('fpTools-stats-modeview');
@@ -709,8 +696,9 @@
 
         const sym = { RUB: '₽', USD: '$', EUR: '€' };
         const stMap = { closed: 'Закрыт', paid: 'Оплачен', refunded: 'Возврат' };
-        let revenue = 0;
-        dayOrders.forEach(o => { if (o.orderStatus === 'closed' || o.orderStatus === 'paid') revenue += (o.price || 0); });
+        const totals = {};
+        dayOrders.forEach(o => { if (o.orderStatus === 'closed' || o.orderStatus === 'paid') {const c=o.currency||'RUB';totals[c]=(totals[c]||0)+(Number(o.price)||0);} });
+        const revenue = Object.entries(totals).map(([c,v])=>money(v,c)).join(' · ') || '0 ₽';
 
         const rows = dayOrders.map(o => {
             const d = o.orderDate ? new Date(o.orderDate) : null;
@@ -735,7 +723,7 @@
             <div class="fp-sm-card">
                 <div class="fp-sm-day-head">
                     <button class="fp-sm-back" id="fp-sm-day-back"><span class="material-symbols-rounded">arrow_back</span> Назад</button>
-                    <span class="fp-sm-card-title" style="margin:0;">${esc(dayKey)} · ${dayOrders.length} заказ. · ${Math.round(revenue).toLocaleString('ru-RU')} ₽</span>
+                    <span class="fp-sm-card-title" style="margin:0;">${esc(dayKey)} · ${dayOrders.length} заказ. · ${esc(revenue)}</span>
                 </div>
                 <div class="fp-sm-sr-list">${rows || emptyHTML('Нет заказов за этот день.')}</div>
             </div>`;
@@ -781,8 +769,9 @@
             return false;
         };
         const list = sortOrders(orders.filter(match));
-        let revenue = 0;
-        list.forEach(o => { if (o.orderStatus === 'closed' || o.orderStatus === 'paid') revenue += (o.price || 0); });
+        const totals = {};
+        list.forEach(o => { if (o.orderStatus === 'closed' || o.orderStatus === 'paid') {const c=o.currency||'RUB';totals[c]=(totals[c]||0)+(Number(o.price)||0);} });
+        const revenue = Object.entries(totals).map(([c,v])=>money(v,c)).join(' · ') || '0 ₽';
         const typeLabel = type === 'buyer' ? 'Покупатель' : (type === 'product' ? 'Товар' : 'Категория');
         const rows = list.map(o => orderRowHTML(o, true)).join('');
 
@@ -790,7 +779,7 @@
             <div class="fp-sm-card">
                 <div class="fp-sm-day-head">
                     <button class="fp-sm-back" id="fp-sm-filter-back"><span class="material-symbols-rounded">arrow_back</span> Назад</button>
-                    <span class="fp-sm-card-title" style="margin:0;">${esc(typeLabel)}: ${esc(key)} · ${list.length} зак. · ${Math.round(revenue).toLocaleString('ru-RU')} ₽</span>
+                    <span class="fp-sm-card-title" style="margin:0;">${esc(typeLabel)}: ${esc(key)} · ${list.length} зак. · ${esc(revenue)}</span>
                 </div>
                 <div class="fp-sm-sr-list">${rows || emptyHTML('Нет заказов.')}</div>
             </div>`;
@@ -819,7 +808,7 @@
         // обновление данных
         if (chrome.storage && chrome.storage.onChanged) {
             chrome.storage.onChanged.addListener((changes, area) => {
-                if (area === 'local' && changes.fpToolsSalesData && (currentMode !== 'cards' || searchQuery)) render();
+                if (area === 'local' && changes.fpToolsSalesLastUpdate && (currentMode !== 'cards' || searchQuery)) render();
             });
         }
 

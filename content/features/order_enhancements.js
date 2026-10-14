@@ -3,9 +3,7 @@
 
 // ── 1. Unconfirmed balance display ──────────────────────────────────────────
 async function initUnconfirmedBalance() {
-    const { fpToolsShowUnconfirmed, fpToolsSalesData } = await chrome.storage.local.get([
-        'fpToolsShowUnconfirmed', 'fpToolsSalesData'
-    ]);
+    const { fpToolsShowUnconfirmed } = await chrome.storage.local.get('fpToolsShowUnconfirmed');
     if (fpToolsShowUnconfirmed === false) return;
 
     // Find the sales statistics block added by misc.js
@@ -13,12 +11,13 @@ async function initUnconfirmedBalance() {
     if (!statsBlock) return;
 
     // Calculate from stored data
-    const orders = Object.values(fpToolsSalesData || {});
+    let orders;
+    try { orders = await FPTAnalytics.read('sales'); } catch (_) { return; }
     const pending = orders.filter(o => o.orderStatus === 'paid');
     if (!pending.length) return;
 
-    const pendingTotal = pending.reduce((s, o) => s + (o.price || 0), 0);
-    const currency = pending[0]?.currency === 'USD' ? '$' : (pending[0]?.currency === 'EUR' ? '€' : '₽');
+    const totals = {};
+    pending.forEach(o => {const currency=o.currency || 'RUB'; totals[currency]=(totals[currency] || 0)+(Number(o.price) || 0);});
 
     // Find the "В ожидании" row and add the sum
     const rows = statsBlock.querySelectorAll('.fp-stat-row, .stat-row, [data-stat]');
@@ -26,7 +25,7 @@ async function initUnconfirmedBalance() {
         if (row.textContent.includes('В ожидании') || row.textContent.includes('ожидании')) {
             const sum = document.createElement('span');
             sum.style.cssText = 'color:#ff9800;font-size:11px;margin-left:6px;';
-            sum.textContent = `(${Math.round(pendingTotal * 100) / 100} ${currency})`;
+            sum.textContent = '(' + Object.entries(totals).map(([currency,total]) => `${Math.round(total * 100) / 100} ${{RUB:'₽',USD:'$',EUR:'€'}[currency] || currency}`).join(' · ') + ')';
             row.appendChild(sum);
         }
     });

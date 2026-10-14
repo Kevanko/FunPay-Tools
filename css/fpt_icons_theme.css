@@ -1396,3 +1396,5 @@ button.add-image-btn .material-symbols-rounded {
     color: var(--fpt-text, #fff) !important;
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--fpt-uacc, #5b86d8) 35%, transparent) inset !important;
 }
+
+.fpt-vector-wrap{display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;font-family:inherit!important}.fpt-vector-icon{flex:none;vertical-align:middle}.fpt-brand-logo{width:36px;height:36px;object-fit:contain}.fpt-launcher-logo{width:24px;height:24px;object-fit:contain;margin-right:8px;vertical-align:middle}

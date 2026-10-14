@@ -2,3 +2,4 @@
 *.zip
 Thumbs.db
 .graphify/
+node_modules/

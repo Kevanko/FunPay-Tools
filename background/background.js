@@ -1,8 +1,21 @@
+import { initializeAppUpdates } from './app_updates.js';
+initializeAppUpdates();
+import { lotNotes } from './lot_notes_repository.js';
+import { AnalyticsRepository } from './analytics_repository.js';
+import { collectAnalytics } from './analytics_collector.js';
+import '../content/settings_schema.js';
+import { parseOffscreen, closeIdleParser } from './offscreen_client.js';
+const fetch = (url, options = {}) => {
+    const address = typeof url === 'string' ? new URL(url) : null;
+    return globalThis.fetch(url, address && ['funpay.com', 'support.funpay.com'].includes(address.hostname)
+        ? { credentials: 'include', signal: AbortSignal.timeout(30000), ...options } : options);
+};
+
 // background/background.js - FunPay Tools 2.8
 
 import { fetchAIResponse, fetchAILotGeneration, fetchAITranslation, fetchAIImageGeneration } from './ai.js';
 import { BUMP_ALARM_NAME, startAutoBump, stopAutoBump, runBumpCycle } from './autobump.js';
-import { runAutoResponderCycle, resetAutoResponderState, runMultiAccountAutoReply, withCookieLock, fpIsRateLimited, fpFetch } from './autoresponder.js';
+import { runAutoResponderCycle, resetAutoResponderState, runMultiAccountAutoReply, withCookieLock, fpIsRateLimited, fpFetch, fetchAccountPage } from './autoresponder.js';
 import { startEngine, stopEngine, onHeartbeat, onKeepalivePing, ENGINE_HEARTBEAT_ALARM } from './fpt_engine.js';
 import { startSmartBump, stopSmartBump, runSmartBumpCycle, SMART_BUMP_ALARM } from './smart_bump.js';
 import {
@@ -19,34 +32,27 @@ const RETRY_LIMIT = 5;
 const RETRY_DELAY = 5000; // 5 секунд
 
 // --- ФИНАЛЬНАЯ, ИСПРАВЛЕННАЯ ФУНКЦИЯ СБОРА СТАТИСТИКИ БЕЗ ОГРАНИЧЕНИЙ ---
-async function runSalesUpdateCycle() {
+let _salesCyclePromise = null;
+async function runSalesUpdateCycle(expectedAccountId = null) {
+    if (expectedAccountId) { const auth = await withCookieLock(() => getAuthDetailsForBackground()); if (String(auth.userId) !== String(expectedAccountId)) throw new Error('Аккаунт изменился'); }
+    if (!_salesCyclePromise) _salesCyclePromise = runSalesUpdateCycleInner().finally(() => { _salesCyclePromise = null; });
+    return _salesCyclePromise;
+}
+async function runSalesUpdateCycleInner() {
     console.log("FP Tools: Запуск полного цикла сбора статистики продаж...");
     try {
-        const auth = await getAuthDetailsForBackground();
+        const auth = await withCookieLock(() => getAuthDetailsForBackground());
         if (!auth.golden_key) throw new Error("Не удалось получить golden_key для сбора статистики.");
 
-        // Продажи храним ОТДЕЛЬНО ПО АККАУНТУ (ключ с userId) — иначе заказы разных
-        // аккаунтов сваливаются в один общий объект и графики смешиваются. Глобальный
-        // fpToolsSalesData — «зеркало» активного аккаунта для отрисовки.
-        //
-        // ВАЖНО: заказы /orders/trade грузятся по АКТИВНОЙ сессии (ambient-cookie), а
-        // userId из getAuthDetailsForBackground берётся из вкладок и может ОТСТАВАТЬ
-        // (старая вкладка другого аккаунта) → заказы лягут под чужой ключ = смешивание.
-        // Поэтому userId берём из ТОЙ ЖЕ активной сессии (прямой запрос с credentials).
-        let uid = '';
-        try {
-            const me = await fetch('https://funpay.com/', { credentials: 'include', cache: 'no-store' });
-            const mh = await me.text();
-            const mm = mh.match(/data-app-data="([^"]+)"/);
-            if (mm) { const d = JSON.parse(mm[1].replace(/&quot;/g, '"')); const u = Array.isArray(d) ? d[0] : d; if (u && u.userId) uid = String(u.userId); }
-        } catch (_) {}
-        if (!uid && auth.userId) uid = String(auth.userId);   // запасной вариант
+        const uid = String(auth.userId || '');
+        if (!/^\d+$/.test(uid)) throw new Error('Не подтвержден владелец истории');
         const K_DATA = uid ? `fpToolsSalesData__${uid}` : 'fpToolsSalesData';
         const K_FIRST = uid ? `fpToolsFirstOrderId__${uid}` : 'fpToolsFirstOrderId';
         const K_LAST = uid ? `fpToolsLastOrderId__${uid}` : 'fpToolsLastOrderId';
 
         let store = await chrome.storage.local.get([K_DATA, K_FIRST, K_LAST]);
-        let savedOrders = store[K_DATA] || {};
+        await AnalyticsRepository.migrateSales(uid);
+        let savedOrders = Object.fromEntries((await AnalyticsRepository.all(uid, 'sales')).map(o => [o.orderId, o]));
         let firstOrderId = store[K_FIRST];
         let lastOrderId = store[K_LAST];
 
@@ -62,7 +68,7 @@ async function runSalesUpdateCycle() {
             // and retry instead of throwing and killing the whole cycle.
             let response;
             for (let attempt = 0; attempt < 4; attempt++) {
-                response = await fetch(url, options);
+                response = await fetchAccountPage(auth.golden_key, uid, url, options);
                 if (response.status === 429 || response.status >= 500) {
                     await new Promise(r => setTimeout(r, 3000 * (attempt + 1) + Math.random() * 1000));
                     continue;
@@ -71,17 +77,15 @@ async function runSalesUpdateCycle() {
             }
             if (!response.ok) throw new Error(`Ошибка сети: ${response.status}`);
             const html = await response.text();
-            return await parseHtmlViaOffscreen(html, 'parseSalesPage');
+            const parsed = await parseHtmlViaOffscreen(html, 'parseSalesPage');
+            if (!Array.isArray(parsed?.orders)) throw new Error('Не удалось разобрать историю продаж');
+            await AnalyticsRepository.put(uid, 'sales', parsed.orders);
+            return parsed;
         };
 
         const saveSalesData = async (orders, firstId, lastId) => {
-            await chrome.storage.local.set({
-                // по аккаунту
-                [K_DATA]: orders, [K_FIRST]: firstId, [K_LAST]: lastId,
-                // зеркало для отрисовки активного аккаунта (его читают графики/главная)
-                fpToolsSalesData: orders, fpToolsFirstOrderId: firstId, fpToolsLastOrderId: lastId,
-                fpToolsSalesLastUpdate: Date.now()
-            });
+            await AnalyticsRepository.setMeta(uid, 'sales', 'lastUpdate', Date.now());
+            await chrome.storage.local.set({ [K_FIRST]: firstId, [K_LAST]: lastId, fpToolsSalesLastUpdate: Date.now() });
         };
 
         if (firstOrderId) {
@@ -158,6 +162,7 @@ async function runSalesUpdateCycle() {
 
     } catch (e) {
         console.error(`FP Tools: Ошибка в цикле сбора статистики: ${e.message}`);
+        throw e;
     } finally {
         console.log("FP Tools: Сбор статистики продаж завершен.");
         await chrome.storage.local.set({ fpToolsSalesLastUpdate: Date.now() });
@@ -255,30 +260,6 @@ async function getAuthDetailsForBackground() {
     const phpSessIdCookie = await chrome.cookies.get({ url: 'https://funpay.com', name: 'PHPSESSID' });
     const phpsessid = phpSessIdCookie?.value || '';
 
-    const tabs = await chrome.tabs.query({ url: "https://funpay.com/*" });
-    for (const tab of tabs) {
-        try {
-            if (tab.discarded) continue;
-            const response = await chrome.tabs.sendMessage(tab.id, { action: "getAppData" });
-            if (response && response.success) {
-                const appData = Array.isArray(response.data) ? response.data[0] : response.data;
-                if (appData && appData['csrf-token'] && appData.userId) {
-                    console.log("FP Tools: Auth-данные получены из активной вкладки.");
-                    return {
-                        golden_key: golden_key,
-                        phpsessid: phpsessid,
-                        csrf_token: appData['csrf-token'],
-                        userId: appData.userId,
-                        username: appData.userName,
-                    };
-                }
-            }
-        } catch (e) {
-            console.warn(`FP Tools: Не удалось получить appData из вкладки ${tab.id}. Пробую следующую.`);
-        }
-    }
-
-    console.log("FP Tools: Не удалось получить appData от вкладок, делаю прямой запрос к FunPay...");
     try {
         const response = await fetch("https://funpay.com/", {
             headers: { "cookie": `golden_key=${golden_key}` }
@@ -406,9 +387,10 @@ async function tgRunBump() {
 // Сводка продаж для команды /sales.
 async function tgSalesSummary() {
     try {
-        const { fpToolsSalesData } = await chrome.storage.local.get('fpToolsSalesData');
-        if (!fpToolsSalesData) return null;
-        const all = Object.values(fpToolsSalesData);
+        const auth = await withCookieLock(() => getAuthDetailsForBackground());
+        const uid = String(auth.userId || '');
+        await AnalyticsRepository.migrateSales(uid);
+        const all = await AnalyticsRepository.all(uid, 'sales');
         if (!all.length) return null;
         const now = Date.now(), day = 864e5;
         const t0 = new Date(); const todayStart = new Date(t0.getFullYear(), t0.getMonth(), t0.getDate()).getTime();
@@ -504,36 +486,7 @@ async function runTelegramCheckCycle() {
 // Создание сериализовано: два параллельных вызова (например, сбор статистики
 // и уведомления) оба видели «документа нет» и второй createDocument падал с
 // "Only a single offscreen document may be created".
-let _offscreenCreatePromise = null;
-async function ensureOffscreenDocument() {
-    const existingContexts = await chrome.runtime.getContexts({
-        contextTypes: ['OFFSCREEN_DOCUMENT'],
-        documentUrls: [chrome.runtime.getURL(OFFSCREEN_DOCUMENT_PATH)]
-    });
-    if (existingContexts.length) return;
-    if (!_offscreenCreatePromise) {
-        _offscreenCreatePromise = chrome.offscreen.createDocument({
-            url: OFFSCREEN_DOCUMENT_PATH,
-            reasons: ['DOM_PARSER'],
-            justification: 'Parsing FunPay page HTML',
-        }).catch(e => {
-            // гонку с уже созданным документом не считаем ошибкой
-            if (!String(e && e.message || '').includes('single offscreen')) throw e;
-        }).finally(() => { _offscreenCreatePromise = null; });
-    }
-    await _offscreenCreatePromise;
-}
-
-async function parseHtmlViaOffscreen(html, action, extra = {}) {
-    await ensureOffscreenDocument();
-
-    return await chrome.runtime.sendMessage({
-        target: 'offscreen',
-        action: action,
-        html: html,
-        ...extra
-    });
-}
+const parseHtmlViaOffscreen = parseOffscreen;
 
 async function cloneBuildFieldsInternal(auth, nodeId, attributes, fillDefaults) {
     if (!nodeId) throw new Error('Неизвестна подкатегория (node) лота.');
@@ -866,7 +819,7 @@ async function _fptFetchAsAccount(goldenKey) {
                 addRules: [{
                     id: FPT_DNR_SNAP_RULE, priority: 1,
                     action: { type: 'modifyHeaders', requestHeaders: [{ header: 'cookie', operation: 'set', value: `golden_key=${goldenKey}` }] },
-                    condition: { urlFilter: '_fptsnap=1', resourceTypes: ['main_frame', 'xmlhttprequest', 'other'] }
+                    condition: { regexFilter: '^https://funpay\\.com/.*[?&]_fptsnap=1(?:&|$)', requestDomains: ['funpay.com'], initiatorDomains: [chrome.runtime.id], resourceTypes: ['xmlhttprequest', 'other'] }
                 }]
             });
             const resp = await fpFetch(url, { credentials: 'omit', cache: 'no-store' });
@@ -991,34 +944,73 @@ async function _fptGunzipB64(b64) {
     const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
     return new TextDecoder().decode(await new Response(stream).arrayBuffer());
 }
-async function fptCloudPush(id, settings, updatedAt, baseVersion) {
+function fptRandomSecret() {
+    return Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, '0')).join('');
+}
+async function fptCloudCapability(accountId) {
+    if (!/^\d+$/.test(String(accountId || ''))) throw new Error('Недопустимый аккаунт');
+    const auth = await getAuthDetailsForBackground();
+    if (String(auth.userId) !== String(accountId)) throw new Error('Аккаунт страницы больше не активен');
+    const { fptCloudCapabilities = {} } = await chrome.storage.local.get('fptCloudCapabilities');
+    let cap = fptCloudCapabilities[accountId];
+    if (!cap) {
+        cap = { id: 'p_' + fptRandomSecret(), token: fptRandomSecret() };
+        fptCloudCapabilities[accountId] = cap;
+        const old = await chrome.storage.local.get(['fptCloudVer', 'fptCloudLastHash']);
+        await chrome.storage.local.set({ fptCloudCapabilities, fptCloudVer: { ...(old.fptCloudVer || {}), [accountId]: 0 }, fptCloudLastHash: { ...(old.fptCloudLastHash || {}), [accountId]: '' } });
+    }
+    return cap;
+}
+let _cloudCapabilityChain = Promise.resolve();
+function fptGetCloudCapability(accountId) {
+    const next = _cloudCapabilityChain.then(() => withCookieLock(() => fptCloudCapability(accountId)));
+    _cloudCapabilityChain = next.catch(() => {});
+    return next;
+}
+async function fptCloudPush(accountId, settings, updatedAt, baseVersion) {
+    const { id, token } = await fptGetCloudCapability(accountId);
     if (!id) return { ok: false, error: 'no_id' };
-    const bundle = await _fptGzipB64(JSON.stringify(settings || {}));
-    const res = await fetch(`${FPT_CLOUD_ENDPOINT}/s/${encodeURIComponent(id)}`, {
+    const clean = { s: globalThis.FPTSettingsSchema.sanitize(settings?.s || {}, { cloud: true }), t: {} };
+    for (const [k, value] of Object.entries(settings?.t || {})) if (globalThis.FPTSettingsSchema.keys.includes(k) && Number.isFinite(value)) clean.t[k] = value;
+    const bundle = await _fptGzipB64(JSON.stringify(clean));
+    const res = await fetch(`${FPT_CLOUD_ENDPOINT}/v2/s/${encodeURIComponent(id)}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        signal: AbortSignal.timeout(30000), redirect: 'error',
         body: JSON.stringify({ bundle, updated_at: updatedAt || Date.now(), baseVersion: baseVersion || 0 })
     });
     let j = {}; try { j = await res.json(); } catch (_) {}
     // on 409 the server returns the CURRENT bundle — decode it so the client can field-merge
     if (res.status === 409 && typeof j.bundle === 'string') {
-        try { j.settings = JSON.parse(await _fptGunzipB64(j.bundle)); } catch (_) {}
+        try { j.settings = JSON.parse(await _fptGunzipB64(j.bundle));
+        settings.s = globalThis.FPTSettingsSchema.sanitize(settings.s || {}, { cloud: true }); } catch (_) {}
     }
     return { ok: res.ok, status: res.status, ...j };
 }
-async function fptCloudPull(id) {
+async function fptCloudPull(accountId) {
+    const { id, token } = await fptGetCloudCapability(accountId);
     if (!id) return { ok: false, error: 'no_id' };
-    const res = await fetch(`${FPT_CLOUD_ENDPOINT}/s/${encodeURIComponent(id)}`);
+    const res = await fetch(`${FPT_CLOUD_ENDPOINT}/v2/s/${encodeURIComponent(id)}`, { headers: { Authorization: 'Bearer ' + token }, signal: AbortSignal.timeout(30000), redirect: 'error' });
     if (res.status === 404) return { ok: true, exists: false };
     if (!res.ok) return { ok: false, status: res.status };
     const j = await res.json();
     let settings = {};
-    try { settings = JSON.parse(await _fptGunzipB64(j.bundle)); } catch (_) { return { ok: false, error: 'decode' }; }
+    try { settings = JSON.parse(await _fptGunzipB64(j.bundle));
+        settings.s = globalThis.FPTSettingsSchema.sanitize(settings.s || {}, { cloud: true }); } catch (_) { return { ok: false, error: 'decode' }; }
     return { ok: true, exists: true, settings, updated_at: j.updated_at, version: j.version };
 }
 
 // --- Главный обработчик сообщений ---
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request?.action === 'fptOffscreenIdle' && sender.url === chrome.runtime.getURL('offscreen/offscreen.html')) {
+        (async () => {
+            const { fpToolsAutoReplies = {}, fptMultiAccountAR } = await chrome.storage.local.get(['fpToolsAutoReplies', 'fptMultiAccountAR']);
+            const enabled = fptMultiAccountAR || Object.keys(fpToolsAutoReplies).some(k => /Enabled$/.test(k) && fpToolsAutoReplies[k]);
+            await closeIdleParser(request.lastActivityAt, enabled);
+            sendResponse({ ok: true });
+        })();
+        return true;
+    }
     // 3.0: offscreen keepalive ping - receiving it resets the worker idle timer.
     if (request && request.target === 'background' && request.action === 'fptEngineKeepalive') {
         onKeepalivePing();
@@ -1033,7 +1025,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 const { fptVps } = await chrome.storage.local.get('fptVps');
                 const { url, token } = fptVps || {};
                 if (!url || !token) { sendResponse({ ok: false, error: 'нет подключения' }); return; }
+                const endpoint = new URL(url);
+                if (endpoint.username || endpoint.password) throw new Error('Уберите логин и пароль из URL VPS');
+                if (endpoint.protocol !== 'https:' && !(endpoint.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(endpoint.hostname))) throw new Error('VPS требует HTTPS или локальный SSH-туннель');
+                if (!/^\/(accounts|stats|log|health)(\?|$)/.test(request.path || '')) throw new Error('Недопустимый путь VPS');
                 const res = await fetch(url.replace(/\/+$/, '') + request.path, {
+                    signal: AbortSignal.timeout(30000), redirect: 'error',
                     method: request.method || 'GET',
                     headers: { authorization: 'Bearer ' + token, ...(request.body ? { 'content-type': 'application/json' } : {}) },
                     body: request.body ? JSON.stringify(request.body) : undefined
@@ -1044,13 +1041,128 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         })();
         return true;
     }
+    if (request.action === 'fptRetryUncertain') {
+        (async () => {
+            try {
+                await withCookieLock(async () => {
+                    const auth = await getAuthDetailsForBackground();
+                    if (String(auth.userId) !== String(request.accountId) || !/^[a-f0-9]{64}$/.test(request.id || '')) throw new Error('Аккаунт изменился или неверная запись');
+                    const key = 'fptOutbox__' + auth.userId;
+                    const state = await chrome.storage.local.get(key);
+                    const ledger = state[key] || {};
+                    if (ledger[request.id]?.status !== 'uncertain') throw new Error('Запись уже обработана');
+                    delete ledger[request.id];
+                    await chrome.storage.local.set({ [key]: ledger });
+                });
+                sendResponse({ ok: true });
+            } catch (e) { sendResponse({ ok: false, error: e.message }); }
+        })();
+        return true;
+    }
+    if (request.action === 'fptCloudExportCapability') {
+        fptGetCloudCapability(request.accountId).then(c => sendResponse({ ok: true, schema: 1, accountId: String(request.accountId), ...c })).catch(e => sendResponse({ ok: false, error: e.message }));
+        return true;
+    }
+    if (request.action === 'fptCloudImportCapability') {
+        (async () => {
+            try {
+                const cap = request.capability;
+                if (!cap || cap.schema !== 1 || String(cap.accountId) !== String(request.accountId) || !/^p_[a-f0-9]{64}$/.test(cap.id) || !/^[a-f0-9]{64}$/.test(cap.token)) throw new Error('Неверный ключ синхронизации');
+                await withCookieLock(async () => {
+                    const auth = await getAuthDetailsForBackground();
+                    if (String(auth.userId) !== String(request.accountId)) throw new Error('Аккаунт изменился');
+                    const state = await chrome.storage.local.get(['fptCloudCapabilities', 'fptCloudVer', 'fptCloudLastHash']);
+                    await chrome.storage.local.set({ fptCloudCapabilities: { ...(state.fptCloudCapabilities || {}), [request.accountId]: { id: cap.id, token: cap.token } }, fptCloudVer: { ...(state.fptCloudVer || {}), [request.accountId]: 0 }, fptCloudLastHash: { ...(state.fptCloudLastHash || {}), [request.accountId]: '' } });
+                });
+                sendResponse({ ok: true });
+            } catch (e) { sendResponse({ ok: false, error: e.message }); }
+        })();
+        return true;
+    }
+    if (request.action === 'fptCloudIdentity') {
+        fptGetCloudCapability(request.accountId).then(c => sendResponse({ ok: true, id: c.id })).catch(e => sendResponse({ ok: false, error: e.message }));
+        return true;
+    }
+    if (request.action === 'fptUpdateAnalytics') {
+        (async () => {
+            try {
+                if (request.kind === 'sales') {
+                    const auth = await withCookieLock(() => getAuthDetailsForBackground());
+                    if (String(auth.userId) !== String(request.accountId)) throw new Error('Аккаунт изменился');
+                    await runSalesUpdateCycle(request.accountId);
+                    const current = await withCookieLock(() => getAuthDetailsForBackground());
+                    if (String(current.userId) !== String(request.accountId)) throw new Error('Аккаунт изменился');
+                    sendResponse({ ok: true, accountId: String(request.accountId), kind: 'sales' });
+                    return;
+                }
+                if (!['purchases', 'finance'].includes(request.kind)) throw new Error('Неверный источник истории');
+                const result = await withCookieLock(async () => {
+                    const checkAccount = async () => {
+                        const auth = await getAuthDetailsForBackground();
+                        if (String(auth.userId) !== String(request.accountId)) throw new Error('Аккаунт изменился');
+                        return String(auth.userId);
+                    };
+                    const fetchPage = async cursor => {
+                        const url = request.kind === 'purchases' ? 'https://funpay.com/orders/' : 'https://funpay.com/users/transactions';
+                        const params = new URLSearchParams();
+                        if (cursor) params.set('continue', cursor);
+                        if (request.kind === 'finance') { params.set('user_id', request.accountId); params.set('filter', ''); }
+                        const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body: params });
+                        if (!response.ok) throw new Error('История: HTTP ' + response.status);
+                        return response.text();
+                    };
+                    return collectAnalytics(request.accountId, request.kind, { fetchPage, parsePage: html => parseOffscreen(html, request.kind === 'purchases' ? 'parsePurchasesPage' : 'parseFinancePage'), checkAccount });
+                });
+                sendResponse(result);
+            } catch (e) { sendResponse({ ok: false, accountId: String(request.accountId), error: e.message }); }
+        })();
+        return true;
+    }
+    if (request.action === 'fptLotNotes') {
+        (async () => {
+            try {
+                const data = await withCookieLock(async () => {
+                    const auth = await getAuthDetailsForBackground();
+                    if (String(auth.userId) !== String(request.accountId)) throw new Error('Аккаунт изменился');
+                    return lotNotes(request.accountId, { op: request.op, offerId: request.offerId, text: request.text, title: request.title });
+                });
+                sendResponse({ ok: true, accountId: String(request.accountId), data });
+            } catch (e) { sendResponse({ ok: false, error: e.message }); }
+        })();
+        return true;
+    }
+    if (request.action === 'fptGetAnalytics') {
+        (async () => {
+            try {
+                const rows = await withCookieLock(async () => {
+                    const auth = await getAuthDetailsForBackground();
+                    if (String(auth.userId) !== String(request.accountId)) throw new Error('Аккаунт изменился');
+                    if (!['sales', 'purchases', 'finance'].includes(request.kind)) throw new Error('Неверный источник истории');
+                    if (request.kind === 'sales') await AnalyticsRepository.migrateSales(request.accountId);
+                    return AnalyticsRepository.all(request.accountId, request.kind);
+                });
+                sendResponse({ ok: true, accountId: String(request.accountId), rows });
+            } catch (e) { sendResponse({ ok: false, accountId: String(request.accountId), error: e.message }); }
+        })();
+        return true;
+    }
+    if (request.action === 'fptMoneyQuote') {
+        (async()=>{try{
+            const auth=await withCookieLock(()=>getAuthDetailsForBackground());const accountId=String(auth.userId);
+            if(accountId!==String(request.accountId)||!/^\d+$/.test(String(request.nodeId))||!Number.isFinite(request.price)||request.price<=0||request.price>100000000)throw Error('Неверный аккаунт или сумма расчёта');
+            const res=await fetchAccountPage(auth.golden_key,accountId,'https://funpay.com/lots/calc',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8','X-Requested-With':'XMLHttpRequest'},body:new URLSearchParams({nodeId:String(request.nodeId),price:String(request.price)})});
+            if(!res.ok)throw Error('FunPay не ответил на расчёт');const data=await res.json();if(data.error||!Array.isArray(data.methods))throw Error('FunPay не вернул способы оплаты');
+            const methods=data.methods.map((m,i)=>({key:String(m.id||m.name||i)+':'+String(m.unit||''),name:String(m.name||m.title||'Способ '+(i+1)),unit:String(m.unit||''),buyer:Number(String(m.price).replace(/\s/g,'').replace(',','.'))})).filter(m=>m.unit&&Number.isFinite(m.buyer)&&m.buyer>0);
+            sendResponse({ok:true,accountId,methods});
+        }catch(e){sendResponse({ok:false,error:e.message});}})();return true;
+    }
     // Cloud settings sync: gzip + network in the SW; content sends only settings (no creds).
     if (request.action === 'fptCloudPush') {
-        (async () => { try { sendResponse(await fptCloudPush(request.id, request.settings, request.updatedAt, request.baseVersion)); } catch (e) { sendResponse({ ok: false, error: e.message }); } })();
+        (async () => { try { sendResponse(await fptCloudPush(request.accountId, request.settings, request.updatedAt, request.baseVersion)); } catch (e) { sendResponse({ ok: false, error: e.message }); } })();
         return true;
     }
     if (request.action === 'fptCloudPull') {
-        (async () => { try { sendResponse(await fptCloudPull(request.id)); } catch (e) { sendResponse({ ok: false, error: e.message }); } })();
+        (async () => { try { sendResponse(await fptCloudPull(request.accountId)); } catch (e) { sendResponse({ ok: false, error: e.message }); } })();
         return true;
     }
     // Общий реестр кастомных ников (видны всем пользователям расширения).
@@ -1797,6 +1909,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 // чистим И общий ключ, И пер-аккаунтный ключ активного аккаунта
                 const auth = await getAuthDetailsForBackground();
                 const uid = auth && auth.userId ? String(auth.userId) : '';
+                if (!uid) throw new Error('Не подтверждён аккаунт');
+                await AnalyticsRepository.clear(uid, 'sales');
                 const keys = ['fpToolsSalesData', 'fpToolsFirstOrderId', 'fpToolsLastOrderId', 'fpToolsSalesLastUpdate'];
                 if (uid) keys.push(`fpToolsSalesData__${uid}`, `fpToolsFirstOrderId__${uid}`, `fpToolsLastOrderId__${uid}`);
                 await chrome.storage.local.remove(keys);

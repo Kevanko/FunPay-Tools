@@ -157,6 +157,11 @@
                 showButtonStyler(e.clientX, e.clientY);
             }
         });
+        const openRequestedPage = () => {
+            if (/^#fpt-page=[a-z_]+$/.test(window.location.hash)) button?.click();
+        };
+        window.addEventListener('hashchange', openRequestedPage);
+        setTimeout(openRequestedPage, 0);
     }
 
     function addFpToolsButton() {
@@ -182,7 +187,7 @@
 
         const userMenuItem = rightNav.querySelector('li.dropdown.hidden-sm.hidden-xs');
         const toolsMenu = createElement('li', { class: 'dropdown fp-tools-header-item' });
-        toolsMenu.innerHTML = `<a role="button" tabindex="0" style="font-weight: 650; cursor: pointer; user-select: none;" id="fpToolsButton" data-fpt-location="header">FP Tools<span></span></a>`;
+        toolsMenu.innerHTML = `<a role="button" tabindex="0" style="font-weight: 650; cursor: pointer; user-select: none;" id="fpToolsButton" data-fpt-location="header"><img class="fpt-launcher-logo" src="${chrome.runtime.getURL("icons/brand-mark.png")}" alt="">FP Tools<span></span></a>`;
         if (userMenuItem) {
             rightNav.insertBefore(toolsMenu, userMenuItem);
         } else {
@@ -222,6 +227,7 @@
             fontWeight: '700',
             cursor: 'pointer'
         }, 'FP Tools');
+        button.innerHTML = '<img class="fpt-launcher-logo" src="' + chrome.runtime.getURL('icons/brand-mark.png') + '" alt="">FP Tools';
         button.dataset.fptLocation = 'floating';
         document.body.appendChild(button);
         wireFpToolsButton(button);
