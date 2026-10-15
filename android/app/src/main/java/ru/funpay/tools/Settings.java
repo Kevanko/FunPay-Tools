@@ -11,6 +11,8 @@ final class Settings {
     Settings(Context c) { context=c.getApplicationContext();p=c.getSharedPreferences("preferences",Context.MODE_PRIVATE); }
     String theme(){return p.getString("theme","clay");}
     int font(){return p.getInt("font",0);}
+    Palette palette(){JSONObject custom=config().optJSONObject("fpToolsTheme");return new Palette(theme(),custom!=null&&theme().equals(custom.optString("sitePreset",theme()))?custom:null);}
+    void appearance(String key,Object value){try{JSONObject cfg=config(),theme=cfg.optJSONObject("fpToolsTheme");if(theme==null)theme=new JSONObject();theme.put("sitePreset",theme()).put(key,value);if(key.equals("bgColor1"))theme.put("linkColor",value).put("accentMode","static");cfg.put("fpToolsTheme",theme);save(cfg);}catch(JSONException ignored){}}
     void theme(String id){p.edit().putString("theme",id).apply();}
     void font(int index){p.edit().putInt("font",index).apply();}
     void chooseFont(int index){font(index);try{JSONObject cfg=config(),theme=cfg.optJSONObject("fpToolsTheme");if(theme==null)theme=new JSONObject();theme.put("font",new String[]{"Manrope","Trebuchet MS","Georgia","Consolas","Tahoma","Segoe UI"}[Math.max(0,Math.min(5,index))]);cfg.put("fpToolsTheme",theme);save(cfg);}catch(JSONException ignored){}}

@@ -23,12 +23,14 @@ final class AppearanceBackground extends View {
     static View wrap(Activity activity,View content,Palette palette,Settings settings){
         FrameLayout frame=new FrameLayout(activity);frame.addView(new AppearanceBackground(activity,palette,settings),new FrameLayout.LayoutParams(-1,-1));frame.addView(content,new FrameLayout.LayoutParams(-1,-1));return frame;
     }
-    private void updateMotion(boolean visible){removeCallbacks(frame);PowerManager power=(PowerManager)getContext().getSystemService(Context.POWER_SERVICE);animate=visible&&motion&&!style.equals("none")&&android.provider.Settings.Global.getFloat(getContext().getContentResolver(),android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,1)>0&&!power.isPowerSaveMode();if(visible)invalidate();}
+    private boolean motionAllowed(){PowerManager power=(PowerManager)getContext().getSystemService(Context.POWER_SERVICE);return isShown()&&getWindowVisibility()==VISIBLE&&hasWindowFocus()&&motion&&!style.equals("none")&&android.provider.Settings.Global.getFloat(getContext().getContentResolver(),android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,1)>0&&!power.isPowerSaveMode();}
+    private void updateMotion(boolean visible){removeCallbacks(frame);animate=visible&&motionAllowed();if(visible)invalidate();}
+    @Override protected void onAttachedToWindow(){super.onAttachedToWindow();post(()->updateMotion(getWindowVisibility()==VISIBLE));}
     @Override protected void onWindowVisibilityChanged(int visibility){super.onWindowVisibilityChanged(visibility);updateMotion(visibility==VISIBLE&&hasWindowFocus());}
     @Override public void onWindowFocusChanged(boolean focus){super.onWindowFocusChanged(focus);updateMotion(focus&&getWindowVisibility()==VISIBLE);}
     @Override protected void onDetachedFromWindow(){removeCallbacks(frame);super.onDetachedFromWindow();}
     @Override protected void onDraw(Canvas canvas){
-        super.onDraw(canvas);canvas.drawColor(palette.bg);if(style.equals("none"))return;
+        super.onDraw(canvas);animate=motionAllowed();canvas.drawColor(palette.bg);if(style.equals("none"))return;
         float width=getWidth(),height=getHeight(),phase=animate?(android.os.SystemClock.uptimeMillis()%60000)/60000f*(float)(2*Math.PI):0;
         paint.setColor(style.equals("cobalt")?Color.rgb(80,118,183):palette.accent);paint.setAlpha(palette.dark?28:16);paint.setStyle(Paint.Style.FILL);
         if(style.equals("grid")){paint.setStrokeWidth(getResources().getDisplayMetrics().density);float step=32*getResources().getDisplayMetrics().density;for(float x=0;x<width;x+=step)canvas.drawLine(x,0,x,height,paint);for(float y=0;y<height;y+=step)canvas.drawLine(0,y,width,y,paint);}
