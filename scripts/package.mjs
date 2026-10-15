@@ -11,3 +11,8 @@ for(const file of ['background','content','css','popup','icons','fonts','offscre
 const archive=path.join(destination,`FunPay-Tools-${manifest.version}.zip`);
 fs.writeFileSync(archive,zipSync(entries,{level:6}));
 console.log(archive);
+const updaterEntries={};
+for(const file of ['install-updater.ps1','updater_host.py','README.md'])updaterEntries[file]=[new Uint8Array(fs.readFileSync(path.join('desktop',file))),{mtime:new Date('2026-01-01T00:00:00Z')}];
+const updaterArchive=path.join(destination,`FunPay-Tools-Windows-Updater-${manifest.version}.zip`);
+fs.writeFileSync(updaterArchive,zipSync(updaterEntries,{level:6}));
+console.log(updaterArchive);

@@ -23,6 +23,8 @@
 
 Works in Chrome, Edge, Opera, Yandex Browser and other Chromium browsers.
 
+For GitHub auto-updates in Chrome on Windows, install the [local updater](desktop/README.md). It maintains a separate extension copy and verifies release SHA-256. Moving from another folder requires a one-time settings export and import.
+
 ## Features
 
 Version 3.14 adds account-scoped IndexedDB history, purchases and balance history, CSV/JSON exports, lot notes, a new-chat entry point and public order-to-lot drafts. Currency totals stay separate. Eight themes and system fonts share one palette between the popup and site panel.
@@ -33,7 +35,7 @@ Version 3.14 adds account-scoped IndexedDB history, purchases and balance histor
 - **Automation** — auto-bump with per-second timer, auto-replies and review replies by templates, auto-delivery with stock tracking, Telegram/Discord notifications.
 - **Lots** — bulk price edit, pin, duplicate, disable, delete; export/import, clone to other categories, inline price edit.
 - **Chat** — multi-image messages, search in dialog, templates and slash commands, buyer history, AI assistant.
-- **UI** — four themes (graphite, obsidian, blue-gray, light), custom accent, no flash on page load.
+- **UI** — eight themes with different typography, spacing and panel shapes; custom colors and procedural wallpapers.
 
 ![Command center](assets/screen_home.png)
 

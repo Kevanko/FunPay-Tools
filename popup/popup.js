@@ -90,7 +90,7 @@
   ];
   const PAGES = {
     home: ["Главная", "general"],
-    phone: ["На телефон", "general"],
+    phone: ["На телефон", "phone"],
     lots: ["Лоты", "lot_io"],
     autobump: ["Авто-поднятие", "autobump"],
     delivery: ["Авто-выдача", "auto_delivery"],
@@ -206,6 +206,11 @@
     Object.entries(v).forEach(([k, value]) =>
       document.documentElement.style.setProperty(k, value),
     );
+    const profile=fptDesignMetrics(t);
+    document.documentElement.style.setProperty("--r-md",profile.radius+"px");
+    document.documentElement.style.setProperty("--r-lg",profile.panel+"px");
+    document.documentElement.style.setProperty("--design-gap",profile.gap+"px");
+    document.documentElement.setAttribute?.("data-design",t.sitePreset||"graphite");
     document.documentElement.style.colorScheme = p.scheme;
   }
   function nav(filter = "") {
@@ -398,7 +403,7 @@
               '"><span class="fpt-theme-prev" style="background:' +
               FPT_SITE_PRESETS[k].containerBgColor +
               '"></span><span class="fpt-theme-label">' +
-              LABELS[k] +
+              (FPT_DESIGN_PROFILES[k]?.label||LABELS[k]) +
               "</span></button>",
           )
           .join("") +
@@ -411,7 +416,7 @@
             esc(f) +
             "</option>",
         ).join("") +
-        '</select></label><p class="fpt-desc">Пользовательские цвета сохраняются при выборе пресета. Точная настройка и сброс доступны в редакторе.</p>' +
+        '</select></label><div class="fpt-appearance-fields"><label>Акцент<input id="theme-accent" type="color" value="'+esc(t.bgColor1||FPT_THEME_ACCENTS[t.sitePreset]||'#5b86d8')+'"></label><label>Панели<input id="theme-surface" type="color" value="'+esc(t.containerBgColor||'#1d2028')+'"></label><label>Текст<input id="theme-text" type="color" value="'+esc(t.textColor||'#f1f3f7')+'"></label></div><label>Скругления<input id="theme-radius" type="range" min="0" max="28" value="'+Number(t.borderRadius??10)+'"></label><label>Обои<select class="inp" id="theme-wallpaper">'+[['none','Без обоев'],['dunes','Дюны'],['mesh','Сетка цвета'],['grid','Чертёж'],['cobalt','Кобальт'],['aurora','Сияние'],['drift','Плавное движение']].map(([value,label])=>'<option value="'+value+'" '+((t.wallpaper||'none')===value?'selected':'')+'>'+label+'</option>').join('')+'</select></label><p class="fpt-desc">Профиль меняет палитру, шрифт, плотность и скругления. Индивидуальные настройки задаются после выбора профиля.</p>' +
         editButton(id, "Цвета, обои и дополнительные настройки");
     } else if (id === "settings")
       body =
@@ -515,8 +520,9 @@
     if (id === "appearance")
       document.getElementById("font").onchange = (e) =>
         saveTheme({ font: e.target.value });
+    if(id === "appearance"){for(const [field,key] of [["theme-accent","bgColor1"],["theme-surface","containerBgColor"],["theme-text","textColor"],["theme-radius","borderRadius"],["theme-wallpaper","wallpaper"]])document.getElementById(field).onchange=e=>{const value=key==="borderRadius"?Number(e.target.value):e.target.value;saveTheme({[key]:value,...(key==="bgColor1"?{linkColor:value,accentMode:"static"}:{}),...(key==="wallpaper"?{bgImage:"",bgVideo:""}:{})});};}
     if (id === "settings") {
-      document.getElementById("check-app-update").onclick=async()=>{let out=document.getElementById("app-update-result");out.textContent="Проверяю…";try{const r=await chrome.runtime.sendMessage({action:"checkAppUpdate"});out=document.getElementById("app-update-result");if(!out)return;if(!r?.ok)throw Error(r?.error||"Нет ответа расширения");out.textContent=r.update.available?"Доступна версия "+r.update.version+". Распакуйте ZIP и обновите папку расширения, затем нажмите «Обновить» в chrome://extensions.":"Установлена актуальная версия "+chrome.runtime.getManifest().version;if(r.update.available){const a=document.createElement("a");a.href=r.update.url;a.textContent=" Скачать ZIP";a.target="_blank";a.rel="noopener noreferrer";out.appendChild(a);}}catch(e){out=document.getElementById("app-update-result");if(out)out.textContent="Проверка не завершена: "+e.message;}};
+      document.getElementById("check-app-update").onclick=async()=>{let out=document.getElementById("app-update-result");out.textContent="Проверяю…";try{const r=await chrome.runtime.sendMessage({action:"checkAppUpdate"});out=document.getElementById("app-update-result");if(!out)return;if(!r?.ok)throw Error(r?.error||"Нет ответа расширения");out.textContent=r.update.installed?"Версия "+r.update.version+" установлена. Перезапускаю расширение…":r.update.installError?"Версия "+r.update.version+": "+r.update.installError:r.update.available?"Доступна версия "+r.update.version+". Для автоматической установки подключите компонент обновлений ПК. Сейчас можно скачать ZIP.":"Установлена актуальная версия "+chrome.runtime.getManifest().version+(r.update.managed?". Автообновление включено.":". Компонент автообновления ПК не подключён.");if(r.update.available){const a=document.createElement("a");a.href=r.update.url;a.textContent=" Скачать ZIP";a.target="_blank";a.rel="noopener noreferrer";out.appendChild(a);}}catch(e){out=document.getElementById("app-update-result");if(out)out.textContent="Проверка не завершена: "+e.message;}};
       document.getElementById("sound").onchange = (e) =>
         save({ notificationSound: e.target.value });
       document.getElementById("volume").oninput = (e) =>
@@ -593,20 +599,7 @@
     if (!FPT_SITE_PRESETS[id] || !EXT) return;
     try {
       const d = await chrome.storage.local.get("fpToolsTheme");
-      const t = { ...(d.fpToolsTheme || {}) };
-      fptNormalizeToPreset(t);
-      const old = FPT_SITE_PRESETS[t.sitePreset] || FPT_SITE_PRESETS.graphite;
-      const patch = { sitePreset: id };
-      if (!t.containerBgColor || t.containerBgColor === old.containerBgColor)
-        patch.containerBgColor = FPT_SITE_PRESETS[id].containerBgColor;
-      if (!t.textColor || t.textColor === old.textColor)
-        patch.textColor = FPT_SITE_PRESETS[id].textColor;
-      if (!t.bgColor1 || t.bgColor1 === FPT_THEME_ACCENTS[t.sitePreset]) {
-        patch.bgColor1 = FPT_THEME_ACCENTS[id];
-        patch.bgColor2 = fptLightenHex(patch.bgColor1, 0.32);
-        if (!t.linkColor || t.linkColor === t.bgColor1)
-          patch.linkColor = patch.bgColor1;
-      }
+      const patch = fptPresetPatch(id);
       await saveTheme(patch);
     } catch (e) {
       showError("Не удалось применить тему.");

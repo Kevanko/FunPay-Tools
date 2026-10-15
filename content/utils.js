@@ -716,7 +716,8 @@ function fptApplyThemeVars() {
         // фона страницы здесь только давал «докрашивание» виджетов через 120–400мс.
         const preset = document.documentElement.getAttribute('data-fpt-preset');
         if (preset && preset !== 'native') {
-            const isLight = preset === 'light';
+            const isLight = typeof FPT_SITE_PRESETS !== 'undefined' && FPT_SITE_PRESETS[preset]
+                ? FPT_SITE_PRESETS[preset].scheme === 'light' : preset === 'light';
             document.documentElement.classList.toggle('fpt-theme-dark', !isLight);
             document.documentElement.classList.toggle('fpt-theme-light', isLight);
             // снять возможные инлайны от прошлых пересчётов — пусть рулит ранний CSS

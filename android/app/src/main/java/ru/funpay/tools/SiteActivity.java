@@ -2,55 +2,69 @@ package ru.funpay.tools;
 
 import android.app.*;
 import android.content.*;
-import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.webkit.*;
 import android.widget.*;
 import org.json.JSONObject;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.io.*;
-import java.util.concurrent.Executors;
 
 public final class SiteActivity extends Activity {
-    WebView web;TextView status;boolean login;
+    WebView web;TextView status;Button accountButton;android.graphics.Typeface font;boolean login,capturing,resumed,probePending,destroyed;
+    final android.os.Handler handler=new android.os.Handler(android.os.Looper.getMainLooper());
+    final Runnable accountProbe=new Runnable(){public void run(){if(!resumed||destroyed||!login)return;probeAccount();handler.postDelayed(this,1500);}};
     @Override public void onCreate(Bundle state){
         super.onCreate(state);login=getIntent().getBooleanExtra("login",false);
-        Palette p=new Palette(new Settings(this).theme());LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(p.bg);
+        Settings prefs=new Settings(this);Palette p=new Palette(prefs.theme());getWindow().setStatusBarColor(p.bg);getWindow().setNavigationBarColor(p.bg);getWindow().getDecorView().setSystemUiVisibility(p.dark?0:android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(p.bg);
         root.setOnApplyWindowInsetsListener((v,insets)->{v.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());return insets;});
-        LinearLayout bar=new LinearLayout(this);Button back=new Button(this);back.setText("Назад");decorate(back,R.drawable.ic_ui_back,p);back.setOnClickListener(v->finish());bar.addView(back);
-        status=new TextView(this);status.setText(login?"Вход на funpay.com":"FunPay · защищённое соединение");status.setTextColor(p.text);status.setPadding(12,20,0,10);bar.addView(status,new LinearLayout.LayoutParams(0,-2,1));root.addView(bar);
-        web=new WebView(this);WebSettings ws=web.getSettings();ws.setJavaScriptEnabled(true);ws.setDomStorageEnabled(true);ws.setAllowFileAccess(false);ws.setAllowContentAccess(false);ws.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);ws.setSafeBrowsingEnabled(true);ws.setUserAgentString(FunPayClient.UA);
+        font=Palette.typeface(this,prefs.font());LinearLayout bar=new LinearLayout(this);bar.setGravity(android.view.Gravity.CENTER_VERTICAL);Button back=new Button(this);back.setText("Назад");decorate(back,R.drawable.ic_ui_back,p);back.setOnClickListener(v->finish());bar.addView(back);
+        status=new TextView(this);status.setText(login?"Вход на funpay.com":"FunPay · защищённое соединение");status.setTextColor(p.text);status.setTypeface(font);status.setTextSize(12);status.setPadding(dp(8),dp(8),dp(8),dp(8));bar.addView(status,new LinearLayout.LayoutParams(0,-2,1));root.addView(bar);
+        web=new WebView(this);WebSettings ws=web.getSettings();ws.setJavaScriptEnabled(true);ws.setDomStorageEnabled(true);ws.setAllowFileAccess(false);ws.setAllowContentAccess(false);ws.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);ws.setSafeBrowsingEnabled(true);
         CookieManager.getInstance().setAcceptCookie(true);CookieManager.getInstance().setAcceptThirdPartyCookies(web,false);
         web.setWebViewClient(new WebViewClient(){
-            @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest req){Uri u=req.getUrl();if("https".equals(u.getScheme())&&"funpay.com".equals(u.getHost()))return false;if(req.isForMainFrame()&&req.hasGesture()&&"https".equals(u.getScheme()))try{startActivity(new Intent(Intent.ACTION_VIEW,u));}catch(Exception ignored){}return true;}
+            @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest req){Uri u=req.getUrl();if(!req.isForMainFrame())return !"https".equals(u.getScheme());if("https".equals(u.getScheme())&&"funpay.com".equals(u.getHost()))return false;if(req.isForMainFrame()&&req.hasGesture()&&"https".equals(u.getScheme()))try{startActivity(new Intent(Intent.ACTION_VIEW,u));}catch(Exception ignored){}return true;}
             @Override public void onPageFinished(WebView w,String url){
                 if(!url.startsWith(FunPayClient.BASE+"/"))return;
-                String css="body{background:"+String.format("#%06x",p.bg&0xffffff)+"!important;} .navbar{box-shadow:none!important;}";
+                String bg=String.format("#%06x",p.bg&0xffffff),surface=String.format("#%06x",p.surface&0xffffff),ink=String.format("#%06x",p.text&0xffffff),accent=String.format("#%06x",p.accent&0xffffff),muted=String.format("#%06x",p.muted&0xffffff);
+                String css="html{color-scheme:"+(p.dark?"dark":"light")+"}body,.wrapper,.wrapper-content,.wrapper-footer,#header,.navbar{background:"+bg+"!important;color:"+ink+"!important;}h1,h2,h3,label,.navbar a{color:"+ink+"!important;}a{color:"+accent+"}.form-control,.dropdown-menu{background:"+surface+"!important;color:"+ink+"!important;border-color:"+muted+"!important;border-radius:"+p.radius+"px!important}.form-control::placeholder{color:"+muted+"!important}.navbar{box-shadow:none!important;}";
                 w.evaluateJavascript("(()=>{let s=document.getElementById('pocket-style');if(!s){s=document.createElement('style');s.id='pocket-style';document.head.appendChild(s);}s.textContent="+JSONObject.quote(css)+";})()",null);
+                if(login)probeAccount();
             }
             @Override public void onReceivedError(WebView v,WebResourceRequest r,WebResourceError e){if(r.isForMainFrame())status.setText("Не удалось загрузить. Проверьте сеть.");}
         });
         root.addView(web,new LinearLayout.LayoutParams(-1,0,1));
-        if(login){Button use=new Button(this);use.setText("Использовать этот аккаунт");decorate(use,R.drawable.ic_ui_user,p);use.setOnClickListener(v->capture(use));root.addView(use);}
-        setContentView(root);String path=getIntent().getStringExtra("path");if(path==null||!path.startsWith("/")||path.startsWith("//"))path=login?"/account/login":"/";web.loadUrl(FunPayClient.BASE+path);
+        if(login){accountButton=new Button(this);accountButton.setText("Проверить вход");decorate(accountButton,R.drawable.ic_ui_user,p);accountButton.setOnClickListener(v->capture(accountButton));root.addView(accountButton);}
+        setContentView(root);String path=getIntent().getStringExtra("path");if(path==null||!path.startsWith("/")||path.startsWith("//"))path=login?"/account/login":"/";final String address=FunPayClient.BASE+path;
+        if(login&&getIntent().getBooleanExtra("switchAccount",false))CookieManager.getInstance().removeAllCookies(done->{if(!destroyed){CookieManager.getInstance().flush();web.loadUrl(address);}});else web.loadUrl(address);
     }
-    void decorate(Button b,int resource,Palette p){int size=(int)(20*getResources().getDisplayMetrics().density);android.graphics.drawable.Drawable d=getDrawable(resource).mutate();d.setTint(p.accent);d.setBounds(0,0,size,size);b.setCompoundDrawablesRelative(d,null,null,null);b.setCompoundDrawablePadding(size/2);b.setAllCaps(false);b.setTextColor(p.text);b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(p.surface));b.setStateListAnimator(null);b.setElevation(0);}
+    void probeAccount(){
+        if(destroyed||capturing||probePending||accountButton==null||!isFunPayPage())return;
+        String cookies=CookieManager.getInstance().getCookie(FunPayClient.BASE);if(cookies==null||!cookies.contains("golden_key="))return;
+        probePending=true;web.evaluateJavascript("(()=>{try{const raw=document.querySelector('[data-app-data]')?.getAttribute('data-app-data');if(!raw)return false;const value=JSON.parse(raw),data=Array.isArray(value)?value[0]:value;return Number(data?.userId)>0&&!!data['csrf-token'];}catch{return false;}})()",value->{probePending=false;if(!destroyed&&resumed&&"true".equals(value))capture(accountButton);});
+    }
+    boolean isFunPayPage(){Uri current=Uri.parse(web.getUrl()==null?"":web.getUrl());return "https".equals(current.getScheme())&&"funpay.com".equals(current.getHost());}
+    int dp(int size){return Math.round(size*getResources().getDisplayMetrics().density);}
+    void decorate(Button b,int resource,Palette p){int size=dp(20);android.graphics.drawable.Drawable d=getDrawable(resource).mutate();d.setTint(p.accent);d.setBounds(0,0,size,size);b.setCompoundDrawablesRelative(d,null,null,null);b.setCompoundDrawablePadding(size/2);b.setAllCaps(false);b.setTypeface(Palette.weight(font,550));b.setTextAlignment(android.view.View.TEXT_ALIGNMENT_GRAVITY);b.setGravity(android.view.Gravity.CENTER_VERTICAL|android.view.Gravity.START);b.setMinHeight(dp(48));b.setPadding(dp(16),dp(8),dp(16),dp(8));b.setTextColor(p.text);b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(p.surface));b.setStateListAnimator(null);b.setElevation(0);}
     void capture(Button button){
+        if(destroyed||capturing)return;
         String cookies=CookieManager.getInstance().getCookie(FunPayClient.BASE);if(cookies==null||!cookies.contains("golden_key=")){status.setText("Сначала войдите на сайте");return;}
-        button.setEnabled(false);status.setText("Проверяю аккаунт…");
-        Executors.newSingleThreadExecutor().execute(()->{
+        Uri current=Uri.parse(web.getUrl()==null?"":web.getUrl());if(!"https".equals(current.getScheme())||!"funpay.com".equals(current.getHost())){status.setText("Откройте страницу FunPay после входа");return;}
+        capturing=true;button.setEnabled(false);status.setText("Проверяю аккаунт…");
+        // Read the authenticated page already loaded by WebView. A second HTTP client
+        // may receive a challenge or different session despite successful browser login.
+        web.evaluateJavascript("(()=>{const e=document.querySelector('[data-app-data]');return e?e.outerHTML:null;})()",raw->{
+            if(destroyed)return;
             try{
-                HttpURLConnection con=(HttpURLConnection)new URL(FunPayClient.BASE+"/").openConnection();con.setInstanceFollowRedirects(false);con.setConnectTimeout(15000);con.setReadTimeout(20000);con.setRequestProperty("Cookie",cookies);con.setRequestProperty("User-Agent",FunPayClient.UA);
-                String html;
-                try{if(con.getResponseCode()!=200)throw new IOException("Проверьте вход на сайте");try(InputStream in=con.getInputStream()){ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1){if(out.size()+n>4*1024*1024)throw new IOException("Ответ слишком большой");out.write(b,0,n);}html=out.toString("UTF-8");}}finally{con.disconnect();}
-                JSONObject a=FunPayClient.authData(html);
-                new SessionStore(this).save(cookies,a.optString("userId"),a.optString("userName"));CookieManager.getInstance().flush();
-                runOnUiThread(()->{setResult(RESULT_OK);finish();});
-            }catch(Exception e){runOnUiThread(()->{status.setText(e.getMessage());button.setEnabled(true);});}
+                if(!isFunPayPage())throw new IOException("Откройте страницу FunPay после входа");
+                Object value=new org.json.JSONTokener(raw).nextValue();if(!(value instanceof String html))throw new IOException("Дождитесь загрузки FunPay и завершите вход на сайте");
+                JSONObject account=FunPayClient.authData(html);
+                String latest=CookieManager.getInstance().getCookie(FunPayClient.BASE);if(latest==null||!latest.matches("(?s).*(?:^|;\\s*)golden_key=[^;]+.*"))throw new IOException("Сайт ещё не сохранил сессию. Завершите вход.");
+                new SessionStore(this).save(latest,account.get("userId").toString(),account.optString("userName","Аккаунт FunPay"));CookieManager.getInstance().flush();setResult(RESULT_OK);finish();
+            }catch(Exception e){capturing=false;status.setText(e.getMessage());button.setEnabled(true);}
         });
     }
+    @Override protected void onResume(){super.onResume();resumed=true;if(login)handler.post(accountProbe);}
+    @Override protected void onPause(){resumed=false;handler.removeCallbacks(accountProbe);super.onPause();}
     @Override public void onBackPressed(){if(web.canGoBack())web.goBack();else super.onBackPressed();}
-    @Override protected void onDestroy(){web.destroy();super.onDestroy();}
+    @Override protected void onDestroy(){destroyed=true;handler.removeCallbacksAndMessages(null);web.destroy();super.onDestroy();}
 }

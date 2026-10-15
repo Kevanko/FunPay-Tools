@@ -13,6 +13,21 @@ final class Settings {
     int font(){return p.getInt("font",0);}
     void theme(String id){p.edit().putString("theme",id).apply();}
     void font(int index){p.edit().putInt("font",index).apply();}
+    void chooseFont(int index){font(index);try{JSONObject cfg=config(),theme=cfg.optJSONObject("fpToolsTheme");if(theme==null)theme=new JSONObject();theme.put("font",new String[]{"Manrope","Trebuchet MS","Georgia","Consolas","Tahoma","Segoe UI"}[Math.max(0,Math.min(5,index))]);cfg.put("fpToolsTheme",theme);save(cfg);}catch(JSONException ignored){}}
+    void applyImportedAppearance(JSONObject cfg){JSONObject theme=cfg.optJSONObject("fpToolsTheme");if(theme==null)return;String id=theme.optString("sitePreset");if(java.util.Arrays.asList(Palette.IDS).contains(id))theme(id);String family=theme.optString("font","Manrope");font(switch(family){case "Consolas","Courier New"->3;case "Georgia","Palatino Linotype","Cambria"->2;case "Trebuchet MS"->1;case "Tahoma"->4;case "Manrope"->0;default->5;});}
+    void chooseTheme(String id){
+        if(!java.util.Arrays.asList(Palette.IDS).contains(id))return;theme(id);font(Palette.themeFont(id));
+        try{Palette palette=new Palette(id);JSONObject cfg=config(),theme=cfg.optJSONObject("fpToolsTheme");if(theme==null)theme=new JSONObject();
+            theme.put("sitePreset",id).put("containerBgColor",String.format(java.util.Locale.ROOT,"#%06x",palette.surface&0xffffff)).put("textColor",String.format(java.util.Locale.ROOT,"#%06x",palette.text&0xffffff)).put("bgColor1",String.format(java.util.Locale.ROOT,"#%06x",palette.accent&0xffffff)).put("linkColor",String.format(java.util.Locale.ROOT,"#%06x",palette.accent&0xffffff)).put("font",id.equals("obsidian")?"Consolas":id.equals("paper")?"Verdana":id.equals("light")?"Arial":id.equals("forest")||id.equals("slate")?"Trebuchet MS":"Manrope").put("borderRadius",palette.radius).put("wallpaper","none").put("bgImage","").put("bgVideo","").put("accentMode","static").put("menuTransparent",false);
+            cfg.put("fpToolsTheme",theme).put("enableCustomTheme",true);save(cfg);
+        }catch(JSONException ignored){}
+    }
+    static final String[] WALL_IDS={"none","dunes","mesh","grid","cobalt","aurora","drift"};
+    static final String[] WALL_NAMES={"Без обоев","Дюны","Мягкие формы","Сетка","Кобальт","Сияние","Дрейф"};
+    String wallpaper(){JSONObject theme=config().optJSONObject("fpToolsTheme");String id=theme==null?"none":theme.optString("wallpaper","none");return java.util.Arrays.asList(WALL_IDS).contains(id)?id:"none";}
+    boolean wallpaperMotion(){return p.getBoolean("wallpaperMotion",true);}
+    void wallpaperMotion(boolean on){p.edit().putBoolean("wallpaperMotion",on).apply();}
+    void wallpaper(String id){if(!java.util.Arrays.asList(WALL_IDS).contains(id))return;try{JSONObject cfg=config(),theme=cfg.optJSONObject("fpToolsTheme");if(theme==null)theme=new JSONObject();theme.put("wallpaper",id).put("bgImage","").put("bgVideo","");cfg.put("fpToolsTheme",theme);save(cfg);}catch(JSONException ignored){}}
     String uid(){JSONObject s=new SessionStore(context).read();return s==null?"":s.optString("uid");}
     synchronized JSONObject config() {
         try{return new JSONObject(p.getString("config_"+uid(),"{}"));}catch(Exception e){return new JSONObject();}

@@ -775,15 +775,7 @@ function setupRedesignThemeControls() {
             const preset = FPT_SITE_PRESETS[id];
             const patch = { sitePreset: id };
             if (preset) {
-                const current = fptNormalizeToPreset({ ...fpToolsTheme });
-                const previous = FPT_SITE_PRESETS[current.sitePreset] || FPT_SITE_PRESETS.graphite;
-                if (!current.containerBgColor || current.containerBgColor === previous.containerBgColor) patch.containerBgColor = preset.containerBgColor;
-                if (!current.textColor || current.textColor === previous.textColor) patch.textColor = preset.textColor;
-                if (!current.bgColor1 || current.bgColor1 === FPT_THEME_ACCENTS[current.sitePreset]) {
-                    patch.bgColor1 = FPT_THEME_ACCENTS[id];
-                    patch.bgColor2 = fptLightenHex(patch.bgColor1, .32);
-                    if (!current.linkColor || current.linkColor === current.bgColor1) patch.linkColor = patch.bgColor1;
-                }
+                Object.assign(patch,fptPresetPatch(id));
                 await chrome.storage.local.set({ enableCustomTheme: true });
                 const cb = document.getElementById('enableCustomThemeCheckbox');
                 if (cb) { cb.checked = true; toggleThemeControls(false); }

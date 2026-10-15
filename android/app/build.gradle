@@ -2,7 +2,7 @@ plugins { id 'com.android.application' }
 android {
     namespace 'ru.funpay.tools'
     compileSdk 35
-    defaultConfig { applicationId 'ru.funpay.tools'; minSdk 26; targetSdk 35; versionCode 6; versionName '1.1.2'; testInstrumentationRunner 'ru.funpay.tools.TypographyChecks' }
+    defaultConfig { applicationId 'ru.funpay.tools'; minSdk 26; targetSdk 35; versionCode 8; versionName '1.2.0'; testInstrumentationRunner 'ru.funpay.tools.TypographyChecks' }
     signingConfigs { release { storeFile file(System.getenv('FPT_KEYSTORE') ?: 'missing-release-key'); storePassword System.getenv('FPT_STORE_PASSWORD'); keyAlias 'funpay-pocket'; keyPassword System.getenv('FPT_KEY_PASSWORD') } }
     buildTypes { release { signingConfig signingConfigs.release } }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }

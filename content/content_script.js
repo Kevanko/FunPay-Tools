@@ -122,13 +122,20 @@
 
     function wireFpToolsButton(button) {
         button?.addEventListener('click', async () => {
+            const requestedPage = window.location.hash.match(/^#fpt-page=([a-z_]+)$/)?.[1];
             // Build the popup on first click (perf: avoids a permanent heavy DOM subtree).
             if (typeof window.__fpEnsurePopup === 'function') {
                 await window.__fpEnsurePopup();
             }
             const popup = document.querySelector('.fp-tools-popup');
             if (popup) {
-                await loadLastActivePage();
+                const requestedItem = requestedPage && popup.querySelector(`.fp-tools-nav li[data-page="${requestedPage}"]`);
+                if (requestedItem) {
+                    requestedItem.click();
+                    history.replaceState(null, '', location.pathname + location.search);
+                } else if (!popup.classList.contains('active')) {
+                    await loadLastActivePage();
+                }
                 popup.classList.add('active');
                 if (typeof applyFptMenuTransparency === 'function') applyFptMenuTransparency();
                 if (typeof syncFptMenuControls === 'function') syncFptMenuControls();

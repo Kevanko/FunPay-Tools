@@ -109,6 +109,38 @@ for (const [id, surface, text, base, dim, faint, scheme] of [
             pInput: base, pHeader: surface, pVeil: base, pBadge: surface,
             pShadow: light ? 'rgba(45,35,25,.15)' : 'rgba(0,0,0,.35)', pLogoFilter: light ? 'none' : 'brightness(0) invert(1)' } };
 }
+// Complete interface profiles shared by the toolbar, site and Android companion.
+const FPT_DESIGN_PROFILES = {
+ graphite:{radius:10,panel:14,gap:16,density:12,font:'Manrope',wallpaper:'none',label:'Тёмная / Studio'},
+ obsidian:{radius:4,panel:6,gap:12,density:9,font:'Consolas',wallpaper:'none',label:'Терминал'},
+ slate:{radius:16,panel:24,gap:20,density:16,font:'Trebuchet MS',wallpaper:'none',label:'Сланец'},
+ light:{radius:6,panel:8,gap:16,density:12,font:'Arial',wallpaper:'none',label:'Белая / Clean'},
+ clay:{radius:14,panel:20,gap:24,density:16,font:'Manrope',wallpaper:'none',label:'Глина / Warm'},
+ paper:{radius:2,panel:4,gap:20,density:14,font:'Verdana',wallpaper:'none',label:'Бумага / Editorial'},
+ forest:{radius:20,panel:28,gap:24,density:18,font:'Trebuchet MS',wallpaper:'none',label:'Лес / Soft'},
+ ink:{radius:8,panel:12,gap:12,density:10,font:'Manrope',wallpaper:'none',label:'Чернила / Compact'}
+};
+function fptPresetPatch(id){const p=FPT_SITE_PRESETS[id],d=FPT_DESIGN_PROFILES[id];if(!p||!d)throw Error('Неизвестная тема');const accent=FPT_THEME_ACCENTS[id];return {sitePreset:id,containerBgColor:p.containerBgColor,textColor:p.textColor,bgColor1:accent,bgColor2:fptLightenHex(accent,.32),linkColor:accent,font:d.font,borderRadius:d.radius,accentMode:'static',menuTransparent:false,wallpaper:d.wallpaper,bgImage:'',bgVideo:''};}
+function fptDesignMetrics(settings){const profile=FPT_DESIGN_PROFILES[settings.sitePreset]||FPT_DESIGN_PROFILES.graphite;const value=Number(settings.borderRadius??profile.radius),radius=Number.isFinite(value)?Math.max(0,Math.min(28,value)):profile.radius;return {...profile,radius,panel:radius===0?0:Math.max(0,radius+profile.panel-profile.radius)};}
+function fptDesignCss(settings){const d=fptDesignMetrics(settings);return `
+:root{--fpt-radius:${d.radius}px;--fpt-panel-radius:${d.panel}px;--fpt-layout-gap:${d.gap}px;--fpt-control-pad:${d.density}px;}
+html.fpt-custom-theme-on body{background:${(settings.wallpaper&&settings.wallpaper!=="none")||settings.bgVideo||settings.bgImage?"transparent":"var(--fpt-p1)"}!important;color:var(--fpt-pTx)!important;font-family:var(--fpt-ui-font)!important;}
+html.fpt-custom-theme-on :is(.navbar,.navbar-default,.dropdown-menu,.modal-content,.panel,.well,.chat-header,.chat-form,.contact-list,.contact-item,.offer,.tc-header){background-color:var(--fpt-p2)!important;color:var(--fpt-pTx)!important;border-color:var(--fpt-pLine)!important;}
+html.fpt-custom-theme-on :is(.form-control,textarea,select,input:not([type=checkbox]):not([type=radio]):not([type=range])){background-color:var(--fpt-pInput)!important;color:var(--fpt-pTx)!important;border-color:var(--fpt-pLine)!important;border-radius:var(--fpt-radius)!important;font-family:var(--fpt-ui-font)!important;}
+html.fpt-custom-theme-on :is(.panel,.well,.modal-content,.offer,.tc-item){border-radius:var(--fpt-panel-radius)!important;}
+html.fpt-custom-theme-on :is(.text-muted,.help-block,.contact-item-message,.tc-desc,.text-bold small){color:var(--fpt-pTxDim)!important;}
+html.fpt-custom-theme-on :is(.tc-item,.contact-item){border-color:var(--fpt-pLine)!important;}
+html.fpt-custom-theme-on :is(.tc-item,.contact-item):hover{background:var(--fpt-p3)!important;}
+html.fpt-custom-theme-on :is(h1,h2,h3,h4,label,.table){color:var(--fpt-pTx)!important;}
+html.fpt-custom-theme-on :is(h1,h2,h3,h4,h5,h6,.btn,.dropdown-menu){font-family:var(--fpt-ui-font)!important;}
+html.fpt-custom-theme-on .table>tbody>tr>td{border-color:var(--fpt-pLine)!important;}
+html.fpt-custom-theme-on :is(.btn,.fp-tools-popup button,.fp-tools-popup select){border-radius:var(--fpt-radius)!important;}
+html.fpt-custom-theme-on .fp-tools-popup{border-radius:var(--fpt-panel-radius)!important;}
+html.fpt-custom-theme-on .fp-tools-content{padding:var(--fpt-layout-gap)!important;}
+html.fpt-custom-theme-on .fp-tools-nav li a{padding:var(--fpt-control-pad) 14px!important;}
+html.fpt-custom-theme-on .fpt-home{--home-radius:var(--fpt-panel-radius);--home-gap:var(--fpt-layout-gap);}
+html.fpt-custom-theme-on .fpt-home :is(.cc-stats,.cc-module,.cc-card,.cc-panel){border-radius:var(--fpt-panel-radius)!important;}
+`;}
 const FPT_ACCENT_PRESETS = ['#5b86d8', '#3f9e7c', '#8b7fd0', '#c2703d', '#6b7280'];
 const FPT_THEME_ACCENTS = { graphite: '#5b86d8', obsidian: '#5b86d8', slate: '#5b86d8', light: '#5b86d8', clay: '#a56545', paper: '#67745c', forest: '#9db78b', ink: '#aab7c8' };
 
@@ -281,6 +313,7 @@ function getCustomThemeCss(settings) {
         ` + themedCss;
     }
 
+    themedCss += fptDesignCss(settings);
     themedCss = themedCss.replace(/border-radius: \d+px/g, `border-radius: ${settings.borderRadius}px`);
 
     if (settings.enableCircleCustomization) {

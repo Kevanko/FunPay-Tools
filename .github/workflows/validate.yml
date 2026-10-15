@@ -11,6 +11,7 @@ jobs:
       - run: npm run build:qr
       - run: npm run check
       - run: npm test
+      - run: python -B -m unittest discover -s tests -p test_desktop_updater.py -v
       - run: npm ci --ignore-scripts && npm run selftest
         working-directory: vps
       - run: npm run package

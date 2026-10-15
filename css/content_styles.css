@@ -12070,3 +12070,23 @@ body:has(.fp-tools-popup.active) #fpToolsButton[data-fpt-location="floating"]{vi
 [data-fpt-preset]:not([data-fpt-preset="native"]) .fp-tools-popup:not(.fpt-menu-transparent) .fpt-metric-card strong{color:var(--fpt-text)!important}
 [data-fpt-preset]:not([data-fpt-preset="native"]) .fp-tools-popup:not(.fpt-menu-transparent) .fpt-metric-card small{color:var(--fpt-text-dim)!important}
 .fp-tools-popup .fpt-metric-card .fpt-vector-wrap{color:var(--fpt-accent)}
+
+#fpt-site-phone .fpt-card{padding:24px;margin-bottom:20px;background:var(--fpt-surface);border:1px solid var(--fpt-line);border-radius:var(--fpt-panel-radius,16px)}#fpt-site-phone canvas{display:block;width:min(280px,100%);height:auto;border-radius:12px;margin:16px 0}#fpt-site-phone .fpt-h2{font-size:20px;margin-bottom:10px}#fpt-site-phone .fpt-desc{color:var(--fpt-text-dim);line-height:1.6}#fpt-site-phone .fpt-qr-controls{display:flex;gap:8px;flex-wrap:wrap}
+
+/* One readable navigation column, with occasional tools behind an explicit toggle. */
+.fp-tools-popup .fp-tools-nav ul{display:flex!important;flex-direction:column;gap:3px!important}
+.fp-tools-popup .fp-tools-nav li[data-page] a{display:flex!important;flex-direction:row!important;justify-content:flex-start!important;align-items:center;gap:10px;text-align:left;min-height:40px}
+.fp-tools-popup .fp-tools-nav li[data-page] a>span:last-child{flex:1;white-space:normal}
+.fp-tools-popup .fp-tools-nav li[data-page] a svg{flex-shrink:0}
+.fp-tools-popup .fp-tools-nav li[hidden],.fp-tools-popup .fpt-nav-more[hidden]{display:none!important}
+.fp-tools-popup .fpt-nav-more{display:block;width:calc(100% - 20px);margin:14px 10px 6px;padding:12px 8px;background:transparent;border:1px solid var(--fpt-line);border-radius:var(--fpt-radius,8px);color:var(--fpt-text-dim);font:inherit;font-size:12px;text-align:left;cursor:pointer}
+.fp-tools-popup .fpt-nav-more:hover{background:var(--fpt-surface-2);color:var(--fpt-text)}
+.fp-tools-popup .fp-tools-site-link:hover{background:none;-webkit-text-fill-color:currentColor;animation:none;color:var(--fpt-text)}
+.fp-tools-popup .fp-tools-site-link::after{display:none}
+html[data-fpt-preset] .fp-tools-popup :is(.calculator-container,.template-container,.fpt-theme-extra){background:var(--fpt-surface);border-color:var(--fpt-line);border-radius:var(--fpt-panel-radius,12px)}
+html[data-fpt-preset] .fp-tools-popup :is(.calculator-display,#calcDisplay){color:var(--fpt-text)!important;background:var(--fpt-surface-2)!important}
+html[data-fpt-preset] .fp-tools-popup .calculator-container{background:var(--fpt-surface)!important}
+html[data-fpt-preset] .fp-tools-popup{box-shadow:0 16px 48px color-mix(in srgb,var(--fpt-pShadow) 65%,transparent)!important;border:1px solid var(--fpt-line)}
+html[data-fpt-preset] .fp-tools-popup::before{display:none}
+html[data-fpt-preset] .fp-tools-popup .fp-tools-nav li.active a{background:color-mix(in srgb,var(--fpt-accent) 12%,var(--fpt-surface))!important;color:var(--fpt-text)!important}
+html[data-fpt-preset] .fp-tools-popup .fp-tools-nav li.active a :is(span,svg){color:var(--fpt-text)!important}

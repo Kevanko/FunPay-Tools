@@ -102,6 +102,7 @@ function createMainPopup() {
                 <ul>
                     <li class="fp-nav-divider">Рабочий стол</li>
                     <li data-page="general" class="active"><a><span class="nav-icon material-symbols-rounded">grid_view</span><span>Обзор</span></a></li>
+                    <li data-page="phone"><a>${FPTIcons.svg("qr",20)}<span>На телефон</span></a></li>
                     <li data-page="lot_io"><a><span class="nav-icon material-symbols-rounded">inventory_2</span><span>Лоты</span></a></li>
                     <li data-page="autobump"><a><span class="nav-icon material-symbols-rounded">rocket_launch</span><span>Авто-поднятие</span></a></li>
                     <li data-page="auto_delivery"><a><span class="nav-icon material-symbols-rounded">bolt</span><span>Авто-выдача</span></a></li>
@@ -130,8 +131,10 @@ function createMainPopup() {
                     <li data-page="tickets"><a><span class="nav-icon material-symbols-rounded">confirmation_number</span><span>Тикеты</span></a></li>
                     <li data-page="support"><a><span class="nav-icon material-symbols-rounded">favorite</span><span>Поддержка</span></a></li>
                 </ul>
+                <button type="button" class="fpt-nav-more" aria-expanded="false">Ещё инструменты</button>
             </nav>
             <main class="fp-tools-content">
+                <div class="fp-tools-page-content" data-page="phone"><div id="fpt-site-phone"></div></div>
                 <div class="fp-tools-page-content active" data-page="general">
                     <section class="fpt-command-center" aria-label="Сводка FP Tools">
                         <div class="fpt-command-copy">
@@ -1268,6 +1271,7 @@ function createMainPopup() {
 // своим снапшотом — пресеты «не доезжали» до storage (гонка двух set).
 
 function setupPopupNavigation() {
+    chrome.storage.local.get(null).then(data=>{const root=document.getElementById("fpt-site-phone");if(root&&globalThis.FPTPhoneTransfer)FPTPhoneTransfer.mount(root,data).catch(console.error);});
     const toolsPopup = document.querySelector('.fp-tools-popup');
     if (!toolsPopup) return;
     const navItems = toolsPopup.querySelectorAll('.fp-tools-nav li, .fp-tools-header-tab');
@@ -1304,6 +1308,7 @@ function setupPopupNavigation() {
         li.addEventListener('click', (e) => {
             e.preventDefault();
             const pageId = li.dataset.page;
+            if(li.hidden&&li.dataset.secondary==='true')toolsPopup.querySelector('.fpt-nav-more')?.click();
 
             navItems.forEach(item => item.classList.remove('active'));
             li.classList.add('active');
@@ -1363,6 +1368,9 @@ function setupMenuSearch(toolsPopup) {
     const emptyState = toolsPopup.querySelector('.fpt-nav-empty');
     const nav = toolsPopup.querySelector('.fp-tools-nav');
     if (!searchInput || !nav) return;
+    const more=nav.querySelector('.fpt-nav-more');
+    const secondary=new Set(['effects','needs','epic_nicks','global_chat','ai_audit','piggy_banks','calculator','overview','tickets','support','slash_commands']);
+    nav.querySelectorAll('li[data-page]').forEach(item=>{item.dataset.secondary=String(secondary.has(item.dataset.page));});
 
     const applyFilter = () => {
         const query = searchInput.value.trim().toLowerCase();
@@ -1371,7 +1379,7 @@ function setupMenuSearch(toolsPopup) {
 
         items.forEach(item => {
             const text = item.textContent.trim().toLowerCase();
-            const isVisible = !query || text.includes(query) || item.dataset.page.toLowerCase().includes(query);
+            const isVisible = query ? text.includes(query)||item.dataset.page.toLowerCase().includes(query) : item.dataset.secondary!=='true'||item.classList.contains('active')||more?.getAttribute('aria-expanded')==='true';
             item.hidden = !isVisible;
             if (isVisible) visibleCount += 1;
         });
@@ -1388,11 +1396,14 @@ function setupMenuSearch(toolsPopup) {
                 }
                 cursor = cursor.nextElementSibling;
             }
-            divider.hidden = query ? !hasVisibleItem : false;
+            divider.hidden = !hasVisibleItem;
         });
 
         if (emptyState) emptyState.hidden = visibleCount !== 0;
+        if(more)more.hidden=Boolean(query);
     };
+    more?.addEventListener('click',()=>{const expanded=more.getAttribute('aria-expanded')!=='true';more.setAttribute('aria-expanded',String(expanded));more.textContent=expanded?'Свернуть инструменты':'Ещё инструменты';applyFilter();});
+    applyFilter();
 
     searchInput.addEventListener('input', applyFilter);
     searchInput.addEventListener('keydown', e => {
