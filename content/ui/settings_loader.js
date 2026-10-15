@@ -4,6 +4,11 @@ let fpToolsAccounts = [];
 let aiModeActive = false;
 let fptFlushTemplateEdits = null;
 
+function fptNotificationVolume(value) {
+    if (!Number.isFinite(value)) return 1;
+    return Math.max(0, Math.min(1, value > 1 && value <= 100 ? value / 100 : value));
+}
+
 async function renderTemplateSettings() {
     const container = document.getElementById('template-settings-container');
     if (!container) return;
@@ -523,7 +528,7 @@ async function loadSavedSettings() {
     const volSlider = document.getElementById('notificationVolume');
     const volValue = document.getElementById('notificationVolumeValue');
     if (volSlider) {
-        const vol = (typeof settings.notificationVolume === 'number') ? settings.notificationVolume : 1;
+        const vol = fptNotificationVolume(settings.notificationVolume);
         volSlider.value = Math.round(vol * 100);
         if (volValue) volValue.textContent = `${Math.round(vol * 100)}%`;
         if (!volSlider.dataset.fptBound) {
@@ -561,7 +566,7 @@ async function loadSavedSettings() {
                 if (changes.notificationVolume) {
                     const slider = document.getElementById('notificationVolume');
                     const label = document.getElementById('notificationVolumeValue');
-                    const v = Math.round((typeof changes.notificationVolume.newValue === 'number' ? changes.notificationVolume.newValue : 1) * 100);
+                    const v = Math.round(fptNotificationVolume(changes.notificationVolume.newValue) * 100);
                     if (slider) slider.value = v;
                     if (label) label.textContent = `${v}%`;
                 }

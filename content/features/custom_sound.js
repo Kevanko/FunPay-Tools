@@ -20,7 +20,7 @@ async function _loadCfg() {
     const { notificationSound, notificationVolume, fpToolsCustomSoundData } =
         await chrome.storage.local.get(['notificationSound', 'notificationVolume', 'fpToolsCustomSoundData']);
     cfg.sound = notificationSound || 'default';
-    cfg.volume = (typeof notificationVolume === 'number') ? Math.max(0, Math.min(1, notificationVolume>1?notificationVolume/100:notificationVolume)) : 1;
+    cfg.volume = Number.isFinite(notificationVolume) ? Math.max(0, Math.min(1, notificationVolume>1&&notificationVolume<=100?notificationVolume/100:notificationVolume)) : 1;
 
     // data: URL своей мелодии → blob: URL один раз (blob не попадает под CSP на data:-медиа).
     if (fpToolsCustomSoundData) {
@@ -53,16 +53,17 @@ function _chosenUrl() {
 // Глушим нативные <audio> только когда выбран НЕ дефолт (иначе пусть FunPay играет сам).
 function _applyMute() {
     const mute = _chosenUrl() != null;
-    document.querySelectorAll('audio.loud, audio.quiet').forEach(el => { el.muted = mute; });
+    document.querySelectorAll('audio.loud, audio.quiet').forEach(el => { el.muted = mute; el.volume = cfg.volume; });
 }
 
 function _hook(el) {
     if (!el || el.dataset.fptSoundHook) return;
     el.dataset.fptSoundHook = '1';
     el.muted = _chosenUrl() != null;
+    el.volume = cfg.volume;
     el.addEventListener('play', () => {
         const url = _chosenUrl();
-        if (!url) { el.muted = false; return; } // default — нативный звук
+        if (!url) { el.muted = false; el.volume = cfg.volume; return; } // default — нативный звук
         el.muted = true;                         // заглушить нативный chime
         const a = new Audio(url);
         a.volume = cfg.volume;
