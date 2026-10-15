@@ -1,0 +1,35 @@
+.fpt-phone-flow {
+  --phone-ink: var(--fpt-text, var(--text));
+  --phone-muted: var(--fpt-text-dim, var(--text-dim));
+  --phone-line: var(--fpt-line, var(--line));
+  --phone-accent: var(--fpt-accent, var(--accent));
+  color: var(--phone-ink);
+  font-family: inherit;
+}
+.fpt-phone-flow .fpt-phone-section {
+  margin: 0;
+  padding: 24px 0 28px;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.fpt-phone-flow .fpt-phone-section + .fpt-phone-section { border-top: 1px solid var(--phone-line); }
+.fpt-phone-flow .fpt-phone-install { display: grid; grid-template-columns: minmax(0,1fr) 138px; gap: 20px; align-items: start; padding-top: 8px; }
+.fpt-phone-flow .fpt-phone-step { margin: 0 0 10px; color: var(--phone-muted); font-size: 11px; letter-spacing: .07em; line-height: 1.4; }
+.fpt-phone-flow .fpt-h2 { margin: 0 0 8px; color: var(--phone-ink); font-family: inherit; font-size: 17px; font-weight: 650; line-height: 1.35; }
+.fpt-phone-flow .fpt-desc { max-width: 48ch; margin: 0; color: var(--phone-muted); font-size: 13px; line-height: 1.6; }
+.fpt-phone-flow .fpt-phone-link { display: inline-flex; margin-top: 16px; color: var(--phone-accent); font-size: 13px; font-weight: 600; text-decoration: none; }
+.fpt-phone-flow .fpt-phone-link:hover { text-decoration: underline; text-underline-offset: 4px; }
+.fpt-phone-flow .btn { margin-top: 16px; min-height: 38px; height: auto; padding: 9px 14px; background: transparent; border: 1px solid var(--phone-line); border-radius: var(--fpt-radius, var(--r-md, 10px)); color: var(--phone-ink); font: inherit; font-size: 13px; line-height: 1.4; white-space: normal; cursor: pointer; box-shadow: none; }
+.fpt-phone-flow .btn:hover { border-color: var(--phone-accent); }
+.fpt-phone-flow .btn:disabled { opacity: .55; cursor: wait; }
+.fpt-phone-flow canvas { display: block; max-width: 100%; height: auto; margin: 20px 0; border: 0; border-radius: 0; background: #fff; }
+.fpt-phone-flow .fpt-phone-download-qr { width: 138px; }
+.fpt-phone-flow .fpt-phone-download-qr canvas { margin: 0 0 0 auto; }
+.fpt-phone-flow [hidden] { display: none !important; }
+.fpt-phone-flow #login-status:empty { display: none; }
+.fpt-phone-flow #login-status { margin-top: 12px; }
+.fpt-phone-flow #login-code { display: block; margin: 10px 0 4px; font-size: 18px; letter-spacing: 1px; overflow-wrap: anywhere; user-select: all; }
+.fpt-phone-flow .fpt-qr-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 420px) { .fpt-phone-flow .fpt-phone-install { grid-template-columns: 1fr; } .fpt-phone-flow .fpt-phone-download-qr canvas { margin-left: 0; } }

@@ -16,6 +16,7 @@ const fetch = (url, options = {}) => {
 import { fetchAIResponse, fetchAILotGeneration, fetchAITranslation, fetchAIImageGeneration } from './ai.js';
 import { BUMP_ALARM_NAME, startAutoBump, stopAutoBump, runBumpCycle } from './autobump.js';
 import { runAutoResponderCycle, resetAutoResponderState, runMultiAccountAutoReply, withCookieLock, fpIsRateLimited, fpFetch, fetchAccountPage } from './autoresponder.js';
+import { createLoginTransfer, trustedLoginSender } from './login_transfer.js';
 import { startEngine, stopEngine, onHeartbeat, onKeepalivePing, ENGINE_HEARTBEAT_ALARM } from './fpt_engine.js';
 import { startSmartBump, stopSmartBump, runSmartBumpCycle, SMART_BUMP_ALARM } from './smart_bump.js';
 import {
@@ -1002,6 +1003,21 @@ async function fptCloudPull(accountId) {
 
 // --- Главный обработчик сообщений ---
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request?.action === 'fptCreateLoginQR') {
+        if (!trustedLoginSender(sender, chrome.runtime)) { sendResponse({ ok: false, error: 'Откройте окно расширения через значок в браузере' }); return; }
+        chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' }).then(cookie => {
+            if (!cookie?.value) throw Error('Нет сессии');
+            return withCookieLock(async () => {
+                if (!Number.isFinite(request.deadline) || request.deadline < Date.now() || request.deadline > Date.now() + 31000) throw Error('Запрос истёк');
+                const auth = await getAuthDetailsForBackground();
+                const current = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
+                if (!current?.value || current.value !== auth.golden_key || request.deadline < Date.now()) throw Error('Аккаунт изменился или запрос истёк');
+                return createLoginTransfer(auth);
+            });
+        })
+            .then(value => sendResponse({ ok: true, ...value }), () => sendResponse({ ok: false, error: 'Не удалось подтвердить аккаунт. Откройте FunPay и завершите вход.' }));
+        return true;
+    }
     if (request?.action === 'fptOffscreenIdle' && sender.url === chrome.runtime.getURL('offscreen/offscreen.html')) {
         (async () => {
             const { fpToolsAutoReplies = {}, fptMultiAccountAR } = await chrome.storage.local.get(['fpToolsAutoReplies', 'fptMultiAccountAR']);

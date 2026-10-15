@@ -283,7 +283,7 @@
       '</h1><p class="fpt-desc">' +
       (id === "home"
         ? "Состояние настроек на этом устройстве."
-        : "Редактор полных настроек доступен на сайте FunPay.") +
+        : id === "phone" ? "Приложение, вход и ваши настройки." : "Редактор полных настроек доступен на сайте FunPay.") +
       "</p></div></div>";
     if (id === "home")
       body =
@@ -510,7 +510,7 @@
     if (focusId) document.getElementById(focusId)?.focus?.();
     else if (focusToggle)
       root.querySelector?.('[data-toggle="' + focusToggle + '"]')?.focus?.();
-    if(id === "phone"){const area=document.createElement("div");area.id="phone-transfer";root.appendChild(area);FPTPhoneTransfer.mount(area,state.data);}
+    if(id === "phone"){const area=document.createElement("div");area.id="phone-transfer";root.querySelector('.fpt-page').appendChild(area);FPTPhoneTransfer.mount(area,state.data);}
     if (id === "calc") {
       ["price", "fee"].forEach(
         (k) => (document.getElementById(k).oninput = calculate),
@@ -706,6 +706,9 @@
           });
           if(Object.keys(ch).every(k=>k==="fptAppUpdate"))return;
           applyAppearance();
+          // Keep an in-progress QR transfer intact when runtime counters change.
+          // Settings QR reads storage on demand, so a full redraw is unnecessary.
+          if(state.page === "phone")return;
           render();
         }
       });
