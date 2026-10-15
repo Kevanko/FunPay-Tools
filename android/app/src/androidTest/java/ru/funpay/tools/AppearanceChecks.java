@@ -18,6 +18,9 @@ public final class AppearanceChecks extends Instrumentation {
         try{
             if(new SessionStore(getTargetContext()).read()!=null)throw new IllegalStateException("Run only in a profile without an account");
             new SessionStore(getTargetContext()).save("","424242","Тест оформления");fixture=true;
+            var importFixture=Settings.decode("{\"_magic\":\"FPTCONFIG\",\"_version\":2,\"settings\":{\"notificationVolume\":35,\"fpToolsUserNotes\":\"Проверка переноса\",\"fpToolsTheme\":{\"sitePreset\":\"clay\",\"font\":\"Manrope\"}}}");
+            prefs.save(importFixture);var reread=Settings.decode(prefs.encode());if(reread.getDouble("notificationVolume")!=.35||!reread.getString("fpToolsUserNotes").equals("Проверка переноса"))throw new AssertionError("Portable settings changed after real storage roundtrip");
+            String beforeInvalid=prefs.config().toString();boolean rejected=false;try{Settings.decode("{\"_magic\":\"FPTCONFIG\",\"_version\":2,\"settings\":{\"fpToolsTheme\":\"invalid\"}}");}catch(Exception expected){rejected=true;}if(!rejected||!prefs.config().toString().equals(beforeInvalid))throw new AssertionError("Invalid settings accepted or altered saved config");
             app=(MainActivity)startActivitySync(new Intent(getTargetContext(),MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));final MainActivity screen=app;
             onMain(()->screen.selectPage("settings"));waitForIdleSync();TypographyChecks typography=new TypographyChecks();
             for(String id:Palette.IDS){
