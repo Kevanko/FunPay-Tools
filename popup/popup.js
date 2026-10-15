@@ -441,9 +441,9 @@
           )
           .join("") +
         '</select></label><label>Громкость<input id="volume" type="range" min="0" max="100" value="' +
-        (d.notificationVolume ?? 100) +
+        Math.round((d.notificationVolume ?? 1)*100) +
         '"><output id="volume-output">' +
-        (d.notificationVolume ?? 100) +
+        Math.round((d.notificationVolume ?? 1)*100) +
         '%</output></label><button class="btn btn-soft" id="preview">' +
         ((d.notificationSound || "default") === "default"
           ? "Настроить стандартный звук"
@@ -529,7 +529,7 @@
         (document.getElementById("volume-output").textContent =
           e.target.value + "%");
       document.getElementById("volume").onchange = (e) =>
-        save({ notificationVolume: Number(e.target.value) });
+        save({ notificationVolume: Number(e.target.value)/100 });
       document.getElementById("preview").onclick = () => {
         const k = state.data.notificationSound || "default";
         if (k === "default") {
@@ -540,7 +540,7 @@
         const audio = new Audio(
           chrome.runtime.getURL("sounds/" + file + ".mp3"),
         );
-        audio.volume = (state.data.notificationVolume ?? 100) / 100;
+        audio.volume = Math.max(0,Math.min(1,state.data.notificationVolume ?? 1));
         audio.play().catch(() => showError("Не удалось проиграть звук."));
       };
     }
@@ -670,6 +670,7 @@
   async function load() {
     try {
       state.data = await chrome.storage.local.get(null);
+      if(typeof state.data.notificationVolume==='number'&&state.data.notificationVolume>1&&state.data.notificationVolume<=100){state.data.notificationVolume/=100;await chrome.storage.local.set({notificationVolume:state.data.notificationVolume});}
       state.loaded = true;
       state.error = "";
       applyAppearance();

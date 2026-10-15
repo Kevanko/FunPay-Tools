@@ -20,7 +20,7 @@ async function _loadCfg() {
     const { notificationSound, notificationVolume, fpToolsCustomSoundData } =
         await chrome.storage.local.get(['notificationSound', 'notificationVolume', 'fpToolsCustomSoundData']);
     cfg.sound = notificationSound || 'default';
-    cfg.volume = (typeof notificationVolume === 'number') ? Math.max(0, Math.min(1, notificationVolume)) : 1;
+    cfg.volume = (typeof notificationVolume === 'number') ? Math.max(0, Math.min(1, notificationVolume>1?notificationVolume/100:notificationVolume)) : 1;
 
     // data: URL своей мелодии → blob: URL один раз (blob не попадает под CSP на data:-медиа).
     if (fpToolsCustomSoundData) {

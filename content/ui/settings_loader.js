@@ -2,6 +2,7 @@
 
 let fpToolsAccounts = [];
 let aiModeActive = false;
+let fptFlushTemplateEdits = null;
 
 async function renderTemplateSettings() {
     const container = document.getElementById('template-settings-container');
@@ -12,23 +13,29 @@ async function renderTemplateSettings() {
         const item = createElement('div', { class: 'template-item' });
         if (!config.enabled) item.classList.add('disabled-in-settings');
         
-        const colorPickerHtml = `<input type="color" class="template-color-picker" value="${config.color || '#5b86d8'}" data-key="${key}" data-custom="${isCustom}">`;
-        const deleteBtnHtml = isCustom ? `<button class="delete-custom-template-btn" data-id="${config.id}" title="Удалить"><span class="material-symbols-rounded">delete</span></button>` : '';
+        const colorPickerHtml = `<input type="color" class="template-color-picker">`;
+        const deleteBtnHtml = isCustom ? `<button class="delete-custom-template-btn" title="Удалить"><span class="material-symbols-rounded">delete</span></button>` : '';
 
         // === ИЗМЕНЕНИЕ ЗДЕСЬ ===
         item.innerHTML = `
             <div class="template-item-header">
-                <input type="checkbox" class="template-toggle" data-key="${key}" data-custom="${isCustom}" ${config.enabled ? 'checked' : ''}>
+                <input type="checkbox" class="template-toggle">
                 ${colorPickerHtml}
-                <span class="template-label" contenteditable="true" data-key="${key}" data-custom="${isCustom}">${config.label}</span>
+                <span class="template-label" contenteditable="true"></span>
                 ${deleteBtnHtml}
             </div>
             <div class="textarea-with-controls">
-                <textarea class="template-input template-text" data-key="${key}" data-custom="${isCustom}" placeholder="Текст шаблона...">${config.text}</textarea>
+                <textarea class="template-input template-text" placeholder="Текст шаблона..."></textarea>
                 <button class="btn add-image-btn fpt-img-btn" title="Добавить изображение"><span class="material-symbols-rounded">image</span></button>
             </div>
         `;
         // === КОНЕЦ ИЗМЕНЕНИЯ ===
+        item.querySelectorAll('.template-toggle,.template-color-picker,.template-label,.template-text').forEach(control=>{control.dataset.key=String(key);control.dataset.custom=String(isCustom);});
+        item.querySelector('.template-toggle').checked=!!config.enabled;
+        item.querySelector('.template-color-picker').value=/^#[a-f0-9]{6}$/i.test(config.color||'')?config.color:'#5b86d8';
+        item.querySelector('.template-label').textContent=String(config.label??'');
+        item.querySelector('.template-text').value=String(config.text??'');
+        const deleteButton=item.querySelector('.delete-custom-template-btn');if(deleteButton)deleteButton.dataset.id=String(config.id);
         container.appendChild(item);
 
         // restore previously-attached images as chips (separate from text)
@@ -57,6 +64,7 @@ async function renderTemplateSettings() {
 }
 
 async function setupTemplateSettingsHandlers() {
+    if(fptFlushTemplateEdits)await fptFlushTemplateEdits();
     await loadTemplateSettings();
     await renderTemplateSettings();
 
@@ -104,12 +112,15 @@ async function setupTemplateSettingsHandlers() {
     // full settings save AND a full rebuild of all chat template buttons in the DOM, which made
     // editing names/colors extremely laggy. Now we update the in-memory model instantly, but
     // defer the expensive save + button rebuild until typing pauses.
-    let saveDebounce = null;
+    let saveDebounce = null,dirty=false;
+    const flushEdits=async()=>{clearTimeout(saveDebounce);if(!dirty)return;dirty=false;try{await saveTemplateSettings();await addChatTemplateButtons();}catch(error){dirty=true;throw error;}};
+    // Existing delegated listeners keep this first closure; do not replace their pending save.
+    if(!container.dataset.fptHandlersAttached)fptFlushTemplateEdits=flushEdits;
     const scheduleSave = () => {
+        dirty=true;
         if (saveDebounce) clearTimeout(saveDebounce);
         saveDebounce = setTimeout(async () => {
-            await saveTemplateSettings();
-            await addChatTemplateButtons();
+            try{await flushEdits();}catch(error){showNotification('Не удалось сохранить шаблон. Повторите изменение.',true);}
         }, 400);
     };
 

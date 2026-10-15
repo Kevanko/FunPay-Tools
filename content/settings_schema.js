@@ -3,9 +3,9 @@
     'use strict';
     const VERSION = 2, MAGIC = 'FPTCONFIG', MAX_BYTES = 4 * 1024 * 1024;
     const bools = new Set(['enableCustomTheme','enableRedesignedHomepage','showSalesStats','hideBalance','viewSellersPromo','autoBumpEnabled','fpToolsSelectiveBumpEnabled','fpToolsBumpOnlyAutoDelivery','fpToolsBumpNotifyEnabled','fpToolsSmartBumpEnabled','fpToolsIdentifierEnabled','fpToolsShowPaymentType','fpToolsShowUnconfirmed','fpToolsBuyerHistory','fpToolsAutoRestoreEnabled','fpToolsAutoDisableEnabled']);
-    const objects = new Set(['fpToolsCustomSoundMeta','reviewTemplateImages','fpToolsCustomCursor','fpToolsMyEpicNick','fpToolsSlashCommands','fpToolsPopupPosition','fpToolsPopupSize','fpToolsTheme','fpToolsTemplateSettings','fpToolsCursorFx','fpToolsUserNotes','fpToolsHeaderButtonStyles','fpToolsLiveStyles','reviewTemplates']);
+    const objects = new Set(['fpToolsCustomSoundMeta','reviewTemplateImages','fpToolsCustomCursor','fpToolsMyEpicNick','fpToolsSlashCommands','fpToolsPopupPosition','fpToolsPopupSize','fpToolsTheme','fpToolsTemplateSettings','fpToolsCursorFx','fpToolsHeaderButtonStyles','fpToolsLiveStyles','reviewTemplates']);
     const arrays = new Set(['fpToolsSelectedBumpCategories','fpToolsDisabledFeatures','fpToolsPinnedLots','fpToolsPiggyBanks']);
-    const strings = new Set(['fpToolsCustomSoundData','notificationSound','fpToolsReviewRequestTemplate']);
+    const strings = new Set(['fpToolsCustomSoundData','notificationSound','fpToolsReviewRequestTemplate','fpToolsUserNotes']);
     const keys = [...bools,...objects,...arrays,...strings,'fpToolsAutoReplies','notificationVolume','autoBumpCooldown'];
     const own = (v,k) => Object.prototype.hasOwnProperty.call(v,k);
     const plain = v => !!v && typeof v === 'object' && !Array.isArray(v) && (Object.getPrototypeOf(v) === Object.prototype || Object.getPrototypeOf(v) === null);
@@ -43,7 +43,8 @@
             if (objects.has(k) && !plain(v)) throw new Error('Неверный объект: ' + k);
             if (arrays.has(k) && !Array.isArray(v)) throw new Error('Неверный список: ' + k);
             if (strings.has(k) && typeof v !== 'string') throw new Error('Неверный текст: ' + k);
-            if (['notificationVolume','autoBumpCooldown'].includes(k) && (!Number.isFinite(Number(v)) || Number(v) < 0 || (k === 'notificationVolume' && Number(v) > 1))) throw new Error('Неверное число: ' + k);
+            if (['notificationVolume','autoBumpCooldown'].includes(k) && (!Number.isFinite(Number(v)) || Number(v) < 0 || (k === 'notificationVolume' && Number(v) > 100))) throw new Error('Неверное число: ' + k);
+            if(k==='notificationVolume'){out[k]=Number(v)>1?Number(v)/100:Number(v);continue;}
             out[k] = k === 'fpToolsAutoReplies' ? sanitizeAutoReplies(v, options) : clean(v);
         }
         if (options.cloud && out.fpToolsTheme) for (const k of ['bgVideo','bgData','bgVideoData']) delete out.fpToolsTheme[k];
