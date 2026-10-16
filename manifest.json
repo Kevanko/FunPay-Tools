@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "FunPay Tools",
-    "version": "3.17.0",
+    "version": "3.17.1",
     "description": "Инструменты продавца для FunPay: статистика продаж, автоматизация, авто-выдача, массовые действия с лотами, темы оформления.",
     "permissions": [
         "storage",
@@ -17,6 +17,7 @@
         "webRequest"
     ],
     "host_permissions": [
+        "https://api.groq.com/*",
         "https://fptools-ai-server.vercel.app/*",
         "https://fptools.onrender.com/*",
         "https://funpay.com/*",
@@ -41,6 +42,10 @@
     "action": {
         "default_popup": "popup/popup.html",
         "default_title": "FP Tools"
+    },
+    "options_ui": {
+        "page": "popup/ai.html",
+        "open_in_tab": true
     },
     "icons": {
         "128": "icons/icon128.png"

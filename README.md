@@ -25,6 +25,12 @@ Works in Chrome, Edge, Opera, Yandex Browser and other Chromium browsers.
 
 For GitHub auto-updates in Chrome on Windows, install the [local updater](desktop/README.md). It maintains a separate extension copy and verifies release SHA-256. Moving from another folder requires a one-time settings export and import.
 
+## AI with a free quota
+
+Open **ИИ → Подключить Groq** in the extension, create a [Groq API key](https://console.groq.com/keys), save it, and test the connection. Use Groq's Free plan for a free quota; current limits are shown in your Groq account. GPT OSS 120B and 20B are supported.
+
+Requests go directly to Groq. The key stays in extension-origin storage in this browser and is excluded from settings exports, QR transfers and cloud sync. Review rewritten messages before sending them. The original author's service remains a manual option, with no automatic fallback.
+
 ## Features
 
 Version 3.14 adds account-scoped IndexedDB history, purchases and balance history, CSV/JSON exports, lot notes, a new-chat entry point and public order-to-lot drafts. Currency totals stay separate. Eight themes and system fonts share one palette between the popup and site panel.

@@ -14,6 +14,7 @@ const fetch = (url, options = {}) => {
 // background/background.js - FunPay Tools 2.8
 
 import { fetchAIResponse, fetchAILotGeneration, fetchAITranslation, fetchAIImageGeneration } from './ai.js';
+import { aiConnectionStatus, saveAIConnection, isAISettingsSender, requestGroq } from './ai_provider.js';
 import { BUMP_ALARM_NAME, startAutoBump, stopAutoBump, runBumpCycle } from './autobump.js';
 import { runAutoResponderCycle, resetAutoResponderState, runMultiAccountAutoReply, withCookieLock, fpIsRateLimited, fpFetch, fetchAccountPage } from './autoresponder.js';
 import { createLoginTransfer, trustedLoginSender } from './login_transfer.js';
@@ -1006,6 +1007,14 @@ async function fptCloudPull(accountId) {
 
 // --- Главный обработчик сообщений ---
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (['fptAIStatus', 'fptAISave', 'fptAITest'].includes(request?.action)) {
+        if (!isAISettingsSender(sender, chrome.runtime)) { sendResponse({ success: false, error: 'Откройте страницу подключения ИИ в расширении' }); return; }
+        const task = request.action === 'fptAIStatus' ? aiConnectionStatus()
+            : request.action === 'fptAISave' ? saveAIConnection(request)
+            : requestGroq('Исправь опечатку. Верни только исправленное слово: Превет', 'You are a text editor. Reply only with the corrected text.');
+        task.then(result => sendResponse(result || { success: false, error: 'Для проверки выберите Groq и сохраните настройки.' }), () => sendResponse({ success: false, error: 'Не удалось открыть настройки ИИ. Повторите попытку.' }));
+        return true;
+    }
     if (request?.action === 'fptCreateLoginQR') {
         if (!trustedLoginSender(sender, chrome.runtime)) { sendResponse({ ok: false, error: 'Откройте окно расширения через значок в браузере' }); return; }
         chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' }).then(cookie => {

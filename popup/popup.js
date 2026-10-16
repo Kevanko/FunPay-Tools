@@ -103,6 +103,7 @@
     calc: ["Калькулятор", "calculator"],
     appearance: ["Оформление", "theme"],
     accounts: ["Аккаунты", "accounts"],
+    ai: ["ИИ", "ai_connection"],
     settings: ["Уведомления", "notifications"],
   };
   const LABELS = {
@@ -229,7 +230,7 @@
             '" ' +
             (state.page === id ? 'aria-current="page"' : "") +
             ">" +
-            FPTIcons.svg(({home:"home",phone:"qr",lots:"lots",autobump:"bump",delivery:"bolt",templates:"document",replies:"reply",commands:"terminal",blacklist:"block",currency:"exchange",piggy:"wallet",calc:"calculator",appearance:"palette",accounts:"users",settings:"bell"})[id],19) + "<span>" + esc(name) +
+            FPTIcons.svg(({home:"home",phone:"qr",lots:"lots",autobump:"bump",delivery:"bolt",templates:"document",replies:"reply",commands:"terminal",blacklist:"block",currency:"exchange",piggy:"wallet",calc:"calculator",appearance:"palette",accounts:"users",ai:"sparkles",settings:"bell"})[id],19) + "<span>" + esc(name) +
             "</span></button>",
         )
         .join("") || '<p class="fpt-navempty">Ничего не найдено</p>';
@@ -284,7 +285,7 @@
       '</h1><p class="fpt-desc">' +
       (id === "home"
         ? "Состояние настроек на этом устройстве."
-        : id === "phone" ? "Приложение, вход и ваши настройки." : "Редактор полных настроек доступен на сайте FunPay.") +
+        : id === "phone" ? "Приложение, вход и ваши настройки." : id === "ai" ? "Свой аккаунт Groq с бесплатной квотой." : "Редактор полных настроек доступен на сайте FunPay.") +
       "</p></div></div>";
     if (id === "home")
       body =
@@ -451,6 +452,7 @@
           : "Прослушать") +
         "</button>" +
         editButton(id, "Все настройки уведомлений") + '<hr><button class="btn btn-soft" id="check-app-update">'+FPTIcons.svg("refresh")+'Проверить обновления</button><p id="app-update-result" class="fpt-desc" role="status"></p>';
+    else if(id === "ai")body='<p class="fpt-desc">Корректировка сообщений, переводы и описания. Ключ хранится только в этом браузере; в QR и облако он не попадает.</p><a class="btn btn-soft" href="'+chrome.runtime.getURL('popup/ai.html')+'" target="_blank" rel="noopener">Подключить Groq</a>';
     else if(id === "phone")body="";
     else
       body =

@@ -10,7 +10,9 @@ test('settings pages preserve controls while separating notifications and provid
  const root=context.createMainPopup();dom.window.document.body.append(root);
  const pages=[...root.querySelectorAll('.fp-tools-page-content')];
  const nav=[...root.querySelectorAll('.fp-tools-nav li[data-page]')];
- assert.equal(pages.length,27);assert.equal(new Set(pages.map(p=>p.dataset.page)).size,27);
+ assert.equal(pages.length,28);assert.equal(new Set(pages.map(p=>p.dataset.page)).size,28);
+ assert.equal(root.querySelector('[data-page="ai_connection"] a').textContent,'ИИ');
+ assert.equal(root.querySelector('.fp-tools-page-content[data-page="ai_connection"] a').getAttribute('href'),'popup/ai.html');
  for(const item of nav)assert.equal(pages.filter(p=>p.dataset.page===item.dataset.page).length,1,item.dataset.page);
  for(const id of ['notificationSoundGroup','notificationVolume','fptCustomSoundInput','discordWebhookUrl']){
   const control=root.querySelector('#'+id);assert.ok(control,id);assert.equal(root.querySelectorAll('#'+id).length,1);assert.equal(control.closest('[data-page]').dataset.page,'notifications');

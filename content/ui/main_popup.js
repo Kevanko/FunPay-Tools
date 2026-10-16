@@ -1264,6 +1264,13 @@ function createMainPopup() {
     `;
     organizeThemeSettings(toolsPopup);
     organizeSettingsPages(toolsPopup);
+    const aiNav=document.createElement('li');aiNav.dataset.page='ai_connection';
+    const aiLink=document.createElement('a');aiLink.innerHTML=FPTIcons.svg('sparkles',20)+'<span>ИИ</span>';aiNav.append(aiLink);
+    toolsPopup.querySelector('.fp-tools-nav li[data-page="ai_audit"]')?.before(aiNav);
+    const aiPage=document.createElement('div');aiPage.className='fp-tools-page-content';aiPage.dataset.page='ai_connection';aiPage.setAttribute('aria-label','ИИ');
+    aiPage.innerHTML='<h3>ИИ</h3><p class="template-info">Корректировка сообщений, переводы и описания через ваш аккаунт Groq с бесплатной квотой.</p><p class="template-info">Ключ хранится отдельно на этом устройстве и не переносится вместе с настройками.</p>';
+    const aiConnect=document.createElement('a');aiConnect.className='btn';aiConnect.href=chrome.runtime.getURL('popup/ai.html');aiConnect.target='_blank';aiConnect.rel='noopener';aiConnect.textContent='Подключить Groq';aiPage.append(aiConnect);
+    toolsPopup.querySelector('main').append(aiPage);
     return toolsPopup;
 }
 

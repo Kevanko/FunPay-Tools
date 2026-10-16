@@ -1,3 +1,4 @@
+import { requestGroq } from './ai_provider.js';
 const VERCEL_API_URL = 'https://fptools.onrender.com/api/ai'; 
 const API_SECRET_KEY = 'fptoolsdim';
 
@@ -12,6 +13,8 @@ function fptNorm(t) {
 }
 
 async function makeAIRequest(finalPrompt) {
+    const groq = await requestGroq(finalPrompt, SYSTEM_PROMPT);
+    if (groq) return groq;
     if (VERCEL_API_URL.includes('YOUR_VERCEL_PROJECT_NAME')) {
         return { success: false, error: "URL сервера не настроен в background/ai.js" };
     }
