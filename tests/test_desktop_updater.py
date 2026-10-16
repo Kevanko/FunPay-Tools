@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 
 spec = importlib.util.spec_from_file_location("updater", Path(__file__).parents[1] / "desktop/updater_host.py")
@@ -24,6 +25,42 @@ def archive(version="9.0.0", extra=None):
 
 
 class DesktopUpdaterTests(unittest.TestCase):
+    def test_existing_installation_updates_in_place_without_changing_profile_or_origin(self):
+        data = archive()
+        metadata = {"extension": {"version": "9.0.0", "url": updater.ASSET_PREFIX + "v9.0.0/extension.zip", "sha256": hashlib.sha256(data).hexdigest()}}
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            active = base / "old-build" / "FunPay-Tools-unpacked"
+            active.mkdir(parents=True)
+            (active / "manifest.json").write_text('{"name":"FunPay Tools","manifest_version":3,"version":"8.0.0"}')
+            profile = base / "browser-profile"
+            profile.mkdir()
+            (profile / "settings").write_text("preserved")
+            before = updater.extension_origin(active)
+            root = base / "updater-state"
+            root.mkdir()
+            (root / "installations.json").write_text(json.dumps({before: str(active)}))
+            with patch.object(updater, "managed_root", return_value=root):
+                self.assertEqual(updater.registered_directory(before), active.resolve())
+                self.assertTrue(updater.update(root / "state", lambda url, limit: json.dumps(metadata).encode() if "latest.json" in url else data, active)["updated"])
+                self.assertEqual(updater.registered_directory(before), active.resolve())
+                with self.assertRaises(ValueError):
+                    updater.registered_directory("chrome-extension://" + "a" * 32 + "/")
+            self.assertEqual(before, updater.extension_origin(active))
+            self.assertEqual((profile / "settings").read_text(), "preserved")
+            self.assertEqual(json.loads((active.with_name(active.name + ".previous") / "manifest.json").read_text())["version"], "8.0.0")
+
+    def test_registered_source_checkout_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            active = root / "checkout" / "extension"
+            active.mkdir(parents=True)
+            (active.parent / ".git").mkdir()
+            origin = updater.extension_origin(active)
+            (root / "installations.json").write_text(json.dumps({origin: str(active)}))
+            with patch.object(updater, "managed_root", return_value=root), self.assertRaisesRegex(ValueError, "Source"):
+                updater.registered_directory(origin)
+
     def test_download_install_and_idempotence_keep_browser_data_outside_install(self):
         data = archive()
         metadata = {"extension": {"version": "9.0.0", "url": updater.ASSET_PREFIX + "v9.0.0/extension.zip", "sha256": hashlib.sha256(data).hexdigest()}}

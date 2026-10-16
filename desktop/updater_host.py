@@ -71,15 +71,35 @@ def managed_root():
     return Path(os.environ["LOCALAPPDATA"]) / "FunPayTools" / "desktop"
 
 
-def managed_origin():
-    path = str((managed_root() / "extension").resolve())
+def extension_origin(directory):
+    path = str(Path(directory).resolve())
     if os.name == "nt":
         path = path[0].upper() + path[1:]
     digest = hashlib.sha256(path.encode("utf-16-le") if os.name == "nt" else os.fsencode(path)).hexdigest()[:32]
     return "chrome-extension://" + "".join(chr(97 + int(c, 16)) for c in digest) + "/"
 
 
-def update(root, fetch=download):
+def managed_origin():
+    return extension_origin(managed_root() / "extension")
+
+
+def registered_directory(origin):
+    if origin == managed_origin():
+        return managed_root() / "extension"
+    config = managed_root() / "installations.json"
+    bindings = json.loads(config.read_text(encoding="utf-8")) if config.exists() else {}
+    directory = Path(bindings.get(origin, "")).resolve()
+    if origin not in bindings or extension_origin(directory) != origin:
+        raise ValueError("Extension installation is not registered")
+    if any((parent / ".git").exists() for parent in (directory, *directory.parents)):
+        raise ValueError("Source checkouts cannot be updated")
+    manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+    if manifest.get("name") != "FunPay Tools" or manifest.get("manifest_version") != 3:
+        raise ValueError("Registered path is not a FunPay Tools installation")
+    return directory
+
+
+def update(root, fetch=download, active_directory=None):
     import time
     root = Path(root).resolve()
     root.mkdir(parents=True, exist_ok=True)
@@ -90,7 +110,7 @@ def update(root, fetch=download):
         # A stale lock from a killed host should not disable updates permanently.
         if time.time() - lock.stat().st_mtime > 600:
             lock.unlink()
-            return update(root, fetch)
+            return update(root, fetch, active_directory)
         raise RuntimeError("Update is already running")
     os.close(descriptor)
     try:
@@ -100,7 +120,7 @@ def update(root, fetch=download):
         url, digest = metadata["url"], metadata["sha256"]
         if not url.startswith(ASSET_PREFIX) or not url.endswith(".zip") or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest.lower()):
             raise ValueError("Invalid release metadata")
-        active = root / "extension"
+        active = Path(active_directory).resolve() if active_directory is not None else root / "extension"
         manifest_path = active / "manifest.json"
         current = json.loads(manifest_path.read_text(encoding="utf-8"))["version"] if manifest_path.exists() else "0.0.0"
         if version(target_version) <= version(current):
@@ -109,13 +129,15 @@ def update(root, fetch=download):
         if hashlib.sha256(archive).hexdigest() != digest.lower():
             raise ValueError("Release SHA256 mismatch")
         files = validate_archive(archive, target_version)
-        with tempfile.TemporaryDirectory(prefix="release-", dir=root) as staging:
+        # Stage beside an existing installation so directory renames remain on one drive.
+        staging_parent = active.parent if active_directory is not None else root
+        with tempfile.TemporaryDirectory(prefix="release-", dir=staging_parent) as staging:
             staged = Path(staging) / "extension"
             for name, content in files.items():
                 destination = staged.joinpath(*PurePosixPath(name).parts)
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 destination.write_bytes(content)
-            backup = root / "previous"
+            backup = active.with_name(active.name + ".previous") if active_directory is not None else root / "previous"
             if backup.exists():
                 shutil.rmtree(backup)
             if active.exists():
@@ -139,7 +161,9 @@ def respond(value):
 
 def main():
     if "--install" in sys.argv:
-        print(json.dumps(update(managed_root())))
+        directory = registered_directory(sys.argv[sys.argv.index("--origin") + 1]) if "--origin" in sys.argv else None
+        root = managed_root() / "installations" / extension_origin(directory)[19:51] if directory is not None else managed_root()
+        print(json.dumps(update(root, active_directory=directory)))
         return
     if os.name == "nt":
         import msvcrt
@@ -154,13 +178,16 @@ def main():
         return
     try:
         message = json.loads(sys.stdin.buffer.read(length))
-        if len(sys.argv) < 2 or sys.argv[1] != managed_origin():
-            respond({"ok": False, "error": "Only the managed extension installation can use this updater"})
-            return
+        if len(sys.argv) < 2:
+            raise ValueError("Missing extension origin")
+        directory = registered_directory(sys.argv[1])
         if message.get("action") == "status":
             respond({"ok": True, "managed": True, "hostVersion": 1})
         elif message.get("action") == "update":
-            respond(update(managed_root()))
+            if sys.argv[1] == managed_origin():
+                respond(update(managed_root()))
+            else:
+                respond(update(managed_root() / "installations" / sys.argv[1][19:51], active_directory=directory))
         else:
             respond({"ok": False, "error": "Unsupported action"})
     except Exception as error:
