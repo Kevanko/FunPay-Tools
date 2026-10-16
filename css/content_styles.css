@@ -12124,5 +12124,13 @@ html[data-fpt-preset] .fp-tools-popup .fp-tools-nav li.active a :is(span,svg){co
 .fp-tools-popup .fpt-setting-range .range-label label{margin:0;font-size:13px}
 .fp-tools-popup .fpt-setting-range input[type=range]{width:100%;height:4px;margin:12px 0;accent-color:var(--fpt-accent)}
 .fp-tools-popup .fpt-setting-range .range-label span{font-size:12px;color:var(--fpt-text-dim);font-variant-numeric:tabular-nums}
-.fp-tools-popup #notificationSoundGroup{display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:8px}
+.fp-tools-popup #notificationSoundGroup{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px}
+.fp-tools-popup #notificationSoundGroup .fp-tools-radio-option{display:inline-flex;flex-direction:row;align-items:center;gap:8px;padding:9px 12px;margin:0;min-height:40px}
+.fp-tools-popup #notificationSoundGroup .fp-tools-radio-option span{white-space:nowrap}
+.fp-tools-popup #notificationSoundGroup input{margin:0;flex:none}
+.fp-tools-popup .fpt-setting-range>div:has(>input[type=range]){margin-top:0!important}
+.fp-tools-popup .fpt-setting-range input[type=range],.fp-tools-popup .fpt-settings-section input[type=range]{appearance:none;-webkit-appearance:none;height:24px;padding:0;background:transparent;border:0;border-radius:0;margin:0;cursor:pointer}
+.fp-tools-popup .fpt-setting-range input[type=range]::-webkit-slider-runnable-track,.fp-tools-popup .fpt-settings-section input[type=range]::-webkit-slider-runnable-track{height:4px;background:var(--fpt-line-strong);border-radius:2px}
+.fp-tools-popup .fpt-setting-range input[type=range]::-webkit-slider-thumb,.fp-tools-popup .fpt-settings-section input[type=range]::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:14px;height:14px;margin-top:-5px;border:0;border-radius:50%;background:var(--fpt-accent)}
+.fp-tools-popup .fpt-setting-range input[type=range]:focus-visible,.fp-tools-popup .fpt-settings-section input[type=range]:focus-visible{outline:2px solid var(--fpt-accent);outline-offset:3px}
 @media(max-width:700px){.fp-tools-popup .fpt-setting-range{grid-template-columns:1fr;gap:8px}}
