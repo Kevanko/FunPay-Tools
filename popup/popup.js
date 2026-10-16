@@ -89,8 +89,8 @@
     "orderConfirmReplyEnabled",
   ];
   const PAGES = {
-    home: ["Главная", "general"],
-    phone: ["На телефон", "phone"],
+    home: ["Обзор", "general"],
+    phone: ["Телефон", "phone"],
     lots: ["Лоты", "lot_io"],
     autobump: ["Поднятие лотов", "autobump"],
     delivery: ["Выдача товаров", "auto_delivery"],
@@ -106,6 +106,14 @@
     ai: ["ИИ", "ai_connection"],
     settings: ["Уведомления", "notifications"],
   };
+  const NAV_GROUPS = [
+    ['work','Работа',['home','phone','lots','templates','blacklist']],
+    ['automation','Автоматизация',['autobump','delivery','replies','commands']],
+    ['appearance','Оформление',['appearance']],
+    ['settings','Настройки',['settings','ai','accounts']],
+    ['tools','Инструменты',['currency','piggy','calc']]
+  ];
+  const expandedGroups = new Set(['work','appearance']);
   const LABELS = {
     graphite: "Студия",
     obsidian: "Терминал",
@@ -218,10 +226,9 @@
   function nav(filter = "") {
     const el = document.getElementById("nav-groups");
     if (!el) return;
-    el.innerHTML =
-      Object.entries(PAGES)
-        .filter(([, v]) => v[0].toLowerCase().includes(filter.toLowerCase()))
-        .map(
+    const normalize=value=>value.toLowerCase().replace(/ё/g,'е').trim();
+    const query=normalize(filter);
+    const navButton =
           ([id, [name]]) =>
             '<button class="fpt-navitem' +
             (state.page === id ? " is-active" : "") +
@@ -231,9 +238,17 @@
             (state.page === id ? 'aria-current="page"' : "") +
             ">" +
             FPTIcons.svg(({home:"home",phone:"qr",lots:"lots",autobump:"bump",delivery:"bolt",templates:"document",replies:"reply",commands:"terminal",blacklist:"block",currency:"exchange",piggy:"wallet",calc:"calculator",appearance:"palette",accounts:"users",ai:"sparkles",settings:"bell"})[id],19) + "<span>" + esc(name) +
-            "</span></button>",
-        )
-        .join("") || '<p class="fpt-navempty">Ничего не найдено</p>';
+            "</span></button>";
+    el.innerHTML = NAV_GROUPS.map(([key,title,ids])=>{
+      const entries=ids.filter(id=>!query||normalize(PAGES[id][0]+' '+title).includes(query)).map(id=>[id,PAGES[id]]);
+      if(!entries.length)return '';
+      const open=Boolean(query)||expandedGroups.has(key)||ids.includes(state.page);
+      return '<details class="fpt-navgroup" data-group="'+key+'" '+(open?'open':'')+'><summary>'+esc(title)+'</summary><div>'+entries.map(navButton).join('')+'</div></details>';
+    }).join('') || '<p class="fpt-navempty">Ничего не найдено</p>';
+    el.querySelectorAll('details[data-group]').forEach(group=>group.addEventListener('toggle',()=>{
+      if(query||!group.isConnected)return;
+      if(group.open)expandedGroups.add(group.dataset.group);else expandedGroups.delete(group.dataset.group);
+    }));
     el.querySelectorAll("[data-page]").forEach((b) =>
       b.addEventListener("click", () => {
         state.page = b.dataset.page;
@@ -283,9 +298,7 @@
       '<div class="fpt-pagehead"><div><h1 class="fpt-h2">' +
       PAGES[id][0] +
       '</h1><p class="fpt-desc">' +
-      (id === "home"
-        ? "Состояние настроек на этом устройстве."
-        : id === "phone" ? "Приложение, вход и ваши настройки." : id === "ai" ? "Свой аккаунт Groq с бесплатной квотой." : "Редактор полных настроек доступен на сайте FunPay.") +
+      ({home:'Основные настройки сайта и продаж.',phone:'Установка приложения и перенос настроек.',lots:'Импорт, экспорт и массовое редактирование.',templates:'Готовые сообщения и быстрые ответы.',blacklist:'Покупатели, для которых отключена автоматизация.',autobump:'Когда и какие категории поднимать.',delivery:'Товары и правила отправки после оплаты.',replies:'Сообщения для событий и ответы на отзывы.',commands:'Команды для быстрых действий в чате.',appearance:'Тема, фон и шрифт на ваших устройствах.',settings:'Мелодии, громкость и обновления.',ai:'Подключение ИИ для сообщений и описаний.',accounts:'Переключение между аккаунтами FunPay.',currency:'Курсы и пересчёт сумм.',piggy:'Цели и накопления с продаж.',calc:'Расчёты без выхода с сайта.'}[id]||'') +
       "</p></div></div>";
     if (id === "home")
       body =
@@ -323,7 +336,7 @@
         [
           ["greetingEnabled", "Приветствие"],
           ["keywordsEnabled", "Ключевые слова"],
-          ["autoReviewEnabled", "Автоотзыв"],
+          ["autoReviewEnabled", "Ответы на отзывы"],
           ["bonusForReviewEnabled", "Бонус за отзыв"],
           ["newOrderReplyEnabled", "Новый заказ"],
           ["orderConfirmReplyEnabled", "Подтверждение заказа"],
@@ -395,7 +408,7 @@
       const t = d.fpToolsTheme || {};
       body =
         '<div class="fpt-themes">' +
-        Object.keys(FPT_SITE_PRESETS)
+        ['obsidian','graphite','light','clay','paper','forest','ink','slate']
           .map(
             (k) =>
               '<button class="fpt-theme" data-preset="' +
@@ -405,7 +418,7 @@
               '"><span class="fpt-theme-prev" style="background:' +
               FPT_SITE_PRESETS[k].containerBgColor +
               '"></span><span class="fpt-theme-label">' +
-              (FPT_DESIGN_PROFILES[k]?.label||LABELS[k]) +
+              LABELS[k] +
               "</span></button>",
           )
           .join("") +
@@ -476,6 +489,14 @@
       (!state.loaded ? '<p role="status">Загрузка настроек…</p>' : "") +
       body +
       "</div>";
+    root.querySelectorAll('input[type="range"]').forEach(range=>{
+      const label=range.closest('label');if(!label)return;
+      label.classList.add('fpt-range-setting');
+      const output=label.querySelector('output')||document.createElement('output');
+      output.setAttribute('for',range.id);label.insertBefore(output,range);
+      const refresh=()=>{output.textContent=range.value+(range.id==='volume'?'%':'px');};
+      range.addEventListener('input',refresh);refresh();
+    });
     root
       .querySelectorAll("[data-editor]")
       .forEach((b) => (b.onclick = () => openEditor(b.dataset.editor)));
