@@ -12061,8 +12061,9 @@ html[data-fpt-preset="light"] .fp-rmthub-form input::placeholder { color: #8a90a
 /* Menu surfaces follow the selected palette instead of dark translucent fills. */
 [data-fpt-preset]:not([data-fpt-preset="native"]) .fp-tools-popup:not(.fpt-menu-transparent) .fp-tools-header{background:var(--fpt-bg-deep);backdrop-filter:none}
 [data-fpt-preset]:not([data-fpt-preset="native"]) .fp-tools-popup:not(.fpt-menu-transparent) .fp-tools-body,
-[data-fpt-preset]:not([data-fpt-preset="native"]) .fp-tools-popup:not(.fpt-menu-transparent) .fp-tools-content{background:var(--fpt-bg)}
-[data-fpt-preset]:not([data-fpt-preset="native"]) .fp-tools-popup:not(.fpt-menu-transparent) .fp-tools-nav{background:var(--fpt-surface)}
+[data-fpt-preset]:not([data-fpt-preset="native"]) .fp-tools-popup:not(.fpt-menu-transparent),
+[data-fpt-preset]:not([data-fpt-preset="native"]) .fp-tools-popup:not(.fpt-menu-transparent) .fp-tools-content{background:var(--fpt-surface)}
+[data-fpt-preset]:not([data-fpt-preset="native"]) .fp-tools-popup:not(.fpt-menu-transparent) .fp-tools-nav{background:var(--fpt-bg)}
 body:has(.fp-tools-popup.active) #fpToolsButton[data-fpt-location="floating"]{visibility:hidden}
 .fp-tools-popup .close-btn:has(svg)::after{content:none}.fp-tools-popup .close-btn{display:flex;align-items:center;justify-content:center}
 

@@ -138,6 +138,8 @@ html.fpt-custom-theme-on :is(.btn,.fp-tools-popup button,.fp-tools-popup select)
 html.fpt-custom-theme-on .fp-tools-popup{border-radius:var(--fpt-panel-radius)!important;}
 html.fpt-custom-theme-on .fp-tools-content{padding:var(--fpt-layout-gap)!important;}
 html.fpt-custom-theme-on .fp-tools-nav li a{padding:var(--fpt-control-pad) 14px!important;}
+html.fpt-custom-theme-on .banner-cookie-consent{background:var(--fpt-p2)!important;color:var(--fpt-pTx)!important;border:1px solid var(--fpt-pLine)!important;border-radius:var(--fpt-panel-radius)!important;box-shadow:none!important;font-family:var(--fpt-ui-font)!important;}
+html.fpt-custom-theme-on .banner-cookie-consent .cc-options{background:var(--fpt-p1)!important;color:var(--fpt-pTx)!important;border:1px solid var(--fpt-pLine)!important;}
 html.fpt-custom-theme-on .fpt-home{--home-radius:var(--fpt-panel-radius);--home-gap:var(--fpt-layout-gap);}
 html.fpt-custom-theme-on .fpt-home :is(.cc-stats,.cc-module,.cc-card,.cc-panel){border-radius:var(--fpt-panel-radius)!important;}
 `;}
