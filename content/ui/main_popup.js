@@ -1420,15 +1420,19 @@ function setupMenuSearch(toolsPopup) {
     const more=nav.querySelector('.fpt-nav-more');
     const secondary=new Set(['effects','needs','epic_nicks','global_chat','ai_audit','piggy_banks','calculator','overview','tickets','support','slash_commands']);
     nav.querySelectorAll('li[data-page]').forEach(item=>{item.dataset.secondary=String(secondary.has(item.dataset.page));});
+    const normalize=value=>value.toLowerCase().replace(/ё/g,'е').replace(/\s+/g,' ').trim();
+    const pageById=new Map([...toolsPopup.querySelectorAll('.fp-tools-page-content')].map(page=>[page.dataset.page,page]));
 
     const applyFilter = () => {
-        const query = searchInput.value.trim().toLowerCase();
+        const query = normalize(searchInput.value);
         const items = Array.from(nav.querySelectorAll('li[data-page]'));
         let visibleCount = 0;
 
         items.forEach(item => {
-            const text = item.textContent.trim().toLowerCase();
-            const isVisible = query ? text.includes(query)||item.dataset.page.toLowerCase().includes(query) : item.dataset.secondary!=='true'||item.classList.contains('active')||more?.getAttribute('aria-expanded')==='true';
+            const page=pageById.get(item.dataset.page);
+            const settings=page?[...page.querySelectorAll('label,h3,h4,summary,input[placeholder],textarea[placeholder]')].map(node=>normalize(node.getAttribute('placeholder')||node.textContent)):[];
+            const text=normalize(item.textContent+' '+item.dataset.page);
+            const isVisible = query ? query.split(' ').every(word=>text.includes(word)||settings.some(label=>label.includes(word))) : item.dataset.secondary!=='true'||item.classList.contains('active')||more?.getAttribute('aria-expanded')==='true';
             item.hidden = !isVisible;
             if (isVisible) visibleCount += 1;
         });
@@ -1455,6 +1459,16 @@ function setupMenuSearch(toolsPopup) {
     applyFilter();
 
     searchInput.addEventListener('input', applyFilter);
+    nav.addEventListener('click',event=>{
+        const item=event.target.closest('li[data-page]'),query=normalize(searchInput.value);if(!item||!query)return;
+        const page=pageById.get(item.dataset.page);if(!page)return;
+        const words=query.split(' '),match=[...page.querySelectorAll('label,h3,h4,summary')].find(node=>words.every(word=>normalize(node.textContent).includes(word)));
+        if(!match)return;
+        for(let parent=match.parentElement;parent&&parent!==page;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+        match.scrollIntoView({block:'center',behavior:'instant'});
+        const control=match.tagName==='LABEL'&&match.htmlFor?page.querySelector('[id="'+match.htmlFor.replace(/["\\]/g,'\\$&')+'"]'):null;
+        if(control)control.focus({preventScroll:true});else{match.tabIndex=-1;match.focus({preventScroll:true});}
+    });
     searchInput.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
             searchInput.value = '';
