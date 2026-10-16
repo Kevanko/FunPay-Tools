@@ -14,6 +14,7 @@ class CursorFX {
         this.cursorHideStyleTag = null;
         this.maxParticles = 120; // 2.8: reduced for GPU perf (review #5)
         this._lastMouseTime = 0;
+        this._lastFrameTime = 0;
 
         this.init();
     }
@@ -44,6 +45,9 @@ class CursorFX {
         document.head.appendChild(this.cursorHideStyleTag);
 
         window.addEventListener('resize', this.resize.bind(this));
+        document.addEventListener('visibilitychange',()=>{if(document.hidden)this.clearParticles();});
+        document.addEventListener('mouseleave',()=>{this.clearParticles();this.customCursor.style.visibility='hidden';});
+        document.addEventListener('mouseenter',()=>{this.customCursor.style.visibility='visible';});
         this.resize();
 
         window.addEventListener('mousemove', e => {
@@ -58,7 +62,7 @@ class CursorFX {
             }
 
             // Only spawn cursor-fx particles when that effect is enabled.
-            if (this.isEnabled) {
+            if (this.isEnabled && !document.hidden) {
                 const now = performance.now();
                 if (now - this._lastMouseTime >= 16) {
                     this._lastMouseTime = now;
@@ -69,8 +73,16 @@ class CursorFX {
     }
 
     resize() {
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
+        const scale=Math.min(window.devicePixelRatio||1,2);
+        this.canvas.width = Math.round(window.innerWidth*scale);
+        this.canvas.height = Math.round(window.innerHeight*scale);
+        this.ctx.setTransform(scale,0,0,scale,0,0);
+    }
+
+    clearParticles() {
+        if(this.animationFrame)cancelAnimationFrame(this.animationFrame);
+        this.animationFrame=null;this._lastFrameTime=0;this.particles.length=0;
+        this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
     }
     
     updateCustomCursor(newConfig) {
@@ -101,6 +113,8 @@ class CursorFX {
 
     updateConfig(newConfig) {
         this.config = { ...this.config, ...newConfig };
+        this.config.count=Math.max(0,Math.min(100,Number(this.config.count)||0));
+        for(const key of ['color1','color2'])if(!/^#[0-9a-f]{6}$/i.test(this.config[key]||''))this.config[key]='#5b86d8';
         if (this.config.enabled && !this.isEnabled) {
             this.start();
         } else if (!this.config.enabled && this.isEnabled) {
@@ -121,8 +135,7 @@ class CursorFX {
             cancelAnimationFrame(this.animationFrame);
             this.animationFrame = null;
         }
-        // Очищаем холст через некоторое время, чтобы частицы успели исчезнуть
-        setTimeout(() => this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height), 200);
+        this.clearParticles();
     }
     
     spawnSingleParticle() {
@@ -132,7 +145,7 @@ class CursorFX {
         
         const p = {
             x: this.mouse.x, y: this.mouse.y,
-            life: Math.random() * 40 + 40,
+            life: Math.random() * 14 + 22,
         };
 
         const hexToRgb = hex => hex.match(/\w\w/g).map(x => parseInt(x, 16));
@@ -140,8 +153,8 @@ class CursorFX {
         switch(this.config.type) {
             case 'trail': p.vx = 0; p.vy = 0; p.size = Math.random() * 3 + 2; break;
             case 'snow': p.vx = Math.random() * 2 - 1; p.vy = Math.random() * 1 + 0.5; p.size = Math.random() * 2 + 1; break;
-            case 'blood': p.vx = Math.random() * 2 - 1; p.vy = Math.random() * 1 - 2; p.gravity = 0.15; p.size = Math.random() * 4 + 2; break;
-            default: const angle = Math.random() * Math.PI * 2; const speed = Math.random() * 3 + 1; p.vx = Math.cos(angle) * speed; p.vy = Math.sin(angle) * speed; p.size = Math.random() * 2 + 1; break;
+            case 'blood': p.vx = Math.random() * .8 - .4; p.vy = Math.random() * .6 - 1; p.gravity = 0.06; p.size = Math.random() * 2 + 1; break;
+            default: const angle = Math.random() * Math.PI * 2; const speed = Math.random() * .9 + .3; p.vx = Math.cos(angle) * speed; p.vy = Math.sin(angle) * speed; p.size = Math.random() * 1.2 + .8; break;
         }
 
         if (this.config.rgb) {
@@ -158,23 +171,20 @@ class CursorFX {
             if (this.config.type === 'snow') p.color = `rgba(255,255,255,${Math.random() * 0.5 + 0.3})`;
         }
         this.particles.push(p);
+        p.duration=p.life;
     }
 
     createParticle() {
-        // Если анимация неактивна, запускаем ее
-        if (!this.animationFrame && this.isEnabled) {
-            this.animate();
-        }
-
-        const count = (this.config.count / 100) * 5;
+        const count = (this.config.count / 100) * 2;
         const numToSpawn = Math.floor(count) + (Math.random() < (count % 1) ? 1 : 0);
 
         for(let i = 0; i < numToSpawn; i++) {
             this.spawnSingleParticle();
         }
+        if(!this.animationFrame&&this.isEnabled&&this.particles.length)this.animate();
     }
 
-    animate() {
+    animate(now=performance.now()) {
         if (!this.isEnabled) {
             this.animationFrame = null;
             return;
@@ -185,23 +195,25 @@ class CursorFX {
             this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         }
         
-        this.hue = (this.hue + 1) % 360;
+        const step=this._lastFrameTime?Math.max(.25,Math.min(2,(now-this._lastFrameTime)/16.667)):1;
+        this._lastFrameTime=now;
+        this.hue = (this.hue + .4*step) % 360;
 
         // Создаем частицы при движении мыши (уже делается в mousemove
 
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const p = this.particles[i];
-            p.life--;
+            p.life-=step;
 
             if (p.life <= 0) {
                 this.particles.splice(i, 1);
                 continue;
             }
 
-            p.x += p.vx; p.y += p.vy;
-            if (p.gravity) p.vy += p.gravity;
+            p.x += p.vx*step; p.y += p.vy*step;
+            if (p.gravity) p.vy += p.gravity*step;
 
-            this.ctx.globalAlpha = p.life / 35;
+            this.ctx.globalAlpha = Math.min(.7,p.life/p.duration*.7);
             this.ctx.fillStyle = p.color;
             this.ctx.beginPath();
             this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);

@@ -1013,6 +1013,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         playNotificationSound().then(sendResponse, () => sendResponse({ ok: false }));
         return true;
     }
+    if (request?.action === 'fptOpenSettingsPanel') {
+        if (sender.id !== chrome.runtime.id || !sender.tab || !/^https:\/\/funpay\.com\//.test(sender.url || '') || !['ai','phone'].includes(request.panel)) { sendResponse({ success: false }); return; }
+        const task = request.panel === 'ai' ? chrome.runtime.openOptionsPage() : chrome.tabs.create({ url: chrome.runtime.getURL('popup/phone.html') });
+        task.then(()=>sendResponse({ success:true }),()=>sendResponse({ success:false,error:'Не удалось открыть настройки расширения' }));
+        return true;
+    }
     if (['fptAIStatus', 'fptAISave', 'fptAITest', 'fptAIModels'].includes(request?.action)) {
         if (!isAISettingsSender(sender, chrome.runtime)) { sendResponse({ success: false, error: 'Откройте страницу подключения ИИ в расширении' }); return; }
         const task = request.action === 'fptAIStatus' ? aiConnectionStatus()

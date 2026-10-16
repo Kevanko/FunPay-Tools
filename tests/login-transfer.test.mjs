@@ -30,5 +30,6 @@ test('session export allowed only from own popup, never site content scripts', (
  const runtime={id:'fixture',getURL:p=>'chrome-extension://fixture/'+p},sender={id:'fixture',url:'chrome-extension://fixture/popup/popup.html'};
  assert.equal(trustedLoginSender(sender,runtime),true);
  assert.equal(trustedLoginSender({...sender,tab:{}},runtime),true);
+ assert.equal(trustedLoginSender({...sender,url:runtime.getURL('popup/phone.html')},runtime),true);
  for(const bad of [{...sender,id:'other'},{...sender,url:'https://funpay.com/'},{...sender,url:sender.url+'?x'},{}])assert.equal(trustedLoginSender(bad,runtime),false);
 });

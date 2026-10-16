@@ -17,3 +17,20 @@ test('hiding extension clears both session QR and separate code from DOM',async(
  const dom=screen({ok:true,qr:'FPTLOGIN1:synthetic-fixture',code:'ABCD-EFGH-JKLM-NPQR',expires:Date.now()+300000}),w=dom.window;
  try{await w.FPTPhoneTransfer.mount(w.document.querySelector('#root'),{});await w.document.querySelector('#login-create').onclick();assert.equal(w.document.querySelector('#login-transfer').hidden,false);assert.match(w.document.querySelector('#login-code').textContent,/ABCD/);Object.defineProperty(w.document,'hidden',{value:true,configurable:true});w.document.dispatchEvent(new w.Event('visibilitychange'));assert.equal(w.document.querySelector('#login-transfer').hidden,true);assert.equal(w.document.querySelector('#login-code').textContent,'');assert.equal(w.document.querySelector('#login-create').disabled,false);}finally{w.close();}
 });
+
+test('failed settings encoding hides empty canvas and exposes a readable error',async()=>{
+ const dom=screen({ok:false}),w=dom.window;w.chrome.storage={local:{get:async()=>({})}};w.chrome.runtime.getManifest=()=>({version:'test'});w.FPTSettingsSchema={encode(){throw Error('Слишком большой файл настроек');}};
+ try{await w.FPTPhoneTransfer.mount(w.document.querySelector('#root'),{});await w.document.querySelector('#show-transfer').onclick();assert.equal(w.document.querySelector('#settings-qr').hidden,true);assert.match(w.document.querySelector('#qr-position').textContent,/Слишком большой/);assert.equal(w.document.querySelector('#qr-next').hidden,true);assert.ok(w.document.querySelector('#settings-file'));}finally{w.close();}
+});
+
+test('site login button requests a trusted extension page instead of exposing login data in site DOM',async()=>{
+ const dom=screen({ok:true}),w=dom.window;dom.reconfigure({url:'https://funpay.com/'});const requests=[];w.chrome.runtime.sendMessage=async value=>{requests.push(value);return {success:true};};
+ try{await w.FPTPhoneTransfer.mount(w.document.querySelector('#root'),{});await w.document.querySelector('#login-create').onclick();assert.equal(requests[0].action,'fptOpenSettingsPanel');assert.equal(requests[0].panel,'phone');assert.equal(w.document.querySelector('#login-transfer').hidden,true);}finally{w.close();}
+});
+
+test('oversized media can be explicitly omitted without losing ordinary settings',async()=>{
+ const dom=screen({ok:false}),w=dom.window;let transferred;
+ w.crypto.randomUUID=()=> 'fixture-transfer';w.chrome.storage={local:{get:async()=>({fpToolsTheme:{font:'Consolas',bgImage:'data:image/png;base64,LARGE'},autoBumpCooldown:30})}};w.chrome.runtime.getManifest=()=>({version:'test'});
+ w.FPTSettingsSchema={encode(data){if(data.fpToolsTheme.bgImage)throw Error('Используйте файл');transferred=data;return JSON.stringify(data);}};
+ try{await w.FPTPhoneTransfer.mount(w.document.querySelector('#root'),{});w.document.querySelector('#settings-include-media').checked=true;await w.document.querySelector('#show-transfer').onclick();assert.equal(w.document.querySelector('#settings-light').hidden,false);await w.document.querySelector('#settings-light').onclick();assert.equal(w.document.querySelector('#settings-qr').hidden,false);assert.equal(transferred.fpToolsTheme.font,'Consolas');assert.equal(transferred.fpToolsTheme.bgImage,'');assert.equal(transferred.autoBumpCooldown,30);assert.match(w.document.querySelector('#qr-position').textContent,/не включены/);}finally{w.close();}
+});

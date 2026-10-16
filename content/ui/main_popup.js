@@ -1269,7 +1269,7 @@ function createMainPopup() {
     toolsPopup.querySelector('.fp-tools-nav li[data-page="ai_audit"]')?.before(aiNav);
     const aiPage=document.createElement('div');aiPage.className='fp-tools-page-content';aiPage.dataset.page='ai_connection';aiPage.setAttribute('aria-label','ИИ');
     aiPage.innerHTML='<h3>ИИ</h3><p class="template-info">Корректировка сообщений, переводы и описания через выбранный ИИ-сервис. Платные провайдеры, бесплатные квоты и свой совместимый API.</p><p class="template-info">Ключ хранится отдельно на этом устройстве и не переносится вместе с настройками.</p>';
-    const aiConnect=document.createElement('a');aiConnect.className='btn';aiConnect.href=chrome.runtime.getURL('popup/ai.html');aiConnect.target='_blank';aiConnect.rel='noopener';aiConnect.textContent='Подключить сервис';aiPage.append(aiConnect);
+    const aiConnect=document.createElement('button');aiConnect.type='button';aiConnect.className='btn';aiConnect.textContent='Подключить сервис';aiConnect.addEventListener('click',async()=>{try{const result=await chrome.runtime.sendMessage({action:'fptOpenSettingsPanel',panel:'ai'});if(!result?.success)throw Error(result?.error||'Не удалось открыть подключение ИИ');}catch(error){aiConnect.textContent=error.message;}});aiPage.append(aiConnect);
     toolsPopup.querySelector('main').append(aiPage);
     refineSettingsLayout(toolsPopup);
     enhancePreferences(toolsPopup);
@@ -1278,6 +1278,13 @@ function createMainPopup() {
 
 function enhancePreferences(root) {
     root.classList.add('fpt-preferences');
+    root.querySelectorAll('input[type="color"]').forEach(control=>{
+        const wrap=document.createElement('div');wrap.className='fpt-color-control';control.before(wrap);wrap.append(control);
+        const hex=document.createElement('input');hex.type='text';hex.className='fpt-color-hex';hex.maxLength=7;hex.setAttribute('aria-label',(root.querySelector('label[for="'+control.id+'"]')?.textContent||'Цвет')+' HEX');wrap.append(hex);
+        const sync=()=>{hex.disabled=control.disabled;if(document.activeElement!==hex)hex.value=control.value.toUpperCase();};sync();control.addEventListener('input',sync);control.addEventListener('change',sync);document.defaultView.addEventListener('fptSettingsLoaded',sync);
+        hex.addEventListener('change',()=>{if(/^#[a-f0-9]{6}$/i.test(hex.value)){hex.setCustomValidity('');control.value=hex.value;control.dispatchEvent(new document.defaultView.Event('input',{bubbles:true}));control.dispatchEvent(new document.defaultView.Event('change',{bubbles:true}));}else hex.setCustomValidity('Введите цвет в формате #AABBCC');});
+        const observer=new document.defaultView.MutationObserver(sync);observer.observe(control,{attributes:true,attributeFilter:['value','disabled']});
+    });
     const notes={
         showSalesStatsCheckbox:['Статистика продаж','Сводка по заказам на странице «Продажи».'],
         hideBalanceCheckbox:['Скрывать баланс','Убирает сумму из шапки сайта.'],
@@ -1294,11 +1301,18 @@ function enhancePreferences(root) {
         fpAutoRestoreEnabled:['Восстанавливать лоты','Включать настроенные лоты после деактивации.'],
         fpAutoDisableEnabled:['Отключать пустые лоты','Деактивация, когда на складе не осталось товаров.']
     };
+    Object.assign(notes,{
+        fpToolsSmartBumpEnabled:['По времени FunPay','Поднимать категории, когда FunPay разрешит следующее поднятие. Этот режим имеет приоритет над интервалом.'],
+        autoBumpEnabled:['По интервалу','Проверять возможность поднятия через заданное число минут. Ограничения FunPay сохраняются.'],
+        selectiveBumpEnabled:['Выбранные категории','Поднимать только категории, отмеченные в списке ниже.'],
+        bumpOnlyAutoDelivery:['Только с автовыдачей','В категории должен быть хотя бы один лот с автоматической выдачей.'],
+        fpToolsBumpNotifyEnabled:['Уведомлять о поднятии','Показывать список категорий после успешного поднятия.']
+    });
     for(const [id,[title,description]]of Object.entries(notes)){
         const control=root.querySelector('#'+id),row=control?.closest('.checkbox-label-inline'),label=root.querySelector('label[for="'+id+'"]');if(!row||!label)continue;
         label.replaceChildren();const name=document.createElement('span');name.textContent=title;
         const help=document.createElement('small');help.className='fpt-preference-description';help.id=id+'-description';help.textContent=description;label.append(name,help);control.setAttribute('aria-describedby',help.id);row.classList.add('fpt-preference-row');
-        const next=row.nextElementSibling;if(next?.classList.contains('template-info')&&['autoReviewEnabled','bonusForReviewEnabled'].includes(id))next.hidden=true;
+        const next=row.nextElementSibling;if(next&&(next.classList.contains('template-info')||next.matches('small'))&&['autoReviewEnabled','bonusForReviewEnabled','fpToolsSmartBumpEnabled','bumpOnlyAutoDelivery','fpToolsBumpNotifyEnabled'].includes(id))next.hidden=true;
     }
     const sections=[
         ['general',0,'На сайте','Выберите, какие сведения показывать.'],
@@ -1315,7 +1329,9 @@ function enhancePreferences(root) {
         ['theme',0,'Выберите тему','Готовая палитра, шрифт и форма элементов.'],
         ['theme',1,'Фон страницы','Готовые обои или ваше изображение.'],
         ['theme',2,'Шрифт и размеры','Текст и скругления элементов интерфейса.'],
-        ['theme',3,'Тонкая настройка','Собственные цвета и дополнительные эффекты.'],
+        ['theme',3,'Палитра интерфейса','Акценты, поверхности и цвет текста. Можно выбрать оттенок или ввести HEX.'],
+        ['theme',4,'Элементы сайта','Стекло, полоса прокрутки, иконки категорий и прозрачность меню.'],
+        ['theme',5,'Сохранить оформление','Экспорт, импорт и сброс выбранной темы.'],
         ['settings_io',0,'Между устройствами','Подключение облака и перенос между аккаунтами.'],
         ['settings_io',1,'Файл настроек','Резервная копия и восстановление из файла.'],
         ['settings_io',2,'Сброс данных','Действия по очистке настроек и истории автоматизации.']
@@ -1356,6 +1372,8 @@ function enhancePreferences(root) {
     root.querySelectorAll('.fpt-nav-group-toggle').forEach((button,index)=>{const icon=document.createElement('span');icon.className='fpt-category-nav-icon';icon.innerHTML=FPTIcons.svg(['home','bolt','palette','settings','terminal','document'][index],18);button.append(icon);});
     const note=document.createElement('div');note.className='fpt-preferences-note';note.textContent='Изменения сохраняются автоматически';root.querySelector('.fp-tools-nav').append(note);
     root.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'){event.preventDefault();root.querySelector('#fpToolsMenuSearch').focus();}});
+    const effects=root.querySelector('[data-page="effects"].fp-tools-page-content');
+    if(effects){const groups=[['Частицы',[]],['Свой курсор',[]]];let current=-1;for(const node of [...effects.children]){if(node.classList.contains('fpt-blocklabel')){current++;node.remove();continue;}if(current>=0)groups[Math.min(current,1)][1].push(node);}addSettingsSectionTabs(effects,groups);}
 }
 
 function refineSettingsLayout(root) {
@@ -1411,7 +1429,8 @@ function refineSettingsLayout(root) {
                 const button=document.createElement('button');button.type='button';button.className='fpt-settings-tool';
                 const copy=document.createElement('span'),name=document.createElement('strong'),hint=document.createElement('small');
                 name.textContent=navItem.querySelector('a>span:last-child').textContent;hint.textContent=descriptions[id]||'';copy.append(name,hint);
-                const icon=document.createElement('span');icon.className='fpt-catalog-icon';icon.innerHTML=navItem.querySelector('a>svg')?.outerHTML||FPTIcons.svg(categoryIcons[groups.indexOf(group)],20);
+                const toolIcons={general:'home',phone:'qr',lot_io:'lots',templates:'document',blacklist:'block',notes:'edit',autobump:'bump',auto_delivery:'lots',auto_review:'reply',slash_commands:'terminal',theme:'palette',effects:'sparkles',epic_nicks:'star',notifications:'bell',ai_connection:'bulb',accounts:'users',settings_io:'cloud',needs:'settings',currency_calc:'exchange',piggy_banks:'wallet',calculator:'calculator',ai_audit:'search',vps:'server',telegram:'send',global_chat:'chat',overview:'info',tickets:'ticket',support:'heart'};
+                const icon=document.createElement('span');icon.className='fpt-catalog-icon';icon.innerHTML=FPTIcons.svg(toolIcons[id]||'settings',24);
                 const arrow=document.createElement('span');arrow.textContent='›';arrow.className='fpt-catalog-arrow';button.append(icon,copy,arrow);
                 button.addEventListener('click',()=>{navItem.click();root.querySelector('.fp-tools-page-content.active .fpt-settings-pagehead h2')?.focus();});grid.append(button);
             }
@@ -1441,17 +1460,19 @@ function refineSettingsLayout(root) {
     const captions={showSalesStatsCheckbox:'Статистика продаж',hideBalanceCheckbox:'Скрывать баланс',viewSellersPromoCheckbox:'Значки промо-лотов',autoReviewEnabled:'Ответы на отзывы',resetThemeBtn:'Сбросить тему',randomizeThemeBtn:'Случайная палитра',generatePaletteBtn:'Палитра из фона'};
     for(const [id,text]of Object.entries(captions)){const control=root.querySelector('#'+id);if(!control)continue;const label=root.querySelector('label[for="'+id+'"]');if(label){const span=label.querySelector('span');if(span)span.textContent=text;else label.textContent=text;}else if(control.tagName==='BUTTON'){const textNode=[...control.childNodes].find(node=>node.nodeType===3&&node.textContent.trim());if(textNode)textNode.textContent=text;}}
     const theme=root.querySelector('.fp-tools-page-content[data-page="theme"]');
-    const themeGroups=[['Тема',[]],['Фон',[]],['Текст',[]],['Дополнительно',[]]];let destination=0;
+    const themeGroups=[['Тема',[]],['Фон',[]],['Текст',[]],['Цвета',[]],['Элементы',[]],['Перенос',[]]];let destination=0;
     for(const node of [...theme.children]){
         if(node.matches('header,h3'))continue;
         if(node.classList.contains('fpt-blocklabel')){if(node.textContent.trim()==='Обои')destination=1;}
         if(node.matches('.color-input-grid'))destination=3;
         if(node.matches('.fpt-settings-section'))destination=node.querySelector('#themeFontSelect')?2:1;
-        if(node.matches('.fpt-settings-advanced,.theme-actions-grid'))destination=3;
+        if(node.matches('.fpt-settings-advanced'))destination=4;
+        if(node.matches('.theme-actions-grid'))destination=5;
         themeGroups[destination][1].push(node);
         if(node.tagName==='DETAILS'){node.open=true;node.querySelector('summary').hidden=true;}
     }
     addSettingsSectionTabs(theme,themeGroups);
+    theme.querySelectorAll('.fpt-theme-extra h4').forEach(heading=>{const labels={'Кругляшки':'Иконки категорий','Контур тексту':'Контур текста','Прозрачное меню FunPay Tools':'Прозрачность меню'};if(labels[heading.textContent.trim()])heading.textContent=labels[heading.textContent.trim()];});
     showCatalog();
 }
 

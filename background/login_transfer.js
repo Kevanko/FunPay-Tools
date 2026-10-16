@@ -5,7 +5,7 @@ const b64 = bytes => btoa(String.fromCharCode(...bytes));
 
 // Separate protocol: ordinary settings exports must never contain a session.
 export function trustedLoginSender(sender, runtime) {
-    return sender?.id === runtime.id && sender.url === runtime.getURL('popup/popup.html');
+    return sender?.id === runtime.id && ['popup/popup.html','popup/phone.html'].some(path=>sender.url === runtime.getURL(path));
 }
 
 export async function createLoginTransfer(auth, now = Date.now(), cloud = null) {

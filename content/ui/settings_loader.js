@@ -587,4 +587,5 @@ async function loadSavedSettings() {
             });
         } catch (_) {}
     }
+    window.dispatchEvent(new Event('fptSettingsLoaded'));
 }

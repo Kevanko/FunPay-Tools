@@ -3,6 +3,11 @@ const assert=require('node:assert/strict');
 const {JSDOM}=require('jsdom');
 const fs=require('node:fs');
 const vm=require('node:vm');
+test('site AI button asks the background to open settings instead of navigating to a blocked extension URL',async()=>{
+ const dom=new JSDOM('',{url:'https://funpay.com/'}),requests=[];
+ const context=vm.createContext({document:dom.window.document,chrome:{runtime:{getURL:path=>path,sendMessage:async message=>{requests.push(message);return {success:true};}}},FPTIcons:{svg:()=>'<svg></svg>'}});
+ try{vm.runInContext(fs.readFileSync('content/ui/main_popup.js','utf8'),context);const root=context.createMainPopup();root.querySelector('[data-page=ai_connection].fp-tools-page-content button.btn').click();await new Promise(r=>setImmediate(r));assert.equal(requests[0].action,'fptOpenSettingsPanel');assert.equal(requests[0].panel,'ai');assert.equal(root.querySelector('[data-page=ai_connection].fp-tools-page-content a'),null);}finally{dom.window.close();}
+});
 test('settings pages preserve controls while separating notifications and providing section navigation',()=>{
  const dom=new JSDOM('',{url:'https://funpay.com/'});
  const context=vm.createContext({document:dom.window.document,chrome:{runtime:{getURL:path=>path}},FPTIcons:{svg:()=>'<svg aria-hidden="true"></svg>'}});
@@ -12,7 +17,7 @@ test('settings pages preserve controls while separating notifications and provid
  const nav=[...root.querySelectorAll('.fp-tools-nav li[data-page]')];
  assert.equal(pages.length,28);assert.equal(new Set(pages.map(p=>p.dataset.page)).size,28);
  assert.equal(root.querySelector('[data-page="ai_connection"] a').textContent,'ИИ');
- assert.equal(root.querySelector('.fp-tools-page-content[data-page="ai_connection"] a').getAttribute('href'),'popup/ai.html');
+ assert.equal(root.querySelector('.fp-tools-page-content[data-page="ai_connection"] button.btn').textContent,'Подключить сервис');
  for(const item of nav)assert.equal(pages.filter(p=>p.dataset.page===item.dataset.page).length,1,item.dataset.page);
  for(const id of ['notificationSoundGroup','notificationVolume','fptCustomSoundInput','discordWebhookUrl']){
   const control=root.querySelector('#'+id);assert.ok(control,id);assert.equal(root.querySelectorAll('#'+id).length,1);assert.equal(control.closest('[data-page]').dataset.page,'notifications');
@@ -51,7 +56,7 @@ test('grouped settings retain every tool and search opens the matching appearanc
  assert.equal(root.querySelectorAll('.fpt-settings-category').length,6);button.click();
  assert.equal(root.querySelector('.fpt-settings-catalog h2').textContent,'Автоматизация');assert.equal(root.querySelectorAll('.fpt-settings-tool').length,4);
  const theme=root.querySelector('.fp-tools-page-content[data-page="theme"]'),tabs=[...theme.querySelectorAll('[role=tab]')];
- assert.deepEqual(tabs.map(node=>node.textContent),['Тема','Фон','Текст','Дополнительно']);
+ assert.deepEqual(tabs.map(node=>node.textContent),['Тема','Фон','Текст','Цвета','Элементы','Перенос']);
  const blur=theme.querySelector('#themeBgBlur');assert.equal(blur.closest('[role=tabpanel]').hidden,true);
  const label=theme.querySelector('label[for=themeBgBlur]');label.scrollIntoView=()=>{};
  const search=root.querySelector('#fpToolsMenuSearch');search.value='размытие';search.dispatchEvent(new dom.window.Event('input'));

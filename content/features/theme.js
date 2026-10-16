@@ -312,6 +312,7 @@ async function updateThemePreview() {
     if (elements.scrollbarWidthValue) elements.scrollbarWidthValue.textContent = `${settings.scrollbarWidth}px`;
 
     updateCirclePreview();
+    window.dispatchEvent(new Event('fptSettingsLoaded'));
 }
 
 function toggleThemeControls(disabled) {

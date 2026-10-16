@@ -32,4 +32,6 @@
 .fpt-phone-flow #login-status { margin-top: 12px; }
 .fpt-phone-flow #login-code { display: block; margin: 10px 0 4px; font-size: 18px; letter-spacing: 1px; overflow-wrap: anywhere; user-select: all; }
 .fpt-phone-flow .fpt-qr-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+.fpt-phone-flow .fpt-phone-media{display:flex;align-items:center;gap:10px;margin:16px 0 10px;cursor:pointer;font:inherit;font-size:14px}
+.fpt-phone-flow #settings-include-media{appearance:auto!important;width:16px!important;height:16px!important;margin:0!important;flex:none;accent-color:var(--phone-accent)}
 @media (max-width: 420px) { .fpt-phone-flow .fpt-phone-install { grid-template-columns: 1fr; } .fpt-phone-flow .fpt-phone-download-qr canvas { margin-left: 0; } }
