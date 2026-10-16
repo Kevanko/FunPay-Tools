@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "FunPay Tools",
-    "version": "3.17.1",
+    "version": "3.18.0",
     "description": "Инструменты продавца для FunPay: статистика продаж, автоматизация, авто-выдача, массовые действия с лотами, темы оформления.",
     "permissions": [
         "storage",
@@ -163,7 +163,8 @@
                 "css/image_generator.css",
                 "css/ai_creator.css",
                 "css/live_styler.css",
-                "css/fpt_icons_theme.css"
+                "css/fpt_icons_theme.css",
+                "css/settings_layout.css"
             ],
             "run_at": "document_idle"
         }

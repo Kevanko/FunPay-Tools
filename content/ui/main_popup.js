@@ -1271,7 +1271,76 @@ function createMainPopup() {
     aiPage.innerHTML='<h3>ИИ</h3><p class="template-info">Корректировка сообщений, переводы и описания через ваш аккаунт Groq с бесплатной квотой.</p><p class="template-info">Ключ хранится отдельно на этом устройстве и не переносится вместе с настройками.</p>';
     const aiConnect=document.createElement('a');aiConnect.className='btn';aiConnect.href=chrome.runtime.getURL('popup/ai.html');aiConnect.target='_blank';aiConnect.rel='noopener';aiConnect.textContent='Подключить Groq';aiPage.append(aiConnect);
     toolsPopup.querySelector('main').append(aiPage);
+    refineSettingsLayout(toolsPopup);
     return toolsPopup;
+}
+
+function refineSettingsLayout(root) {
+    root.classList.add('fpt-settings-layout');
+    const subtitle=root.querySelector('.fpt-brand-subtitle');if(subtitle)subtitle.textContent='Настройки и инструменты';
+    root.querySelector('.fpt-command-center')?.remove();
+    const groups=[
+        ['Работа',['general','phone','lot_io','templates','blacklist','notes']],
+        ['Автоматизация',['autobump','auto_delivery','auto_review','slash_commands']],
+        ['Оформление',['theme','effects','epic_nicks']],
+        ['Настройки',['notifications','ai_connection','accounts','settings_io','needs']],
+        ['Инструменты',['currency_calc','piggy_banks','calculator','ai_audit','vps','telegram','global_chat']],
+        ['Помощь',['overview','tickets','support']]
+    ];
+    const nav=root.querySelector('.fp-tools-nav'),list=nav.querySelector('ul'),items=new Map([...list.querySelectorAll('li[data-page]')].map(item=>[item.dataset.page,item]));
+    list.replaceChildren();nav.querySelector('.fpt-nav-more')?.remove();
+    groups.forEach(([title,ids],index)=>{
+        const group=document.createElement('li');group.className='fpt-nav-group';
+        const button=document.createElement('button');button.type='button';button.className='fpt-nav-group-toggle';button.dataset.expanded=String(index===0||index===2);button.setAttribute('aria-expanded',button.dataset.expanded);
+        const caption=document.createElement('span');caption.textContent=title;button.append(caption);
+        const arrow=document.createElement('span');arrow.className='fpt-nav-chevron';arrow.setAttribute('aria-hidden','true');arrow.textContent='›';button.append(arrow);
+        const children=document.createElement('ul');children.id='fpt-nav-group-'+index;button.setAttribute('aria-controls',children.id);children.hidden=button.dataset.expanded!=='true';
+        for(const id of ids){const item=items.get(id);if(item){item.dataset.group=title;children.append(item);items.delete(id);}}
+        group.append(button,children);list.append(group);
+    });
+    // Keep any future tools discoverable if they were not assigned a group yet.
+    for(const item of items.values())list.lastElementChild.querySelector('ul').append(item);
+    const descriptions={general:'Основные настройки сайта и продаж.',phone:'Установка приложения и перенос настроек.',lot_io:'Импорт, экспорт и массовое редактирование.',templates:'Готовые сообщения и быстрые ответы.',blacklist:'Покупатели, для которых отключена автоматизация.',notes:'Ваши записи и напоминания.',autobump:'Когда и какие категории поднимать.',auto_delivery:'Товары и правила отправки после оплаты.',auto_review:'Сообщения для событий и ответы на отзывы.',slash_commands:'Команды для быстрых действий в чате.',theme:'Тема, фон и шрифт на ваших устройствах.',effects:'Анимации и эффекты указателя.',epic_nicks:'Внешний вид вашего ника.',notifications:'Мелодии, громкость и Discord.',ai_connection:'Подключение ИИ для сообщений и описаний.',accounts:'Переключение между аккаунтами FunPay.',settings_io:'Облако, файл настроек и восстановление.',needs:'Выберите функции, которые нужны в работе.',currency_calc:'Курсы и пересчёт сумм.',piggy_banks:'Цели и накопления с продаж.',calculator:'Расчёты без выхода с сайта.',ai_audit:'Проверка описаний и рекомендаций для лотов.',vps:'Подключение вашего сервера автоматизации.',telegram:'Уведомления и управление через Telegram.',global_chat:'Общение с пользователями расширения.',overview:'Как пользоваться инструментами FP Tools.',tickets:'Ваши обращения и ответы.',support:'Версия, ссылки и поддержка проекта.'};
+    root.querySelectorAll('.fp-tools-page-content').forEach(page=>{
+        const item=root.querySelector('.fp-tools-nav li[data-page="'+page.dataset.page+'"]');
+        const heading=document.createElement('header');heading.className='fpt-settings-pagehead';
+        const title=document.createElement('h2');title.textContent=item?.querySelector('a>span:last-child')?.textContent.trim()||page.getAttribute('aria-label')||'Настройки';
+        const description=document.createElement('p');description.textContent=descriptions[page.dataset.page]||'';heading.append(title,description);page.prepend(heading);
+        for(const old of [...page.children].filter(node=>node.tagName==='H3'))old.classList.add('fpt-legacy-title');
+    });
+    root.querySelectorAll('.template-variables-guide').forEach(guide=>{
+        const details=document.createElement('details');details.className='fpt-variable-help';
+        const summary=document.createElement('summary');summary.textContent='Переменные в сообщениях';details.append(summary);
+        for(const child of [...guide.children])if(child.tagName!=='H5')details.append(child);
+        guide.replaceWith(details);
+    });
+    const captions={showSalesStatsCheckbox:'Статистика продаж',hideBalanceCheckbox:'Скрывать баланс',viewSellersPromoCheckbox:'Значки промо-лотов',autoReviewEnabled:'Ответы на отзывы',resetThemeBtn:'Сбросить тему',randomizeThemeBtn:'Случайная палитра',generatePaletteBtn:'Палитра из фона'};
+    for(const [id,text]of Object.entries(captions)){const control=root.querySelector('#'+id);if(!control)continue;const label=root.querySelector('label[for="'+id+'"]');if(label){const span=label.querySelector('span');if(span)span.textContent=text;else label.textContent=text;}else if(control.tagName==='BUTTON'){const textNode=[...control.childNodes].find(node=>node.nodeType===3&&node.textContent.trim());if(textNode)textNode.textContent=text;}}
+    const theme=root.querySelector('.fp-tools-page-content[data-page="theme"]');
+    const themeGroups=[['Тема',[]],['Фон',[]],['Текст',[]],['Дополнительно',[]]];let destination=0;
+    for(const node of [...theme.children]){
+        if(node.matches('header,h3'))continue;
+        if(node.classList.contains('fpt-blocklabel')){if(node.textContent.trim()==='Обои')destination=1;}
+        if(node.matches('.color-input-grid'))destination=3;
+        if(node.matches('.fpt-settings-section'))destination=node.querySelector('#themeFontSelect')?2:1;
+        if(node.matches('.fpt-settings-advanced,.theme-actions-grid'))destination=3;
+        themeGroups[destination][1].push(node);
+        if(node.tagName==='DETAILS'){node.open=true;node.querySelector('summary').hidden=true;}
+    }
+    addSettingsSectionTabs(theme,themeGroups);
+}
+
+function addSettingsSectionTabs(page,groups) {
+    const nav=document.createElement('nav');nav.className='fpt-page-sections';nav.setAttribute('role','tablist');nav.setAttribute('aria-label','Разделы оформления');
+    const sections=[],buttons=[];
+    groups.forEach(([title,nodes],index)=>{
+        const panel=document.createElement('section');panel.className='fpt-settings-panel';panel.id='fpt-panel-'+page.dataset.page+'-'+index;panel.hidden=index!==0;panel.setAttribute('role','tabpanel');nodes.forEach(node=>panel.append(node));
+        const button=document.createElement('button');button.type='button';button.id=panel.id+'-tab';button.textContent=title;button.setAttribute('role','tab');button.setAttribute('aria-controls',panel.id);button.setAttribute('aria-selected',String(index===0));button.tabIndex=index===0?0:-1;panel.setAttribute('aria-labelledby',button.id);
+        button.addEventListener('click',()=>{sections.forEach((node,i)=>{node.hidden=i!==index;buttons[i].setAttribute('aria-selected',String(i===index));buttons[i].tabIndex=i===index?0:-1;});});
+        button.addEventListener('keydown',event=>{const next=event.key==='ArrowRight'?(index+1)%groups.length:event.key==='ArrowLeft'?(index+groups.length-1)%groups.length:event.key==='Home'?0:event.key==='End'?groups.length-1:-1;if(next>=0){event.preventDefault();buttons[next].click();buttons[next].focus();}});
+        sections.push(panel);buttons.push(button);nav.append(button);
+    });
+    page.append(nav,...sections);
 }
 
 function organizeSettingsPages(root) {
@@ -1442,6 +1511,7 @@ function setupMenuSearch(toolsPopup) {
     const nav = toolsPopup.querySelector('.fp-tools-nav');
     if (!searchInput || !nav) return;
     const more=nav.querySelector('.fpt-nav-more');
+    const groups=[...nav.querySelectorAll('.fpt-nav-group')];
     const secondary=new Set(['effects','needs','epic_nicks','global_chat','ai_audit','piggy_banks','calculator','overview','tickets','support','slash_commands']);
     nav.querySelectorAll('li[data-page]').forEach(item=>{item.dataset.secondary=String(secondary.has(item.dataset.page));});
     const normalize=value=>value.toLowerCase().replace(/ё/g,'е').replace(/\s+/g,' ').trim();
@@ -1455,8 +1525,8 @@ function setupMenuSearch(toolsPopup) {
         items.forEach(item => {
             const page=pageById.get(item.dataset.page);
             const settings=page?[...page.querySelectorAll('label,h3,h4,summary,input[placeholder],textarea[placeholder]')].map(node=>normalize(node.getAttribute('placeholder')||node.textContent)):[];
-            const text=normalize(item.textContent+' '+item.dataset.page);
-            const isVisible = query ? query.split(' ').every(word=>text.includes(word)||settings.some(label=>label.includes(word))) : item.dataset.secondary!=='true'||item.classList.contains('active')||more?.getAttribute('aria-expanded')==='true';
+            const text=normalize(item.textContent+' '+item.dataset.page+' '+(item.dataset.group||''));
+            const isVisible = query ? query.split(' ').every(word=>text.includes(word)||settings.some(label=>label.includes(word))) : groups.length>0||item.dataset.secondary!=='true'||item.classList.contains('active')||more?.getAttribute('aria-expanded')==='true';
             item.hidden = !isVisible;
             if (isVisible) visibleCount += 1;
         });
@@ -1478,13 +1548,17 @@ function setupMenuSearch(toolsPopup) {
 
         if (emptyState) emptyState.hidden = visibleCount !== 0;
         if(more)more.hidden=Boolean(query);
+        groups.forEach(group=>{const button=group.querySelector('.fpt-nav-group-toggle'),list=group.querySelector('ul');const matches=[...list.querySelectorAll('li[data-page]')].some(item=>!item.hidden);group.hidden=Boolean(query)&&!matches;list.hidden=query?!matches:button.dataset.expanded!=='true';button.setAttribute('aria-expanded',String(!list.hidden));});
     };
+    groups.forEach(group=>{const button=group.querySelector('.fpt-nav-group-toggle');button.addEventListener('click',()=>{button.dataset.expanded=String(button.getAttribute('aria-expanded')!=='true');applyFilter();});});
     more?.addEventListener('click',()=>{const expanded=more.getAttribute('aria-expanded')!=='true';more.setAttribute('aria-expanded',String(expanded));more.textContent=expanded?'Свернуть инструменты':'Ещё инструменты';applyFilter();});
     applyFilter();
 
     searchInput.addEventListener('input', applyFilter);
     nav.addEventListener('click',event=>{
-        const item=event.target.closest('li[data-page]'),query=normalize(searchInput.value);if(!item||!query)return;
+        const item=event.target.closest('li[data-page]'),query=normalize(searchInput.value);if(!item)return;
+        const group=item.closest('.fpt-nav-group');if(group){group.querySelector('.fpt-nav-group-toggle').dataset.expanded='true';applyFilter();}
+        if(!query)return;
         if(normalize(item.textContent).includes(query)||normalize(item.dataset.page).includes(query))return;
         const page=pageById.get(item.dataset.page);if(!page)return;
         const words=query.split(' '),match=[...page.querySelectorAll('label,h3,h4,summary')].find(node=>words.every(word=>normalize(node.textContent).includes(word)));

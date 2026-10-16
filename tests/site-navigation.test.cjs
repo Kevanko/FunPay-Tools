@@ -38,6 +38,26 @@ test('requested editor page wins over stored last page during lazy panel creatio
  const callbacks={};const button={addEventListener:(event,fn)=>callbacks[event]=fn};context.wireFpToolsButton(button);await callbacks.click();assert.equal(selected,1);assert.equal(restoreCount,0);assert.equal(window.location.hash,'');window.document.querySelector('.fp-tools-popup').classList.remove('active');await callbacks.click();assert.equal(restoreCount,0); // builder already restored the explicit selection
  dom.window.close();
 });
+
+test('grouped settings retain every tool and search opens the matching appearance tab',()=>{
+ const dom=new JSDOM('',{url:'https://funpay.com/'});
+ const context=vm.createContext({document:dom.window.document,chrome:{runtime:{getURL:path=>path}},FPTIcons:{svg:()=>'<svg></svg>'}});
+ vm.runInContext(fs.readFileSync('content/ui/main_popup.js','utf8'),context);
+ const root=context.createMainPopup();dom.window.document.body.append(root);context.setupMenuSearch(root);
+ assert.equal(root.querySelectorAll('.fpt-nav-group').length,6);assert.equal(root.querySelectorAll('.fpt-command-center').length,0);
+ assert.equal(root.querySelector('.fp-tools-page-content[data-page=general] .fpt-settings-pagehead h2').textContent,'Обзор');
+ const groups=[...root.querySelectorAll('.fpt-nav-group')],automation=groups[1],button=automation.querySelector('button'),list=automation.querySelector('ul');
+ assert.equal(list.hidden,true);button.click();assert.equal(list.hidden,false);button.click();assert.equal(list.hidden,true);
+ const theme=root.querySelector('.fp-tools-page-content[data-page="theme"]'),tabs=[...theme.querySelectorAll('[role=tab]')];
+ assert.deepEqual(tabs.map(node=>node.textContent),['Тема','Фон','Текст','Дополнительно']);
+ const blur=theme.querySelector('#themeBgBlur');assert.equal(blur.closest('[role=tabpanel]').hidden,true);
+ const label=theme.querySelector('label[for=themeBgBlur]');label.scrollIntoView=()=>{};
+ const search=root.querySelector('#fpToolsMenuSearch');search.value='размытие';search.dispatchEvent(new dom.window.Event('input'));
+ root.querySelector('.fp-tools-nav li[data-page=theme] a').click();assert.equal(blur.closest('[role=tabpanel]').hidden,false);assert.equal(dom.window.document.activeElement,blur);
+ search.value='';search.dispatchEvent(new dom.window.Event('input'));assert.equal(root.querySelector('.fp-tools-nav li[data-page=theme]').closest('ul').hidden,false);
+ assert.equal(root.querySelector('.fpt-variable-help').open,false);assert.equal(root.querySelectorAll('#fpt-review-5').length,1);
+ dom.window.close();
+});
 test('settings search finds controls inside sections and reveals collapsed matching settings',()=>{
  const dom=new JSDOM('<div class="fp-tools-popup"><nav class="fp-tools-nav"><input id="fpToolsMenuSearch"><div class="fpt-nav-empty" hidden></div><ul><li data-page="theme"><a>Оформление</a></li><li data-page="notifications"><a>Уведомления</a></li></ul><button class="fpt-nav-more" aria-expanded="false"></button></nav><div class="fp-tools-page-content" data-page="theme"><details><summary>Эффекты</summary><label for="blur">Размытие фона</label><input id="blur" type="range"></details></div><div class="fp-tools-page-content" data-page="notifications"><label>Громкость уведомлений</label></div></div>');
  const source=fs.readFileSync('content/ui/main_popup.js','utf8'),start=source.indexOf('function setupMenuSearch('),end=source.indexOf('// 3.0: add an image-insert',start),context=vm.createContext({});vm.runInContext(source.slice(start,end),context);

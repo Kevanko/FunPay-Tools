@@ -1083,6 +1083,10 @@ async function setupFptTextOutline() {
         chrome.storage.onChanged.addListener((changes, area) => {
             if (area !== 'local') return;
             if (changes.fpToolsTheme || changes.enableCustomTheme) run();
+            if (changes.fpToolsTheme && document.getElementById('themeFontSelect')) {
+                syncRedesignThemeControls({ ...DEFAULT_THEME, ...changes.fpToolsTheme.newValue });
+                updateThemePreview().catch(() => {});
+            }
         });
     } catch (e) { /* контекст без chrome.storage */ }
 })();
