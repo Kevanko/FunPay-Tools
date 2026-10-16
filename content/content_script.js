@@ -517,6 +517,7 @@
         window.__fpEnsurePopup = ensureFpToolsPopup;
 
         const settings = await chrome.storage.local.get([
+            'aiModeActive',
             'enableRedesignedHomepage', 
             'showSalesStats', 
             'hideBalance', 
@@ -524,6 +525,7 @@
             'enableCustomTheme'
         ]);
 
+        applyAIChatMode(settings.aiModeActive === true);
         if (settings.enableRedesignedHomepage !== false) {
             await handleHomepageRedesign();
         } else {

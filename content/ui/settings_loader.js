@@ -404,12 +404,7 @@ async function loadSavedSettings() {
 
     await setupTemplateSettingsHandlers();
 
-    aiModeActive = settings.aiModeActive === true;
-    const aiButton = document.getElementById('aiModeToggleBtn');
-    if(aiButton) {
-        aiButton.classList.toggle('active', aiModeActive);
-        aiButton.title = aiModeActive ? 'AI Режим АКТИВЕН (Enter для генерации/отправки)' : 'AI Режим (Enter для генерации/отправки)';
-    }
+    applyAIChatMode(settings.aiModeActive === true);
 
     const enableCustomThemeCheckboxEl = document.getElementById('enableCustomThemeCheckbox');
     const isThemeEnabled = settings.enableCustomTheme !== false;

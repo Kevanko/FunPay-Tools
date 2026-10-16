@@ -60,10 +60,10 @@ async function makeAIRequest(finalPrompt) {
 
         const result = await response.json();
         
-        if (result && result.response) {
+        if (typeof result?.response === 'string' && result.response.trim()) {
             return { success: true, data: result.response.trim() };
         } else {
-            return { success: false, error: 'AI response format is incorrect or empty.' };
+            return { success: false, error: 'ИИ вернул пустой или неверный ответ. Ваш текст не изменён.' };
         }
 
     } catch (error) {

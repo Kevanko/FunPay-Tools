@@ -1,5 +1,22 @@
-let lastAIProcessedText = null;
-let isAISuggestionActive = false;
+const aiRewriteStates = new WeakMap();
+let aiModeRevision = 0;
+function applyAIChatMode(active) {
+    if(aiModeActive!==active){aiModeRevision++;const input=document.querySelector('.chat-form-input .form-control');if(input)aiRewriteState(input).suggestion=null;}
+    aiModeActive=active;
+    const button=document.getElementById('aiModeToggleBtn');if(!button)return;
+    button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));
+    button.title=active?'ИИ включён: Enter — исправить, повторный Enter — отправить':'Включить исправление текста ИИ';
+}
+function aiRewriteState(input) {
+    if (!aiRewriteStates.has(input)) aiRewriteStates.set(input, { pending: false, suggestion: null, scope: '' });
+    return aiRewriteStates.get(input);
+}
+function aiChatScope(input) {
+    let user = '';
+    try { const raw=JSON.parse(document.body.dataset.appData||'{}');user=String((Array.isArray(raw)?raw[0]:raw)?.userId||''); } catch (_) {}
+    const chat=input.closest('.chat');
+    return [user,document.querySelector('.user-link-name')?.textContent||'',location.pathname,location.search,input.closest('form')?.querySelector('input[name="node"]')?.value||chat?.dataset.node||chat?.dataset.id||document.querySelector('.contact-item.active')?.dataset.id||''].join('|');
+}
 const PROFANITY_ROOTS = ['хуй', 'пизд', 'бля', 'еба', 'ёба', 'сука', 'сучар', 'мраз', 'гнид', 'уеб', 'уёб', 'пидр', 'пидор', 'гомо', 'петух', 'залуп', 'мудак', 'манда', 'мудозвон', 'вагин', 'шлюх', 'нахуй', 'похуй', 'охуе', 'ахуе', 'еблан', 'долбоеб', 'долбоёб', 'ебуч', 'ёбуч', 'пиздюк', 'чмо', 'мразь', 'конча', 'дроч'];
 const profanityRegex = new RegExp(`(${PROFANITY_ROOTS.join('|')})`, 'i');
 
@@ -10,11 +27,11 @@ function setupChatObserver() {
     // Эта функция теперь ничего не делает.
 }
 
-function getChatContext() {
+function getChatContext(input = document.querySelector('.chat-form-input .form-control')) {
     const myUsernameEl = document.querySelector('.user-link-name');
     const myUsername = myUsernameEl ? myUsernameEl.textContent.trim() : "Me";
 
-    const chatContainer = document.querySelector('.chat.chat-float');
+    const chatContainer = input?.closest('.chat') || document.querySelector('.chat.chat-float, .chat');
     if (!chatContainer) return { context: "[No active chat found]", myUsername };
 
     const messageNodes = chatContainer.querySelectorAll('.chat-msg-item');
@@ -51,11 +68,12 @@ function getChatContext() {
     return { context: recentContext, myUsername };
 }
 
-async function getAIProcessedText(text, type = "rewrite") {
-    const chatInput = document.querySelector('.chat-form-input .form-control');
+async function getAIProcessedText(text, type = "rewrite", input = null) {
+    const chatInput = input || document.querySelector('.chat-form-input .form-control');
     let shouldManageLoadingState = type === "rewrite";
+    const wasDisabled = chatInput?.disabled;
 
-    const { context, myUsername } = getChatContext();
+    const { context, myUsername } = getChatContext(chatInput);
 
     if (chatInput && shouldManageLoadingState) {
         chatInput.classList.add('ai-loading-textarea');
@@ -70,31 +88,22 @@ async function getAIProcessedText(text, type = "rewrite") {
             type: type 
         });
 
-        if (chatInput && shouldManageLoadingState) {
-            chatInput.classList.remove('ai-loading-textarea');
-            chatInput.disabled = false;
-        }
-        if (response && response.success) {
-            if (type === "rewrite") {
-                lastAIProcessedText = response.data;
-                isAISuggestionActive = true;
-            }
-            return response.data;
+        if (response?.success && typeof response.data === 'string' && response.data.trim()) {
+            return response.data.trim();
         } else {
             console.error('AI processing failed:', response ? response.error : 'No response');
-            showNotification(`Ошибка обработки AI: ${response ? response.error : 'Нет ответа от AI'}`, true);
-            if (type === "rewrite") { lastAIProcessedText = null; isAISuggestionActive = false; }
-            return type === "generate" ? `[Ошибка AI: ${text}]` : text;
+            showNotification(`Ошибка ИИ: ${response?.error || 'ИИ вернул пустой или неверный ответ'}`, true);
+            return null;
         }
     } catch (error) {
-        if (chatInput && shouldManageLoadingState) {
-            chatInput.classList.remove('ai-loading-textarea');
-            chatInput.disabled = false;
-        }
         console.error('Error sending/processing AI message:', error);
         showNotification(`Ошибка связи с AI модулем: ${error.message}`, true);
-        if (type === "rewrite") { lastAIProcessedText = null; isAISuggestionActive = false; }
-        return type === "generate" ? `[Ошибка AI: ${text}]` : text;
+        return null;
+    } finally {
+        if (chatInput && shouldManageLoadingState) {
+            chatInput.classList.remove('ai-loading-textarea');
+            chatInput.disabled = wasDisabled;
+        }
     }
 }
 
@@ -129,22 +138,17 @@ function setupAIChatFeature() {
 
     if (chatTextarea && chatFormAttachDiv && !document.getElementById('aiModeToggleBtn')) {
         const aiButton = createElement('button', { type: 'button', id: 'aiModeToggleBtn' }, {}, '');
-        const _magicImg = document.createElement('img');
-        _magicImg.src = chrome.runtime.getURL('icons/magic.png');
-        _magicImg.className = 'ai-magic-icon';
-        _magicImg.alt = 'AI';
-        aiButton.appendChild(_magicImg);
+        aiButton.innerHTML = FPTIcons.svg('sparkles',20);
+        aiButton.setAttribute('aria-label','ИИ: исправить текст');
+        aiButton.setAttribute('aria-pressed',String(aiModeActive));
         if (chatFormAttachDiv.nextSibling) chatFormAttachDiv.parentNode.insertBefore(aiButton, chatFormAttachDiv.nextSibling);
         else chatFormAttachDiv.parentNode.appendChild(aiButton);
 
-        aiButton.classList.toggle('active', aiModeActive);
-        aiButton.title = aiModeActive ? 'AI Режим АКТИВЕН (Enter для генерации/отправки)' : 'AI Режим (Enter для генерации/отправки)';
+        applyAIChatMode(aiModeActive);
 
         aiButton.addEventListener('click', async () => {
-            aiModeActive = !aiModeActive;
+            applyAIChatMode(!aiModeActive);
             await chrome.storage.local.set({ aiModeActive: aiModeActive });
-            aiButton.classList.toggle('active', aiModeActive);
-            aiButton.title = aiModeActive ? 'AI Режим АКТИВЕН (Enter для генерации/отправки)' : 'AI Режим (Enter для генерации/отправки)';
             if (aiModeActive) {
                 showNotification('AI режим активирован.');
                 const warningDiv = document.getElementById('fpToolsProfanityWarning');
@@ -152,35 +156,47 @@ function setupAIChatFeature() {
             }
             else {
                 showNotification('AI режим отключен.');
-                isAISuggestionActive = false;
+                aiRewriteState(chatTextarea).suggestion = null;
             }
         });
 
         chatTextarea.addEventListener('input', () => {
-            if (isAISuggestionActive && chatTextarea.value !== lastAIProcessedText) isAISuggestionActive = false;
+            const state=aiRewriteState(chatTextarea);
+            if (chatTextarea.value !== state.suggestion) state.suggestion = null;
         });
 
         chatTextarea.addEventListener('keydown', async (event) => {
-            if (event.key === 'Enter' && !event.shiftKey && aiModeActive) {
+            if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && event.keyCode !== 229 && aiModeActive) {
                 event.preventDefault();
+                event.stopImmediatePropagation();
+                const state=aiRewriteState(chatTextarea);
+                if(state.pending || chatTextarea.disabled)return;
                 const currentText = chatTextarea.value.trim();
-                if (isAISuggestionActive && currentText === lastAIProcessedText && lastAIProcessedText !== null) {
+                if (state.suggestion !== null && chatTextarea.value === state.suggestion && state.scope === aiChatScope(chatTextarea)) {
+                    state.suggestion = null;
                     if (chatForm) {
                         const submitButton = chatForm.querySelector('button[type="submit"]');
-                        if (submitButton) submitButton.click(); else chatForm.submit();
+                        if (submitButton) submitButton.click(); else chatForm.requestSubmit();
                     }
-                    lastAIProcessedText = null; isAISuggestionActive = false;
                 } else if (currentText) {
-                    const processedText = await getAIProcessedText(currentText, "rewrite");
-                    window.__fptProgrammaticInput = true;
-                    chatTextarea.value = processedText;
-                    chatTextarea.dispatchEvent(new Event('input', { bubbles: true }));
-                    chatTextarea.focus();
-                    chatTextarea.selectionStart = chatTextarea.selectionEnd = chatTextarea.value.length;
-                    window.__fptProgrammaticInput = false;
+                    const original=chatTextarea.value,scope=aiChatScope(chatTextarea),revision=aiModeRevision;
+                    state.pending=true;state.suggestion=null;aiButton.setAttribute('aria-busy','true');
+                    try {
+                        const processedText = await getAIProcessedText(currentText, "rewrite", chatTextarea);
+                        if(!processedText || !chatTextarea.isConnected || !aiModeActive || revision!==aiModeRevision || scope!==aiChatScope(chatTextarea) || chatTextarea.value!==original)return;
+                        window.__fptProgrammaticInput = true;
+                        try {
+                            chatTextarea.value = processedText;
+                            state.suggestion=processedText;
+                            state.scope=scope;
+                            chatTextarea.dispatchEvent(new Event('input', { bubbles: true }));
+                            chatTextarea.focus();
+                            chatTextarea.selectionStart = chatTextarea.selectionEnd = chatTextarea.value.length;
+                        } finally { window.__fptProgrammaticInput = false; }
+                    } finally { state.pending=false;aiButton.removeAttribute('aria-busy'); }
                 }
             }
-        });
+        }, true);
 
         let profanityWarning = document.getElementById('fpToolsProfanityWarning');
         if (!profanityWarning) {

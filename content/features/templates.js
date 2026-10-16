@@ -115,15 +115,13 @@ async function replaceTemplateVariables(template) {
         }
         try {
             const aiResults = await Promise.all(aiPromises);
+            if(aiResults.some(value=>typeof value!=='string'||!value.trim()))throw new Error('ИИ не подготовил текст шаблона');
             aiPlaceholders.forEach((ph, index) => {
                 result = result.replace(ph.placeholder, aiResults[index] || "");
             });
         } catch (error) {
             console.error("Error processing one or more AI variables:", error);
-            showNotification("Ошибка при обработке одной или нескольких AI переменных.", true);
-            aiPlaceholders.forEach(ph => {
-                result = result.replace(ph.placeholder, ph.originalMatch);
-            });
+            throw error;
         } finally {
              if (chatInputForLoading) {
                 chatInputForLoading.classList.remove('ai-loading-textarea');
@@ -137,7 +135,12 @@ async function replaceTemplateVariables(template) {
 async function applyTemplateToInput(chatInput, templateContent, images, sendOrder, immediate = true) {
     if (!chatInput || templateContent === undefined) return { handledInBackground: false };
 
-    let processedText = await replaceTemplateVariables(templateContent);
+    if(chatInput.disabled)return { aborted: true };
+    const original=chatInput.value,scope=typeof aiChatScope==='function'?aiChatScope(chatInput):null;
+    let processedText;
+    try { processedText = await replaceTemplateVariables(templateContent); }
+    catch (_) { return { aborted: true }; }
+    if(!chatInput.isConnected || chatInput.value!==original || (scope!==null&&scope!==aiChatScope(chatInput)))return { aborted: true };
     const imgs = Array.isArray(images) ? images.filter(Boolean) : [];
     const order = (sendOrder === 'image_first') ? 'image_first' : 'text_first';
 
@@ -281,7 +284,7 @@ async function useTemplate(templateConfig) {
     const applyResult = await applyTemplateToInput(chatInput, templateConfig.text, imgs, templateConfig.sendOrder, sendTemplatesImmediately);
 
     if (!sendTemplatesImmediately) return;
-    if (applyResult && applyResult.handledInBackground) return;
+    if (applyResult && (applyResult.handledInBackground || applyResult.aborted)) return;
 
     const hasContent = chatInput.value.trim() !== '';
     if (!hasContent) return;

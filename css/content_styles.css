@@ -12134,3 +12134,6 @@ html[data-fpt-preset] .fp-tools-popup .fp-tools-nav li.active a :is(span,svg){co
 .fp-tools-popup .fpt-setting-range input[type=range]::-webkit-slider-thumb,.fp-tools-popup .fpt-settings-section input[type=range]::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:14px;height:14px;margin-top:-5px;border:0;border-radius:50%;background:var(--fpt-accent)}
 .fp-tools-popup .fpt-setting-range input[type=range]:focus-visible,.fp-tools-popup .fpt-settings-section input[type=range]:focus-visible{outline:2px solid var(--fpt-accent);outline-offset:3px}
 @media(max-width:700px){.fp-tools-popup .fpt-setting-range{grid-template-columns:1fr;gap:8px}}
+#aiModeToggleBtn svg{display:block;flex:none}
+#aiModeToggleBtn[aria-busy=true] svg{opacity:.5}
+.ai-loading-textarea{animation:none!important;background:var(--fpt-pInput,var(--fpt-surface-2,#fff))!important;box-shadow:0 0 0 1px var(--fpt-uacc,#5b86d8)!important}
