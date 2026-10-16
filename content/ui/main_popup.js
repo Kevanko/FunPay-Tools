@@ -1308,6 +1308,47 @@ function refineSettingsLayout(root) {
         const description=document.createElement('p');description.textContent=descriptions[page.dataset.page]||'';heading.append(title,description);page.prepend(heading);
         for(const old of [...page.children].filter(node=>node.tagName==='H3'))old.classList.add('fpt-legacy-title');
     });
+    const catalog=document.createElement('section');catalog.className='fpt-settings-catalog';catalog.hidden=true;catalog.setAttribute('aria-label','Каталог настроек');
+    root.querySelector('main').prepend(catalog);
+    const categoryIcons=['home','bolt','palette','settings','terminal','document'];
+    function showCatalog(category) {
+        const group=groups.find(([title])=>title===category);
+        root.querySelectorAll('.fp-tools-page-content').forEach(page=>page.classList.remove('active'));
+        root.querySelectorAll('.fp-tools-nav li[data-page]').forEach(item=>item.classList.remove('active'));
+        root.querySelectorAll('.fpt-nav-group-toggle').forEach(button=>button.classList.toggle('is-current',button.querySelector('span').textContent===category));
+        catalog.replaceChildren();catalog.hidden=false;
+        const header=document.createElement('header');header.className='fpt-settings-pagehead';
+        const title=document.createElement('h2');title.textContent=category||'Все настройки';
+        const description=document.createElement('p');description.textContent=category?'Выберите, что хотите настроить.':'Работа с заказами, внешний вид и настройки расширения — по разделам.';
+        header.append(title,description);catalog.append(header);
+        const grid=document.createElement('div');grid.className=group?'fpt-settings-tool-list':'fpt-settings-category-grid';
+        if(group){
+            for(const id of group[1]){
+                const navItem=root.querySelector('.fp-tools-nav li[data-page="'+id+'"]');if(!navItem)continue;
+                const button=document.createElement('button');button.type='button';button.className='fpt-settings-tool';
+                const copy=document.createElement('span'),name=document.createElement('strong'),hint=document.createElement('small');
+                name.textContent=navItem.querySelector('a>span:last-child').textContent;hint.textContent=descriptions[id]||'';copy.append(name,hint);
+                const icon=document.createElement('span');icon.className='fpt-catalog-icon';icon.innerHTML=navItem.querySelector('a>svg')?.outerHTML||FPTIcons.svg(categoryIcons[groups.indexOf(group)],20);
+                const arrow=document.createElement('span');arrow.textContent='›';arrow.className='fpt-catalog-arrow';button.append(icon,copy,arrow);
+                button.addEventListener('click',()=>{navItem.click();root.querySelector('.fp-tools-page-content.active .fpt-settings-pagehead h2')?.focus();});grid.append(button);
+            }
+        }else groups.forEach(([name,ids],index)=>{
+            const button=document.createElement('button');button.type='button';button.className='fpt-settings-category';button.dataset.category=name;
+            const icon=document.createElement('span');icon.className='fpt-catalog-icon';icon.innerHTML=FPTIcons.svg(categoryIcons[index],22);
+            const label=document.createElement('strong');label.textContent=name;
+            const hint=document.createElement('span');hint.textContent=ids.slice(0,3).map(id=>root.querySelector('.fp-tools-nav li[data-page="'+id+'"] a>span:last-child')?.textContent).filter(Boolean).join(' · ');
+            const count=document.createElement('small'),total=ids.filter(id=>root.querySelector('.fp-tools-nav li[data-page="'+id+'"]')).length;count.textContent=total+' '+(total===1?'раздел':total<5?'раздела':'разделов');
+            button.append(icon,label,hint,count);button.addEventListener('click',()=>showCatalog(name));grid.append(button);
+        });
+        catalog.append(grid);root.querySelector('.fp-tools-content').scrollTop=0;title.tabIndex=-1;title.focus({preventScroll:true});
+    }
+    root.fptOpenCategory=showCatalog;
+    const all=document.createElement('button');all.type='button';all.className='fpt-all-settings';all.innerHTML=FPTIcons.svg('home',18)+'<span>Все настройки</span>';all.addEventListener('click',()=>{const search=nav.querySelector('input');search.value='';search.dispatchEvent(new document.defaultView.Event('input',{bubbles:true}));showCatalog();});nav.querySelector('ul').before(all);
+    root.querySelectorAll('.fp-tools-page-content').forEach(page=>{
+        const item=root.querySelector('.fp-tools-nav li[data-page="'+page.dataset.page+'"]');
+        const back=document.createElement('button');back.type='button';back.className='fpt-category-back';back.textContent='‹ '+(item?.dataset.group||'Все настройки');back.addEventListener('click',()=>showCatalog(item?.dataset.group));
+        const heading=page.querySelector('.fpt-settings-pagehead');heading.prepend(back);heading.querySelector('h2').tabIndex=-1;
+    });
     root.querySelectorAll('.template-variables-guide').forEach(guide=>{
         const details=document.createElement('details');details.className='fpt-variable-help';
         const summary=document.createElement('summary');summary.textContent='Переменные в сообщениях';details.append(summary);
@@ -1328,6 +1369,7 @@ function refineSettingsLayout(root) {
         if(node.tagName==='DETAILS'){node.open=true;node.querySelector('summary').hidden=true;}
     }
     addSettingsSectionTabs(theme,themeGroups);
+    showCatalog();
 }
 
 function addSettingsSectionTabs(page,groups) {
@@ -1450,6 +1492,9 @@ function setupPopupNavigation() {
         li.addEventListener('click', (e) => {
             e.preventDefault();
             const pageId = li.dataset.page;
+            const catalog=toolsPopup.querySelector('.fpt-settings-catalog');if(catalog)catalog.hidden=true;
+            const selectedGroup=li.dataset.group;
+            toolsPopup.querySelectorAll('.fpt-nav-group-toggle').forEach(button=>button.classList.toggle('is-current',button.querySelector('span').textContent===selectedGroup));
             if(li.hidden&&li.dataset.secondary==='true')toolsPopup.querySelector('.fpt-nav-more')?.click();
 
             navItems.forEach(item => item.classList.remove('active'));
@@ -1519,6 +1564,7 @@ function setupMenuSearch(toolsPopup) {
 
     const applyFilter = () => {
         const query = normalize(searchInput.value);
+        nav.classList.toggle('fpt-searching',Boolean(query));
         const items = Array.from(nav.querySelectorAll('li[data-page]'));
         let visibleCount = 0;
 
@@ -1548,9 +1594,12 @@ function setupMenuSearch(toolsPopup) {
 
         if (emptyState) emptyState.hidden = visibleCount !== 0;
         if(more)more.hidden=Boolean(query);
-        groups.forEach(group=>{const button=group.querySelector('.fpt-nav-group-toggle'),list=group.querySelector('ul');const matches=[...list.querySelectorAll('li[data-page]')].some(item=>!item.hidden);group.hidden=Boolean(query)&&!matches;list.hidden=query?!matches:button.dataset.expanded!=='true';button.setAttribute('aria-expanded',String(!list.hidden));});
+        groups.forEach(group=>{const button=group.querySelector('.fpt-nav-group-toggle'),list=group.querySelector('ul');const matches=[...list.querySelectorAll('li[data-page]')].some(item=>!item.hidden);group.hidden=Boolean(query)&&!matches;list.hidden=query?!matches:button.dataset.expanded!=='true';if(toolsPopup.fptOpenCategory){button.removeAttribute('aria-expanded');button.removeAttribute('aria-controls');}else button.setAttribute('aria-expanded',String(!list.hidden));});
     };
-    groups.forEach(group=>{const button=group.querySelector('.fpt-nav-group-toggle');button.addEventListener('click',()=>{button.dataset.expanded=String(button.getAttribute('aria-expanded')!=='true');applyFilter();});});
+    groups.forEach(group=>{const button=group.querySelector('.fpt-nav-group-toggle');button.addEventListener('click',()=>{
+        if(toolsPopup.fptOpenCategory){toolsPopup.fptOpenCategory(button.querySelector('span').textContent);return;}
+        button.dataset.expanded=String(button.getAttribute('aria-expanded')!=='true');applyFilter();
+    });});
     more?.addEventListener('click',()=>{const expanded=more.getAttribute('aria-expanded')!=='true';more.setAttribute('aria-expanded',String(expanded));more.textContent=expanded?'Свернуть инструменты':'Ещё инструменты';applyFilter();});
     applyFilter();
 

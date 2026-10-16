@@ -1177,6 +1177,12 @@ function parseTicketDetails(html) {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.target !== 'offscreen') return true;
+    if (message.action === 'fptPlayNotificationSound') {
+        if (sender.id !== chrome.runtime.id || sender.tab) { sendResponse({ ok: false }); return; }
+        lastActivityAt = Date.now();
+        fptPlayNotificationAudio(message).then(result => { lastActivityAt = Date.now(); sendResponse(result); }, () => sendResponse({ ok: false }));
+        return true;
+    }
     lastActivityAt = Date.now();
 
     switch (message.action) {

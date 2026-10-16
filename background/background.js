@@ -5,6 +5,7 @@ import { AnalyticsRepository } from './analytics_repository.js';
 import { collectAnalytics } from './analytics_collector.js';
 import '../content/settings_schema.js';
 import { parseOffscreen, closeIdleParser } from './offscreen_client.js';
+import { playNotificationSound } from './notification_sound.js';
 const fetch = (url, options = {}) => {
     const address = typeof url === 'string' ? new URL(url) : null;
     return globalThis.fetch(url, address && ['funpay.com', 'support.funpay.com'].includes(address.hostname)
@@ -1007,6 +1008,11 @@ async function fptCloudPull(accountId) {
 
 // --- Главный обработчик сообщений ---
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request?.action === 'fptPlayNotificationSound' && request.target !== 'offscreen') {
+        if (sender.id !== chrome.runtime.id || !sender.tab || !/^https:\/\/funpay\.com\//.test(sender.url || '')) { sendResponse({ ok: false }); return; }
+        playNotificationSound().then(sendResponse, () => sendResponse({ ok: false }));
+        return true;
+    }
     if (['fptAIStatus', 'fptAISave', 'fptAITest'].includes(request?.action)) {
         if (!isAISettingsSender(sender, chrome.runtime)) { sendResponse({ success: false, error: 'Откройте страницу подключения ИИ в расширении' }); return; }
         const task = request.action === 'fptAIStatus' ? aiConnectionStatus()

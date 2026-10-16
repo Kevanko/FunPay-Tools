@@ -61,13 +61,22 @@ function _hook(el) {
     el.dataset.fptSoundHook = '1';
     el.muted = _chosenUrl() != null;
     el.volume = cfg.volume;
-    el.addEventListener('play', () => {
+    let fallback = false;
+    el.addEventListener('play', async () => {
+        if (fallback) return;
         const url = _chosenUrl();
         if (!url) { el.muted = false; el.volume = cfg.volume; return; } // default — нативный звук
         el.muted = true;                         // заглушить нативный chime
-        const a = new Audio(url);
-        a.volume = cfg.volume;
-        a.play().catch(() => {});
+        try {
+            const result = await chrome.runtime.sendMessage({ action: 'fptPlayNotificationSound' });
+            if (result?.ok && !result.native) return;
+            if (result?.native) cfg.volume = result.volume;
+        } catch (_) {}
+        // If the extension context was replaced while the tab was asleep, leave
+        // the site's own notification audible instead of silently muting it.
+        fallback = true;
+        try { el.muted = false; el.volume = cfg.volume; el.currentTime = 0; await el.play(); }
+        catch (_) {} finally { fallback = false; }
     }, true);
 }
 
@@ -101,8 +110,18 @@ async function previewNotificationSound(soundValue, volume) {
     } catch (_) {}
 }
 
+let soundInitialized = false;
 function initializeCustomSound() {
+    if (soundInitialized) return;
+    soundInitialized = true;
     applyNotificationSound();
+    const restore = () => applyNotificationSound().catch(() => {
+        document.querySelectorAll('audio.loud, audio.quiet').forEach(el => { el.muted = false; });
+    });
+    document.addEventListener('visibilitychange', restore);
+    document.addEventListener('resume', restore);
+    document.defaultView?.addEventListener('pageshow', restore);
+    document.defaultView?.addEventListener('focus', restore);
 
     // FunPay может пересоздать <audio> при SPA-навигации — подцепляем новые элементы.
     const observer = new MutationObserver((mutations) => {

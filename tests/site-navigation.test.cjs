@@ -47,7 +47,9 @@ test('grouped settings retain every tool and search opens the matching appearanc
  assert.equal(root.querySelectorAll('.fpt-nav-group').length,6);assert.equal(root.querySelectorAll('.fpt-command-center').length,0);
  assert.equal(root.querySelector('.fp-tools-page-content[data-page=general] .fpt-settings-pagehead h2').textContent,'Обзор');
  const groups=[...root.querySelectorAll('.fpt-nav-group')],automation=groups[1],button=automation.querySelector('button'),list=automation.querySelector('ul');
- assert.equal(list.hidden,true);button.click();assert.equal(list.hidden,false);button.click();assert.equal(list.hidden,true);
+ assert.equal(list.hidden,true);assert.equal(root.querySelector('.fpt-settings-catalog').hidden,false);
+ assert.equal(root.querySelectorAll('.fpt-settings-category').length,6);button.click();
+ assert.equal(root.querySelector('.fpt-settings-catalog h2').textContent,'Автоматизация');assert.equal(root.querySelectorAll('.fpt-settings-tool').length,4);
  const theme=root.querySelector('.fp-tools-page-content[data-page="theme"]'),tabs=[...theme.querySelectorAll('[role=tab]')];
  assert.deepEqual(tabs.map(node=>node.textContent),['Тема','Фон','Текст','Дополнительно']);
  const blur=theme.querySelector('#themeBgBlur');assert.equal(blur.closest('[role=tabpanel]').hidden,true);
