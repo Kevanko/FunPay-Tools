@@ -70,7 +70,7 @@
         }
         const enabled = data.enableCustomTheme !== false;
         const settings = fptNormalizeToPreset({ ...DEFAULT_THEME, ...(data.fpToolsTheme || {}) });
-        const preset = FPT_SITE_PRESETS[settings.sitePreset] || FPT_SITE_PRESETS.graphite;
+        const preset = FPT_SITE_PRESETS[settings.sitePreset] || FPT_SITE_PRESETS.obsidian;
 
         // Пресет на <html> сразу: все [data-fpt-preset]-правила (light-оверрайды,
         // палитра попапа, светлые обои) активны с первого кадра.

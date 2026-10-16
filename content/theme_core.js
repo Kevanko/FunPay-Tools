@@ -121,7 +121,7 @@ const FPT_DESIGN_PROFILES = {
  ink:{radius:8,panel:12,gap:12,density:10,font:'Manrope',wallpaper:'none',label:'Чернила / Compact'}
 };
 function fptPresetPatch(id){const p=FPT_SITE_PRESETS[id],d=FPT_DESIGN_PROFILES[id];if(!p||!d)throw Error('Неизвестная тема');const accent=FPT_THEME_ACCENTS[id];return {sitePreset:id,containerBgColor:p.containerBgColor,textColor:p.textColor,bgColor1:accent,bgColor2:fptLightenHex(accent,.32),linkColor:accent,font:d.font,borderRadius:d.radius,accentMode:'static',menuTransparent:false,wallpaper:d.wallpaper,bgImage:'',bgVideo:''};}
-function fptDesignMetrics(settings){const profile=FPT_DESIGN_PROFILES[settings.sitePreset]||FPT_DESIGN_PROFILES.graphite;const value=Number(settings.borderRadius??profile.radius),radius=Number.isFinite(value)?Math.max(0,Math.min(28,value)):profile.radius;return {...profile,radius,panel:radius===0?0:Math.max(0,radius+profile.panel-profile.radius)};}
+function fptDesignMetrics(settings){const profile=FPT_DESIGN_PROFILES[settings.sitePreset]||FPT_DESIGN_PROFILES.obsidian;const value=Number(settings.borderRadius??profile.radius),radius=Number.isFinite(value)?Math.max(0,Math.min(28,value)):profile.radius;return {...profile,radius,panel:radius===0?0:Math.max(0,radius+profile.panel-profile.radius)};}
 function fptDesignCss(settings){const d=fptDesignMetrics(settings);return `
 :root{--fpt-radius:${d.radius}px;--fpt-panel-radius:${d.panel}px;--fpt-layout-gap:${d.gap}px;--fpt-control-pad:${d.density}px;}
 html.fpt-custom-theme-on body{background:${(settings.wallpaper&&settings.wallpaper!=="none")||settings.bgVideo||settings.bgImage?"transparent":"var(--fpt-p1)"}!important;color:var(--fpt-pTx)!important;font-family:var(--fpt-ui-font)!important;}
@@ -156,7 +156,8 @@ const FPT_THEME_ACCENTS = { graphite: '#5b86d8', obsidian: '#5b86d8', slate: '#5
 const FPT_KNOWN_PRESET_CONTAINERS = ['#1d2028', '#15161b', '#27303f', '#2b3650', '#ffffff', '#1c1f26', '#26303f', '#15171c', '#191b20'];
 const FPT_KNOWN_PRESET_TEXTS = ['#f1f3f7', '#f2f3f7', '#f2f5fa', '#272b33', '#f4f7fb', '#f6f7fa', '#eef2f8', '#2a2d35'];
 function fptNormalizeToPreset(settings) {
-    const preset = FPT_SITE_PRESETS[settings.sitePreset] || FPT_SITE_PRESETS.graphite;
+    if (!Object.prototype.hasOwnProperty.call(FPT_SITE_PRESETS, settings.sitePreset)) settings.sitePreset = DEFAULT_THEME.sitePreset;
+    const preset = FPT_SITE_PRESETS[settings.sitePreset] || FPT_SITE_PRESETS.obsidian;
     const low = (v) => String(v || '').toLowerCase();
     if ([...FPT_KNOWN_PRESET_CONTAINERS, ...Object.values(FPT_SITE_PRESETS).map(p => p.containerBgColor)].includes(low(settings.containerBgColor)))
         settings.containerBgColor = preset.containerBgColor;
@@ -211,7 +212,7 @@ function manageFontImports(settings) {
 }
 
 function getCustomThemeCss(settings) {
-    const preset = FPT_SITE_PRESETS[settings.sitePreset] || FPT_SITE_PRESETS.graphite;
+    const preset = FPT_SITE_PRESETS[settings.sitePreset] || FPT_SITE_PRESETS.obsidian;
     const baseBg = `radial-gradient(120% 90% at 50% -20%, var(--fpt-c1-a06), transparent 55%), linear-gradient(180deg, ${preset.base[0]}, ${preset.base[1]})`;
     // Видео-обои рисуются отдельным <video>-слоем; body::before оставляем лёгкой затемняющей вуалью.
     const bgImageUrl = settings.bgVideo

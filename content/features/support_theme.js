@@ -234,7 +234,7 @@
         }
 
         body {
-            font-family: '${s.font || 'Helvetica Neue'}', 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
+            font-family: ${fptFontStack(s.font || DEFAULT_THEME.font)} !important;
             color: ${pal.pTx};
         }
 
@@ -346,13 +346,13 @@
         }
 
         const s = (typeof fptNormalizeToPreset === 'function')
-            ? fptNormalizeToPreset({ ...(data.fpToolsTheme || {}) })
-            : { ...(data.fpToolsTheme || {}) };
-        const presetId = FPT_SITE_PRESETS[s.sitePreset] ? s.sitePreset : 'graphite';
+            ? fptNormalizeToPreset({ ...DEFAULT_THEME, ...(data.fpToolsTheme || {}) })
+            : { ...DEFAULT_THEME, ...(data.fpToolsTheme || {}) };
+        const presetId = FPT_SITE_PRESETS[s.sitePreset] ? s.sitePreset : DEFAULT_THEME.sitePreset;
         const preset = FPT_SITE_PRESETS[presetId];
 
         document.documentElement.dataset.fptPreset = presetId;
-        manageFont(s.font || 'Helvetica Neue');
+        manageFont(s.font || DEFAULT_THEME.font);
         styleEl.textContent = buildCss(s, preset);
         applyLayers(s);
     }
