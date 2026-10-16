@@ -9,8 +9,8 @@ final class Settings {
     private final Context context;
     private final SharedPreferences p;
     Settings(Context c) { context=c.getApplicationContext();p=c.getSharedPreferences("preferences",Context.MODE_PRIVATE); }
-    String theme(){return p.getString("theme","clay");}
-    int font(){return p.getInt("font",0);}
+    String theme(){return p.getString("theme","obsidian");}
+    int font(){return p.getInt("font",Palette.themeFont(theme()));}
     Palette palette(){JSONObject custom=config().optJSONObject("fpToolsTheme");return new Palette(theme(),custom!=null&&theme().equals(custom.optString("sitePreset",theme()))?custom:null);}
     void appearance(String key,Object value){try{JSONObject cfg=config(),theme=cfg.optJSONObject("fpToolsTheme");if(theme==null)theme=new JSONObject();theme.put("sitePreset",theme()).put(key,value);if(key.equals("bgColor1"))theme.put("linkColor",value).put("accentMode","static");cfg.put("fpToolsTheme",theme);save(cfg);}catch(JSONException ignored){}}
     void theme(String id){p.edit().putString("theme",id).apply();}

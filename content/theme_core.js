@@ -16,16 +16,16 @@ function fptFontStack(font) {
 const DEFAULT_THEME = {
     bgColor1: '#5b86d8',
     bgColor2: '#8fb0e8',
-    containerBgColor: '#191b20',
+    containerBgColor: '#15161b',
     containerBgOpacity: 1,
-    textColor: '#f4f7fb',
+    textColor: '#f2f3f7',
     linkColor: '#5b86d8',
     bgImage: null,
     wallpaper: 'none',
-    font: 'Manrope',
+    font: 'Consolas',
     bgBlur: 0,
     bgBrightness: 100,
-    borderRadius: 8,
+    borderRadius: 4,
     enableCircleCustomization: false,
     showCircles: true,
     circleSize: 100,
@@ -50,7 +50,7 @@ const DEFAULT_THEME = {
     textOutlineColor: '#000000',
     textOutlineWidth: 1,        // px
     // Редизайн-пресеты (funpay-redesign)
-    sitePreset: 'graphite',     // graphite | obsidian | slate | light
+    sitePreset: 'obsidian',
     accentMode: 'static',       // static | rainbow
     bgVideo: null               // dataURL видео-обоев
 };
@@ -125,6 +125,7 @@ function fptDesignMetrics(settings){const profile=FPT_DESIGN_PROFILES[settings.s
 function fptDesignCss(settings){const d=fptDesignMetrics(settings);return `
 :root{--fpt-radius:${d.radius}px;--fpt-panel-radius:${d.panel}px;--fpt-layout-gap:${d.gap}px;--fpt-control-pad:${d.density}px;}
 html.fpt-custom-theme-on body{background:${(settings.wallpaper&&settings.wallpaper!=="none")||settings.bgVideo||settings.bgImage?"transparent":"var(--fpt-p1)"}!important;color:var(--fpt-pTx)!important;font-family:var(--fpt-ui-font)!important;}
+html.fpt-custom-theme-on body.funpay-redesigned,html.fpt-custom-theme-on .fpt-home{background:${(settings.wallpaper&&settings.wallpaper!=="none")||settings.bgVideo||settings.bgImage?"transparent":"var(--fpt-p1)"}!important;}
 html.fpt-custom-theme-on :is(.navbar,.navbar-default,.dropdown-menu,.modal-content,.panel,.well,.chat-header,.chat-form,.contact-list,.contact-item,.offer,.tc-header){background-color:var(--fpt-p2)!important;color:var(--fpt-pTx)!important;border-color:var(--fpt-pLine)!important;}
 html.fpt-custom-theme-on :is(.form-control,textarea,select,input:not([type=checkbox]):not([type=radio]):not([type=range])){background-color:var(--fpt-pInput)!important;color:var(--fpt-pTx)!important;border-color:var(--fpt-pLine)!important;border-radius:var(--fpt-radius)!important;font-family:var(--fpt-ui-font)!important;}
 html.fpt-custom-theme-on :is(.panel,.well,.modal-content,.offer,.tc-item){border-radius:var(--fpt-panel-radius)!important;}

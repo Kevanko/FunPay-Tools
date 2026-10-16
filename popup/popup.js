@@ -182,7 +182,7 @@
   }
   function applyAppearance() {
     const t = state.data.fpToolsTheme || {};
-    const p = FPT_SITE_PRESETS[t.sitePreset] || FPT_SITE_PRESETS.graphite;
+    const p = FPT_SITE_PRESETS[t.sitePreset] || FPT_SITE_PRESETS.obsidian;
     const v = {
       "--bg": p.pal.p1,
       "--bg-deep": p.base[1],
@@ -194,8 +194,8 @@
       "--text-faint": p.pal.pTxFaint,
       "--line": p.pal.pLine,
       "--line-strong": p.pal.pLine,
-      "--font-ui": fptFontStack(t.font || "Segoe UI"),
-      "--font-display": fptFontStack(t.font || "Segoe UI"),
+      "--font-ui": fptFontStack(t.font || FPT_DESIGN_PROFILES[t.sitePreset||'obsidian']?.font || 'Consolas'),
+      "--font-display": fptFontStack(t.font || FPT_DESIGN_PROFILES[t.sitePreset||'obsidian']?.font || 'Consolas'),
     };
     const accent = t.linkColor || t.bgColor1 || "#5b86d8";
     v["--accent"] = accent;
@@ -210,7 +210,7 @@
     document.documentElement.style.setProperty("--r-md",profile.radius+"px");
     document.documentElement.style.setProperty("--r-lg",profile.panel+"px");
     document.documentElement.style.setProperty("--design-gap",profile.gap+"px");
-    document.documentElement.setAttribute?.("data-design",t.sitePreset||"graphite");
+    document.documentElement.setAttribute?.("data-design",t.sitePreset||"obsidian");
     document.documentElement.style.colorScheme = p.scheme;
   }
   function nav(filter = "") {

@@ -12100,3 +12100,16 @@ html[data-fpt-preset] .fp-tools-popup .fp-tools-nav li.active a :is(span,svg){co
 }
 .fp-tools-popup .fp-tools-content .setting-group { padding: 0 0 24px; margin-bottom: 24px; border-bottom: 1px solid var(--fpt-line) !important; }
 .fp-tools-popup .fp-tools-content .setting-group .setting-group { margin-bottom: 0; padding-bottom: 0; border-bottom: 0 !important; }
+
+.fp-tools-popup .fpt-settings-section{margin:24px 0;padding-top:20px;border-top:1px solid var(--fpt-line)}
+.fp-tools-popup .fpt-settings-section h4{margin:0 0 18px;font:600 14px/1.4 var(--fpt-ui-font)}
+.fp-tools-popup .fpt-settings-section .template-container{display:grid;grid-template-columns:minmax(130px,1fr) minmax(160px,1.3fr);gap:24px;align-items:center;margin:0;padding:14px 0}
+.fp-tools-popup .fpt-settings-section .range-label{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0}
+.fp-tools-popup .fpt-settings-section .range-label label{margin:0;font-size:13px}
+.fp-tools-popup .fpt-settings-section .range-label span{font-size:12px;color:var(--fpt-text-dim);font-variant-numeric:tabular-nums}
+.fp-tools-popup .fpt-settings-section input[type=range]{width:100%;height:4px;margin:12px 0;accent-color:var(--fpt-accent);cursor:pointer}
+.fp-tools-popup .fpt-settings-advanced{margin:24px 0;border-top:1px solid var(--fpt-line);padding-top:18px}
+.fp-tools-popup .fpt-settings-advanced summary{padding:8px 0;cursor:pointer;font-size:13px;font-weight:600;color:var(--fpt-text-dim)}
+.fp-tools-popup .fpt-settings-advanced[open] summary{margin-bottom:20px;color:var(--fpt-text)}
+.fp-tools-popup .fpt-brand-logo{filter:var(--fpt-pLogoFilter);opacity:1}
+@media(max-width:700px){.fp-tools-popup .fpt-settings-section .template-container{grid-template-columns:1fr;gap:8px}}

@@ -758,7 +758,7 @@ function createMainPopup() {
                     <div class="fpt-eyebrow fpt-blocklabel">Тема</div>
                     <div class="fpt-theme-swatches">
                         <button type="button" class="fpt-theme-sw" data-fpt-theme="graphite"><span class="fpt-theme-prev" data-t="graphite"></span><span class="fpt-theme-sw-label">Графит</span></button>
-                        <button type="button" class="fpt-theme-sw" data-fpt-theme="obsidian"><span class="fpt-theme-prev" data-t="obsidian"></span><span class="fpt-theme-sw-label">Обсидиан</span></button>
+                        <button type="button" class="fpt-theme-sw" data-fpt-theme="obsidian"><span class="fpt-theme-prev" data-t="obsidian"></span><span class="fpt-theme-sw-label">Терминал</span></button>
                         <button type="button" class="fpt-theme-sw" data-fpt-theme="slate"><span class="fpt-theme-prev" data-t="slate"></span><span class="fpt-theme-sw-label">Сине-серый</span></button>
                         <button type="button" class="fpt-theme-sw" data-fpt-theme="light"><span class="fpt-theme-prev" data-t="light"></span><span class="fpt-theme-sw-label">Светлая</span></button>
                         <button type="button" class="fpt-theme-sw" data-fpt-theme="clay"><span class="fpt-theme-prev" data-t="clay"></span><span class="fpt-theme-sw-label">Глина</span></button>
@@ -1262,7 +1262,28 @@ function createMainPopup() {
             <button id="saveSettings" class="btn">Сохранить</button>
         </div>
     `;
+    organizeThemeSettings(toolsPopup);
     return toolsPopup;
+}
+
+function organizeThemeSettings(root) {
+    const page=root.querySelector('.fp-tools-page-content[data-page="theme"]');
+    if(!page)return;
+    const extra=page.querySelector('.fpt-theme-extra');
+    if(extra){
+        const basic=document.createElement('section');basic.className='fpt-settings-section';
+        const title=document.createElement('h4');title.textContent='Текст и форма';basic.append(title);
+        for(const id of ['themeFontSelect','themeBorderRadius']){const row=extra.querySelector('#'+id)?.closest('.template-container');if(row)basic.append(row);}
+        extra.before(basic);
+        const background=document.createElement('section');background.className='fpt-settings-section';const heading=document.createElement('h4');heading.textContent='Изображение фона';background.append(heading);
+        for(const id of ['themeBgBlur','themeBgBrightness']){const row=extra.querySelector('#'+id)?.closest('.template-container');if(row)background.append(row);}
+        basic.after(background);
+        const details=document.createElement('details');details.className='fpt-settings-advanced';const summary=document.createElement('summary');summary.textContent='Дополнительные эффекты';details.append(summary);extra.before(details);details.append(extra);
+        const previous=basic.previousElementSibling;if(previous?.classList.contains('fpt-eyebrow'))previous.remove();
+    }
+    const labels={themeColor1:'Акцент',themeColor2:'Второй акцент',themeContainerBgColor:'Поверхности',themeTextColor:'Текст',themeLinkColor:'Ссылки',themeFontSelect:'Шрифт',themeBorderRadius:'Скругления',themeBgBlur:'Размытие',themeBgBrightness:'Яркость'};
+    for(const [id,name]of Object.entries(labels)){const label=page.querySelector('label[for="'+id+'"]');if(label)label.textContent=name;}
+    const enabled=page.querySelector('label[for="enableCustomThemeCheckbox"] span');if(enabled)enabled.textContent='Оформление FunPay';
 }
 
 // Темы/обои/акцент управляются ЕДИНСТВЕННЫМ слоем в theme.js

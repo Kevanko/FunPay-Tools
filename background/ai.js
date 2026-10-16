@@ -46,10 +46,13 @@ async function makeAIRequest(finalPrompt) {
             const details = errorData.details || `HTTP ${response.status} ${response.statusText}`;
             console.error(`AI Server Error: ${details}`);
             
+            if (typeof details === 'string' && details.includes('model_unavailable')) {
+                return { success: false, error: 'ИИ-сервер не может запустить выбранную модель. Нужна смена модели на сервере; ваш текст не изменён.' };
+            }
             if (response.status >= 500) {
                  return { 
                     success: false, 
-                    error: "ИИ на сервере разработчика устарел. Разработчик скоро обновит ИИ, и все заработает! ИЗВИНИ 🙏🏻" 
+                    error: 'ИИ-сервер временно недоступен. Повторите позже. Ваш текст не изменён.'
                 };
             }
             return { success: false, error: `Ошибка API: ${details}` };
