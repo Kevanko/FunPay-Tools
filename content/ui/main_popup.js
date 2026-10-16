@@ -828,22 +828,22 @@ function createMainPopup() {
                 <div class="fp-tools-page-content" data-page="autobump">
                     <h3>Авто-поднятие лотов</h3>
                     <div class="fpt-smart-bump-card" style="border:1px solid rgba(91,134,216,0.30);border-radius:12px;padding:14px 16px;margin-bottom:16px;background:linear-gradient(135deg, rgba(91,134,216,0.10), rgba(91,134,216,0.04)), var(--fpt-surface, #0c0c10);">
-                        <div class="checkbox-label-inline" style="margin:0;"><input type="checkbox" id="fpToolsSmartBumpEnabled"><label for="fpToolsSmartBumpEnabled" style="margin-bottom:0;"><span>Умное авто-поднятие</span></label></div>
-                        <small style="font-size:12px;opacity:0.75;display:block;margin-top:8px;margin-left:30px;">Поднимает каждую категорию ровно тогда, когда это разрешает FunPay - читает точное время ожидания из ответа сервера по каждой категории отдельно (умная логика тайминга по каждой категории). Не тратит лишние запросы и не ловит лимиты. Заменяет таймер ниже, пока включено.</small>
+                        <div class="checkbox-label-inline" style="margin:0;"><input type="checkbox" id="fpToolsSmartBumpEnabled"><label for="fpToolsSmartBumpEnabled" style="margin-bottom:0;"><span>По времени FunPay</span></label></div>
+                        <small class="fpt-setting-help">Использует время ожидания каждой категории из ответа FunPay. Пока включено, имеет приоритет над таймером.</small>
                     </div>
-                    <div class="checkbox-label-inline"><input type="checkbox" id="autoBumpEnabled"><label for="autoBumpEnabled" style="margin-bottom:0;"><span>Включить авто-поднятие (по таймеру)</span></label></div>
-                    <div class="template-container"><label for="autoBumpCooldown">Интервал поднятия (минуты):</label><input type="number" id="autoBumpCooldown" class="template-input" min="5" placeholder="Например: 245"><small style="font-size: 12px; opacity: 0.7;">Минимум 5 минут. FunPay позволяет поднимать раз в 4 часа (240 минут).</small></div>
+                    <div class="checkbox-label-inline"><input type="checkbox" id="autoBumpEnabled"><label for="autoBumpEnabled" style="margin-bottom:0;"><span>По таймеру</span></label></div>
+                    <div class="template-container fpt-number-setting"><label for="autoBumpCooldown">Интервал, мин</label><input type="number" id="autoBumpCooldown" class="template-input" min="5" placeholder="Например: 240"><small class="fpt-setting-help">От 5 минут. Интервал проверок не отменяет ограничения FunPay на поднятие.</small></div>
                     
                     <div class="checkbox-label-inline"><input type="checkbox" id="selectiveBumpEnabled"><label for="selectiveBumpEnabled" style="margin-bottom:0;"><span>Поднимать только выбранные категории</span></label></div>
-                    <button id="configureSelectiveBumpBtn" class="btn btn-default" style="width: auto; padding: 8px 16px; font-size: 14px;">выбрать...</button>
+                    <button id="configureSelectiveBumpBtn" class="btn btn-default" style="width: auto; padding: 8px 16px; font-size: 14px;">Выбрать категории</button>
                     
                     <div class="checkbox-label-inline" style="margin-top: 15px;"><input type="checkbox" id="bumpOnlyAutoDelivery"><label for="bumpOnlyAutoDelivery" style="margin-bottom:0;"><span>Поднимать только категории с автовыдачей</span></label></div>
                     <small style="font-size: 12px; opacity: 0.7; display: block; margin-top: -10px; margin-left: 30px;">Будут подняты только те категории, в которых есть хотя бы один лот с иконкой автовыдачи (<span class="material-symbols-rounded" style="font-size:14px;vertical-align:-3px;">bolt</span>).</small>
 
                     <div class="checkbox-label-inline" style="margin-top: 15px;"><input type="checkbox" id="fpToolsBumpNotifyEnabled" checked><label for="fpToolsBumpNotifyEnabled" style="margin-bottom:0;"><span>Уведомлять о поднятии лотов</span></label></div>
-                    <small style="font-size: 12px; opacity: 0.7; display: block; margin-top: -10px; margin-left: 30px;">Показывает аккуратное уведомление справа, когда лоты подняты — с перечнем категорий и их количеством. По умолчанию включено.</small>
+                    <small class="fpt-setting-help">Показывает уведомление со списком поднятых категорий.</small>
 
-                    <label style="margin-top: 20px;">Консоль логов:</label>
+                    <label style="margin-top: 20px;">Журнал поднятия</label>
                     <div id="autoBumpConsole" class="fp-tools-console"></div>
                 </div>
                 <div class="fp-tools-page-content" data-page="notes">

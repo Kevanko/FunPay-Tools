@@ -12128,6 +12128,12 @@ html[data-fpt-preset] .fp-tools-popup .fp-tools-nav li.active a :is(span,svg){co
 .fp-tools-popup .fpt-setting-range .range-label label{margin:0;font-size:13px}
 .fp-tools-popup .fpt-setting-range input[type=range]{width:100%;height:4px;margin:12px 0;accent-color:var(--fpt-accent)}
 .fp-tools-popup .fpt-setting-range .range-label span{font-size:12px;color:var(--fpt-text-dim);font-variant-numeric:tabular-nums}
+.fp-tools-popup .fpt-theme-extra .fpt-setting-range{grid-template-columns:minmax(0,1fr);gap:8px;min-width:0}
+.fp-tools-popup .fpt-setting-range>*{min-width:0}
+.fp-tools-popup .fpt-setting-help{display:block;margin:8px 0 16px;color:var(--fpt-text-dim);font-size:12px;line-height:1.6}
+.fp-tools-popup .fpt-number-setting{display:grid;grid-template-columns:minmax(0,1fr) 120px;gap:8px 20px;align-items:center}
+.fp-tools-popup .fpt-number-setting>label,.fp-tools-popup .fpt-number-setting>input{margin:0}
+.fp-tools-popup .fpt-number-setting>.fpt-setting-help{grid-column:1/-1;margin-bottom:0}
 .fp-tools-popup #notificationSoundGroup{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px}
 .fp-tools-popup #notificationSoundGroup .fp-tools-radio-option{display:inline-flex;flex-direction:row;align-items:center;gap:8px;padding:9px 12px;margin:0;min-height:40px}
 .fp-tools-popup #notificationSoundGroup .fp-tools-radio-option span{white-space:nowrap}
