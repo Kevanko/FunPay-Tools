@@ -696,7 +696,8 @@ const FPT_SECTION_KEYS = {
     slash_commands: ['fpToolsSlashCommands'],
     theme: ['fpToolsTheme', 'enableCustomTheme', 'fpToolsLiveStyles', 'enableRedesignedHomepage', 'fpToolsHeaderButtonStyles'],
     effects: ['fpToolsCursorFx', 'fpToolsCustomCursor'],
-    general: ['notificationSound', 'notificationVolume', 'fpToolsCustomSoundData', 'fpToolsCustomSoundMeta', 'showSalesStats', 'hideBalance', 'viewSellersPromo', 'fpToolsDisabledFeatures', 'fpToolsShowPaymentType', 'fpToolsShowUnconfirmed'],
+    general: ['showSalesStats', 'hideBalance', 'viewSellersPromo', 'fpToolsDisabledFeatures', 'fpToolsShowPaymentType', 'fpToolsShowUnconfirmed'],
+    notifications: ['notificationSound', 'notificationVolume', 'fpToolsCustomSoundData', 'fpToolsCustomSoundMeta'],
     autobump: ['autoBumpEnabled', 'autoBumpCooldown', 'fpToolsSmartBumpEnabled', 'fpToolsBumpNotifyEnabled', 'fpToolsSelectiveBumpEnabled', 'fpToolsBumpOnlyAutoDelivery', 'fpToolsSelectedBumpCategories']
 };
 

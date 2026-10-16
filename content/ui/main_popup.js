@@ -1263,7 +1263,35 @@ function createMainPopup() {
         </div>
     `;
     organizeThemeSettings(toolsPopup);
+    organizeSettingsPages(toolsPopup);
     return toolsPopup;
+}
+
+function organizeSettingsPages(root) {
+    const general=root.querySelector('.fp-tools-page-content[data-page="general"]');
+    const start=[...(general?.children||[])].find(n=>n.tagName==='H3'&&n.textContent.trim()==='Звук уведомления');
+    if(start){
+        const page=document.createElement('div');page.className='fp-tools-page-content';page.dataset.page='notifications';
+        let current=start;
+        while(current&&!(current.tagName==='H3'&&current.textContent.trim()==='Заказы и статистика')){const next=current.nextElementSibling;if(!current.classList.contains('support-promo'))page.append(current);current=next;}
+        general.after(page);
+        const item=document.createElement('li');item.dataset.page='notifications';const anchor=document.createElement('a');anchor.innerHTML=FPTIcons.svg('bell',20)+'<span>Уведомления</span>';item.append(anchor);
+        root.querySelector('.fp-tools-nav li[data-page="theme"]')?.before(item);
+    }
+    const titles={general:'Обзор',phone:'Телефон',lot_io:'Лоты',autobump:'Поднятие лотов',auto_delivery:'Выдача товаров',templates:'Шаблоны',auto_review:'Автоответы',slash_commands:'Команды',global_chat:'Общий чат',blacklist:'Блокировки',ai_audit:'Проверка лотов ИИ',currency_calc:'Курсы валют',piggy_banks:'Цели накопления',calculator:'Калькулятор',theme:'Оформление',effects:'Эффекты',accounts:'Аккаунты',vps:'Сервер',needs:'Видимость функций',epic_nicks:'Профиль и ник',telegram:'Telegram',notes:'Заметки',overview:'Справка',settings_io:'Перенос и синхронизация',tickets:'Обращения',support:'О проекте',notifications:'Уведомления'};
+    for(const [id,title]of Object.entries(titles)){
+        const item=root.querySelector('.fp-tools-nav li[data-page="'+id+'"]');
+        const caption=item?.querySelector('a>span:last-child');if(caption)caption.textContent=title;
+        const page=root.querySelector('.fp-tools-page-content[data-page="'+id+'"]');if(!page)continue;
+        page.setAttribute('aria-label',title);
+        const headings=[...page.children].filter(node=>node.tagName==='H3');
+        if(headings.length===1)headings[0].textContent=title;
+        if(headings.length>1){
+            const nav=document.createElement('nav');nav.className='fpt-page-sections';nav.setAttribute('aria-label','Разделы страницы');
+            headings.forEach((heading,index)=>{heading.id=heading.id||'fpt-section-'+id+'-'+index;const button=document.createElement('button');button.type='button';button.textContent=heading.textContent.trim();button.onclick=()=>{heading.scrollIntoView({block:'start',behavior:'instant'});heading.tabIndex=-1;heading.focus({preventScroll:true});};nav.append(button);});page.prepend(nav);
+        }
+        page.querySelectorAll('.template-container').forEach(row=>{if(row.querySelector(':scope > input[type="range"], :scope > div > input[type="range"]')&&row.querySelector(':scope > .range-label'))row.classList.add('fpt-setting-range');});
+    }
 }
 
 function organizeThemeSettings(root) {

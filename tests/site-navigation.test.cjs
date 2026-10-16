@@ -3,6 +3,26 @@ const assert=require('node:assert/strict');
 const {JSDOM}=require('jsdom');
 const fs=require('node:fs');
 const vm=require('node:vm');
+test('settings pages preserve controls while separating notifications and providing section navigation',()=>{
+ const dom=new JSDOM('',{url:'https://funpay.com/'});
+ const context=vm.createContext({document:dom.window.document,chrome:{runtime:{getURL:path=>path}},FPTIcons:{svg:()=>'<svg aria-hidden="true"></svg>'}});
+ vm.runInContext(fs.readFileSync('content/ui/main_popup.js','utf8'),context);
+ const root=context.createMainPopup();dom.window.document.body.append(root);
+ const pages=[...root.querySelectorAll('.fp-tools-page-content')];
+ const nav=[...root.querySelectorAll('.fp-tools-nav li[data-page]')];
+ assert.equal(pages.length,27);assert.equal(new Set(pages.map(p=>p.dataset.page)).size,27);
+ for(const item of nav)assert.equal(pages.filter(p=>p.dataset.page===item.dataset.page).length,1,item.dataset.page);
+ for(const id of ['notificationSoundGroup','notificationVolume','fptCustomSoundInput','discordWebhookUrl']){
+  const control=root.querySelector('#'+id);assert.ok(control,id);assert.equal(root.querySelectorAll('#'+id).length,1);assert.equal(control.closest('[data-page]').dataset.page,'notifications');
+ }
+ assert.equal(root.querySelector('#notificationVolume').closest('.template-container').classList.contains('fpt-setting-range'),true);
+ assert.equal(root.querySelector('#showSalesStatsCheckbox').closest('[data-page]').dataset.page,'general');
+ assert.equal(root.querySelector('.support-promo').closest('[data-page]').dataset.page,'general');
+ const replies=root.querySelector('.fp-tools-page-content[data-page="auto_review"]');
+ assert.equal(replies.querySelectorAll('.fpt-page-sections button').length,6);
+ const heading=replies.querySelector('h3');let scrolled=false,focused=false;heading.scrollIntoView=()=>{scrolled=true;};heading.focus=()=>{focused=true;};replies.querySelector('.fpt-page-sections button').click();assert.ok(scrolled&&focused);
+ dom.window.close();
+});
 test('requested editor page wins over stored last page during lazy panel creation',async()=>{
  const dom=new JSDOM('<button id="launcher"></button><div class="fp-tools-popup"><nav class="fp-tools-nav"><li data-page="theme"></li></nav></div>',{url:'https://funpay.com/#fpt-page=theme'});
  const {window}=dom;let restoreCount=0,selected=0;window.__fpEnsurePopup=async()=>{await Promise.resolve();window.document.querySelector('.fp-tools-popup').classList.add('active');};window.document.querySelector('li').onclick=()=>selected++;
