@@ -1,7 +1,17 @@
+import { AI_PROVIDERS, AI_MODELS, normalizeAIEndpoint } from '../background/ai_provider.js';
 const $ = id => document.getElementById(id);
 let busy = false;
+let connections = [];
 function show(message) { $('status').textContent = message; }
-function fields() { $('groq-fields').hidden = $('provider').value !== 'groq'; $('author-note').hidden = $('provider').value !== 'author'; }
+function fields(reset = false) {
+    const id = $('provider').value, preset = AI_PROVIDERS[id];
+    $('groq-fields').hidden = id === 'author'; $('author-note').hidden = id !== 'author';
+    $('base-url').readOnly = id !== 'custom';
+    if (reset) { $('base-url').value = preset.baseUrl; $('model').value = id === 'groq' ? AI_MODELS[0] : id === 'plakcel' ? 'glm-5.3' : ''; $('key').value = ''; $('key').placeholder = 'Вставьте API-ключ'; $('saved').value = ''; }
+    $('model-options').replaceChildren(...(id === 'groq' ? AI_MODELS : []).map(value => new Option(value, value)));
+    $('key-link').hidden = id !== 'groq';
+}
+function populate(config) { $('provider').value = config.provider; $('base-url').value = config.baseUrl; $('model').value = config.model; $('key').value = ''; $('key').placeholder = config.configured ? 'Ключ сохранён · можно заменить' : 'Вставьте API-ключ'; fields(); }
 function lock(value) { busy = value; document.querySelectorAll('button,select,input').forEach(node => { node.disabled = value; }); }
 async function call(action, data = {}) {
     const result = await chrome.runtime.sendMessage({ action, ...data });
@@ -10,35 +20,48 @@ async function call(action, data = {}) {
 }
 async function load() {
     const config = await call('fptAIStatus');
-    $('provider').value = config.provider; $('model').value = config.model;
-    $('key').placeholder = config.configured ? 'Ключ сохранён · можно заменить' : 'gsk_…';
-    fields(); show(config.configured ? 'Ключ сохранён. Нажмите «Проверить ИИ».' : 'Создайте ключ в Groq и вставьте его сюда.');
+    connections = config.connections;
+    $('saved').replaceChildren(new Option('Новое подключение', ''), ...connections.map((item,index)=>new Option(AI_PROVIDERS[item.provider].name + (item.baseUrl ? ' · ' + new URL(item.baseUrl).host : '') + (item.model ? ' / '+item.model : ''), String(index))));
+    populate(config); $('saved').value = String(connections.findIndex(item=>item.provider===config.provider && item.baseUrl===config.baseUrl));
+    show(config.configured ? 'Подключение сохранено. Можно проверить ИИ.' : 'Выберите сервис, модель и добавьте API-ключ.');
 }
-$('provider').addEventListener('change', fields);
+$('provider').addEventListener('change', () => fields(true));
+$('saved').addEventListener('change', () => { const config=connections[Number($('saved').value)]; if($('saved').value!==''&&config){populate(config);show('Нажмите «Сохранить», чтобы использовать это подключение.');} });
+$('new').addEventListener('click', () => { $('provider').value='custom';fields(true);$('base-url').focus();show('Добавьте адрес API, модель и ключ нового сервиса.'); });
+$('models').addEventListener('click', async () => {
+    if(busy)return;lock(true);
+    try {
+        const config=await call('fptAIStatus');
+        if($('key').value || $('provider').value!==config.provider || $('base-url').value!==config.baseUrl) throw Error('Сначала сохраните адрес сервиса и ключ.');
+        const result=await call('fptAIModels'); $('model-options').replaceChildren(...result.models.map(value=>new Option(value,value)));show('Загружено моделей: '+result.models.length+'. Выберите модель в поле выше.');$('model').focus();
+    }catch(error){show(error.message);}finally{lock(false);}
+});
 $('connection').addEventListener('submit', async event => {
     event.preventDefault(); if (busy) return;
     // Request optional host access directly from the user's click gesture.
-    const permission = $('provider').value === 'groq' ? chrome.permissions.request({ origins: ['https://api.groq.com/*'] }) : Promise.resolve(true);
+    let baseUrl, permission;
+    try { baseUrl = $('provider').value === 'author' ? '' : normalizeAIEndpoint($('base-url').value); permission = baseUrl ? chrome.permissions.request({ origins: [new URL(baseUrl).origin+'/*'] }) : Promise.resolve(true); }
+    catch(error) { show(error.message); return; }
     lock(true);
     try {
-        if (!await permission) throw new Error('Для подключения нужен доступ расширения к api.groq.com.');
-        const config = await call('fptAISave', { provider: $('provider').value, model: $('model').value, apiKey: $('key').value });
+        if (!await permission) throw new Error('Для подключения нужен доступ расширения к выбранному API.');
+        const config = await call('fptAISave', { provider: $('provider').value, baseUrl, model: $('model').value.trim(), apiKey: $('key').value });
         $('key').value = ''; await load();
-        show(config.provider === 'author' ? 'Выбран сервер автора.' : config.configured ? 'Сохранено. Теперь проверьте ИИ.' : 'Добавьте API-ключ Groq.');
+        show(config.provider === 'author' ? 'Выбран сервер автора.' : config.configured ? 'Сохранено. Теперь проверьте ИИ.' : 'Добавьте API-ключ сервиса.');
     } catch (error) { show(error.message); } finally { lock(false); }
 });
 $('test').addEventListener('click', async () => {
     if (busy) return; lock(true); show('Проверяю на слове «Превет»…');
     try {
         const config = await call('fptAIStatus');
-        if ($('key').value || $('provider').value !== config.provider || $('model').value !== config.model) throw new Error('Сначала сохраните изменения подключения.');
+        if ($('key').value || $('provider').value !== config.provider || $('model').value !== config.model || $('base-url').value !== config.baseUrl) throw new Error('Сначала сохраните изменения подключения.');
         const result = await call('fptAITest'); show('ИИ отвечает: ' + result.data);
     }
     catch (error) { show(error.message); } finally { lock(false); }
 });
 $('remove').addEventListener('click', async () => {
     if (busy) return; lock(true);
-    try { await call('fptAISave', { provider: $('provider').value, model: $('model').value, clearKey: true }); $('key').value = ''; await load(); show('Ключ удалён из этого браузера.'); }
+    try { await call('fptAISave', { provider: $('provider').value, baseUrl: $('base-url').value, model: $('model').value.trim(), clearKey: true }); $('key').value = ''; await load(); show('Ключ выбранного подключения удалён из этого браузера.'); }
     catch (error) { show(error.message); } finally { lock(false); }
 });
 chrome.storage.local.get('fpToolsTheme').then(({ fpToolsTheme: theme }) => {

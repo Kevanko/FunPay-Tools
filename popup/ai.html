@@ -2,19 +2,24 @@
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Подключение ИИ · FP Tools</title><link rel="stylesheet" href="ai.css"></head>
 <body><main>
 <header><img src="../icons/brand-mark.png" alt=""><span>FP Tools <span class="muted">/ ИИ</span></span></header>
-<p class="eyebrow">ВАШЕ ПОДКЛЮЧЕНИЕ</p><h1>Текст, точнее.</h1>
-<p class="intro">Исправляйте сообщения и создавайте описания через свой аккаунт Groq с бесплатной квотой.</p>
+<p class="eyebrow">СЕРВИСЫ И МОДЕЛИ</p><h1>Подключение ИИ</h1>
+<p class="intro">Подключите свой ИИ для сообщений, переводов и описаний. Поддерживаются платные сервисы и бесплатные квоты.</p>
 <form id="connection">
-<label for="provider">Сервис</label><select id="provider"><option value="groq">Groq · свой ключ</option><option value="author">Сервер автора</option></select>
+<div class="field-heading"><label for="saved">Сохранённые подключения</label><button type="button" class="text-button" id="new">Добавить</button></div>
+<select id="saved"><option value="">Новое подключение</option></select>
+<label for="provider">Сервис</label><select id="provider"><option value="groq">Groq</option><option value="openai">OpenAI</option><option value="openrouter">OpenRouter</option><option value="deepseek">DeepSeek</option><option value="plakcel">Plakcel · GLM</option><option value="custom">Другой сервис · совместимый API</option><option value="author">Сервер автора</option></select>
 <div id="groq-fields">
-<label for="model">Модель</label><select id="model"><option value="openai/gpt-oss-120b">GPT OSS 120B · качество</option><option value="openai/gpt-oss-20b">GPT OSS 20B · скорость</option></select>
-<div class="field-heading"><label for="key">API-ключ</label><a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Создать ключ ↗</a></div>
-<input id="key" type="password" autocomplete="off" spellcheck="false" maxlength="512" placeholder="gsk_…" aria-describedby="key-help">
+<label for="base-url">Адрес API</label><input id="base-url" type="url" maxlength="2048" autocomplete="off" spellcheck="false" placeholder="https://example.com/v1" aria-describedby="endpoint-help">
+<p class="hint" id="endpoint-help">Базовый URL из инструкции сервиса. Можно вставить полный адрес /chat/completions. Ссылка на страницу ключа сюда не подходит.</p>
+<div class="field-heading"><label for="model">Модель</label><button type="button" class="text-button" id="models">Загрузить список</button></div><input id="model" type="text" list="model-options" autocomplete="off" spellcheck="false" maxlength="200" placeholder="Идентификатор модели из кабинета сервиса"><datalist id="model-options"></datalist>
+<p class="hint">Укажите точное имя модели, доступной вашему ключу. Например, glm-5.3 для сервиса, который её предоставляет.</p>
+<div class="field-heading"><label for="key">API-ключ</label><a id="key-link" href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Кабинет сервиса ↗</a></div>
+<input id="key" type="password" autocomplete="off" spellcheck="false" maxlength="4096" placeholder="Вставьте API-ключ" aria-describedby="key-help">
 <p class="hint" id="key-help">Ключ остаётся в этом браузере. В QR, файлы настроек и облако он не попадает.</p>
-<p class="hint">Используйте план Free в Groq. Квота ограничена; точные лимиты доступны в аккаунте. Текст запроса отправляется непосредственно Groq.</p>
+<p class="hint">Для другого сервиса нужен API формата OpenAI Chat Completions с Bearer-ключом. Запросы идут напрямую выбранному провайдеру и расходуют его квоту или баланс. Проверка ИИ тоже отправляет короткий запрос.</p>
 </div>
 <p id="author-note" class="hint" hidden>Внешний сервер исходного автора. Его модель сейчас недоступна; настройки этого сервера здесь не меняются.</p>
 <div class="actions"><button type="submit" id="save">Сохранить</button><button type="button" class="secondary" id="test">Проверить ИИ</button><button type="button" class="text-button" id="remove">Удалить ключ</button></div>
 <p id="status" role="status" aria-live="polite"></p>
 </form><footer>Корректировка не отправляет сообщение покупателю. Сначала проверьте предложенный текст.</footer>
-</main><script src="../content/theme_core.js"></script><script src="ai.js"></script></body></html>
+</main><script src="../content/theme_core.js"></script><script type="module" src="ai.js"></script></body></html>

@@ -18,7 +18,46 @@ test('configuration never returns credentials; empty update preserves key and de
  reset();const status=await configure();assert.equal(status.configured,true);assert.equal(JSON.stringify(status).includes(key),false);
  await provider.saveAIConnection({provider:'groq',model:provider.AI_MODELS[1],apiKey:''});assert.equal(saved.apiKey,key);
  await provider.saveAIConnection({provider:'groq',model:provider.AI_MODELS[1],clearKey:true});assert.equal((await provider.aiConnectionStatus()).configured,false);
- assert.equal((await provider.saveAIConnection({provider:'groq',model:'unknown',apiKey:key})).success,false);
+ assert.equal((await provider.saveAIConnection({provider:'groq',model:'invalid model',apiKey:key})).success,false);
+});
+
+test('custom providers normalize base URLs, use their own models and never receive Groq-only options',async()=>{
+ reset();await configure();
+ const config=await provider.saveAIConnection({provider:'custom',baseUrl:'https://example.test/proxy/v1/chat/completions/',model:'glm-5.3',apiKey:'sk_TEST_CUSTOM'});
+ assert.equal(config.success,true);assert.equal(config.baseUrl,'https://example.test/proxy/v1');assert.equal(JSON.stringify(config).includes('sk_TEST_CUSTOM'),false);
+ await provider.requestGroq('Превет','editor');const {url,options}=calls[0],payload=JSON.parse(options.body);
+ assert.equal(url,'https://example.test/proxy/v1/chat/completions');assert.equal(options.headers.Authorization,'Bearer sk_TEST_CUSTOM');assert.equal(payload.model,'glm-5.3');assert.equal(payload.max_tokens,2048);assert.equal('include_reasoning' in payload,false);assert.equal('reasoning_effort' in payload,false);
+});
+
+test('paid presets use fixed API destinations, compatible token limits and a clear insufficient-balance error',async()=>{
+ for(const [id,base] of [['openai','https://api.openai.com/v1'],['openrouter','https://openrouter.ai/api/v1'],['deepseek','https://api.deepseek.com/v1'],['plakcel','https://api.plakcel.xyz/v1']]){
+  reset();await provider.saveAIConnection({provider:id,baseUrl:'https://wrong.test/v1',model:'test-model',apiKey:'sk_TEST_PAID'});await provider.requestGroq('hello','editor');
+  assert.equal(calls[0].url,base+'/chat/completions');const body=JSON.parse(calls[0].options.body);assert.equal(body[id==='openai'?'max_completion_tokens':'max_tokens'],2048);assert.equal(body.include_reasoning,undefined);
+  reply={ok:false,status:402};assert.match((await provider.requestGroq('hello','editor')).error,/Недостаточно/);
+ }
+});
+
+test('saved connections isolate credentials by provider and endpoint, including after restart and key removal',async()=>{
+ reset();await configure();
+ await provider.saveAIConnection({provider:'custom',baseUrl:'https://one.test/v1',model:'one',apiKey:''});assert.equal(saved.apiKey,'');
+ await provider.saveAIConnection({provider:'custom',baseUrl:'https://one.test/v1',model:'one',apiKey:'sk_ONE'});
+ await provider.saveAIConnection({provider:'custom',baseUrl:'https://two.test/v1',model:'two',apiKey:'sk_TWO'});
+ await provider.saveAIConnection({provider:'custom',baseUrl:'https://one.test/v1',model:'one',apiKey:''});assert.equal(saved.apiKey,'sk_ONE');
+ await provider.saveAIConnection({provider:'custom',baseUrl:'https://one.test/v1',model:'one',clearKey:true});assert.equal(saved.apiKey,'');
+ await provider.saveAIConnection({provider:'groq',model:provider.AI_MODELS[0]});assert.equal(saved.apiKey,key);
+ const status=await provider.aiConnectionStatus();assert.equal(status.connections.length,3);assert.equal(JSON.stringify(status).includes('sk_TWO'),false);
+});
+
+test('provider endpoints reject page links, credentials, insecure remote HTTP and query keys without storing or sending',async()=>{
+ reset();for(const baseUrl of ['https://example.test/k/PRIVATE','https://user:pass@example.test/v1','https://example.test/v1?key=PRIVATE','http://example.test/v1','file:///tmp/api','https://example.test/v1#secret'])assert.equal((await provider.saveAIConnection({provider:'custom',baseUrl,model:'m',apiKey:'SECRET'})).success,false);
+ assert.equal(saved,undefined);assert.equal(calls.length,0);assert.equal(provider.normalizeAIEndpoint('http://localhost:11434/v1/'),'http://localhost:11434/v1');
+});
+
+test('model discovery uses only the saved endpoint and filters malformed IDs; missing model never spends a generation',async()=>{
+ reset();await provider.saveAIConnection({provider:'custom',baseUrl:'https://example.test/v1',model:'',apiKey:'sk_MODELS'});
+ assert.equal((await provider.requestGroq('hello','editor')).success,false);assert.equal(calls.length,0);
+ reply={ok:true,json:async()=>({data:[{id:'glm-5.3'},{id:'glm-5.3'},{id:'<script>'},{id:42}]})};assert.deepEqual(await provider.listAIModels(),{success:true,models:['glm-5.3']});assert.equal(calls[0].url,'https://example.test/v1/models');assert.equal(calls[0].options.redirect,'error');
+ permission=false;assert.equal((await provider.listAIModels()).success,false);assert.equal(calls.length,1);
 });
 test('requests go directly to Groq with credentials omitted, redirects rejected and bounded output',async()=>{
  reset();await configure();assert.deepEqual(await provider.requestGroq(' Превет ','editor'),{success:true,data:'Привет'});
