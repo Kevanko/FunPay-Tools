@@ -20,7 +20,12 @@ test('settings pages preserve controls while separating notifications and provid
  assert.equal(root.querySelector('.support-promo').closest('[data-page]').dataset.page,'general');
  const replies=root.querySelector('.fp-tools-page-content[data-page="auto_review"]');
  assert.equal(replies.querySelectorAll('.fpt-page-sections button').length,6);
- const heading=replies.querySelector('h3');let scrolled=false,focused=false;heading.scrollIntoView=()=>{scrolled=true;};heading.focus=()=>{focused=true;};replies.querySelector('.fpt-page-sections button').click();assert.ok(scrolled&&focused);
+ const tabs=[...replies.querySelectorAll('[role="tab"]')],panels=[...replies.querySelectorAll('[role="tabpanel"]')];
+ assert.equal(panels.length,6);assert.equal(panels.filter(panel=>!panel.hidden).length,1);
+ assert.deepEqual(tabs.map(tab=>tab.textContent),['Отзывы','Бонусы','Приветствие','Новый заказ','Подтверждение','Дополнительно']);
+ const themes=[...root.querySelectorAll('.fpt-theme-sw')];assert.equal(themes[0].dataset.fptTheme,'obsidian');assert.equal(themes[0].textContent,'Терминал');
+ tabs[2].click();assert.equal(panels[2].hidden,false);assert.equal(panels[0].hidden,true);assert.equal(tabs[2].getAttribute('aria-selected'),'true');
+ tabs[2].dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));assert.equal(panels[3].hidden,false);assert.equal(dom.window.document.activeElement,tabs[3]);
  dom.window.close();
 });
 test('requested editor page wins over stored last page during lazy panel creation',async()=>{

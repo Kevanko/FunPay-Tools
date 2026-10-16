@@ -1285,10 +1285,22 @@ function organizeSettingsPages(root) {
         const page=root.querySelector('.fp-tools-page-content[data-page="'+id+'"]');if(!page)continue;
         page.setAttribute('aria-label',title);
         const headings=[...page.children].filter(node=>node.tagName==='H3');
+        const sectionNames={general:['Основное','Заказы','Метка FPT'],notifications:['Звук','Discord'],templates:['Сообщения','Редактор'],auto_review:['Отзывы','Бонусы','Приветствие','Новый заказ','Подтверждение','Дополнительно'],settings_io:['Синхронизация','Файл настроек','Сброс']};
+        if(sectionNames[id]?.length===headings.length)headings.forEach((heading,index)=>{heading.textContent=sectionNames[id][index];});
         if(headings.length===1)headings[0].textContent=title;
         if(headings.length>1){
-            const nav=document.createElement('nav');nav.className='fpt-page-sections';nav.setAttribute('aria-label','Разделы страницы');
-            headings.forEach((heading,index)=>{heading.id=heading.id||'fpt-section-'+id+'-'+index;const button=document.createElement('button');button.type='button';button.textContent=heading.textContent.trim();button.onclick=()=>{heading.scrollIntoView({block:'start',behavior:'instant'});heading.tabIndex=-1;heading.focus({preventScroll:true});};nav.append(button);});page.prepend(nav);
+            const nav=document.createElement('nav');nav.className='fpt-page-sections';nav.setAttribute('aria-label','Разделы страницы');nav.setAttribute('role','tablist');
+            const sections=[],buttons=[];
+            headings.forEach((heading,index)=>{
+                const section=document.createElement('section');section.className='fpt-settings-panel';section.id='fpt-panel-'+id+'-'+index;section.hidden=index!==0;section.setAttribute('role','tabpanel');
+                heading.before(section);let node=heading;
+                while(node&&!(node!==heading&&node.tagName==='H3')){const next=node.nextElementSibling;section.append(node);node=next;}
+                const button=document.createElement('button');button.type='button';button.id=section.id+'-tab';button.textContent=heading.textContent.trim();button.setAttribute('role','tab');button.setAttribute('aria-controls',section.id);button.setAttribute('aria-selected',String(index===0));button.tabIndex=index===0?0:-1;section.setAttribute('aria-labelledby',button.id);
+                button.onclick=()=>{sections.forEach((panel,i)=>{panel.hidden=i!==index;buttons[i].setAttribute('aria-selected',String(i===index));buttons[i].tabIndex=i===index?0:-1;});};
+                button.onkeydown=event=>{let next=index;if(event.key==='ArrowRight')next=(index+1)%headings.length;else if(event.key==='ArrowLeft')next=(index+headings.length-1)%headings.length;else if(event.key==='Home')next=0;else if(event.key==='End')next=headings.length-1;else return;event.preventDefault();buttons[next].click();buttons[next].focus();};
+                sections.push(section);buttons.push(button);nav.append(button);
+            });
+            sections[0].before(nav);
         }
         page.querySelectorAll('.template-container').forEach(row=>{if(row.querySelector(':scope > input[type="range"], :scope > div > input[type="range"]')&&row.querySelector(':scope > .range-label'))row.classList.add('fpt-setting-range');});
     }
@@ -1297,6 +1309,11 @@ function organizeSettingsPages(root) {
 function organizeThemeSettings(root) {
     const page=root.querySelector('.fp-tools-page-content[data-page="theme"]');
     if(!page)return;
+    const names={obsidian:'Терминал',graphite:'Студия',light:'Белая',clay:'Глина',paper:'Бумага',forest:'Лес',ink:'Чернила',slate:'Сланец'};
+    const swatches=page.querySelector('.fpt-theme-swatches');
+    for(const [id,name]of Object.entries(names)){const button=swatches?.querySelector('[data-fpt-theme="'+id+'"]');if(button){button.querySelector('.fpt-theme-sw-label').textContent=name;swatches.append(button);}}
+    const wallNames={none:'Без обоев',mesh:'Мягкие формы',aurora:'Сияние'};
+    for(const [id,name]of Object.entries(wallNames)){const label=page.querySelector('[data-wall="'+id+'"] .fpt-wall-label');if(label){const text=[...label.childNodes].find(node=>node.nodeType===3);if(text)text.textContent=name+' ';}}
     const extra=page.querySelector('.fpt-theme-extra');
     if(extra){
         const basic=document.createElement('section');basic.className='fpt-settings-section';
@@ -1461,9 +1478,11 @@ function setupMenuSearch(toolsPopup) {
     searchInput.addEventListener('input', applyFilter);
     nav.addEventListener('click',event=>{
         const item=event.target.closest('li[data-page]'),query=normalize(searchInput.value);if(!item||!query)return;
+        if(normalize(item.textContent).includes(query)||normalize(item.dataset.page).includes(query))return;
         const page=pageById.get(item.dataset.page);if(!page)return;
         const words=query.split(' '),match=[...page.querySelectorAll('label,h3,h4,summary')].find(node=>words.every(word=>normalize(node.textContent).includes(word)));
         if(!match)return;
+        const panel=match.closest('.fpt-settings-panel');if(panel?.hidden)page.querySelector('[aria-controls="'+panel.id+'"]')?.click();
         for(let parent=match.parentElement;parent&&parent!==page;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
         match.scrollIntoView({block:'center',behavior:'instant'});
         const control=match.tagName==='LABEL'&&match.htmlFor?page.querySelector('[id="'+match.htmlFor.replace(/["\\]/g,'\\$&')+'"]'):null;
