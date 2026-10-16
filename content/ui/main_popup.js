@@ -1496,6 +1496,16 @@ function makePopupInteractive(popupEl) {
     let offset = { x: 0, y: 0 };
     let hasBeenDragged = false;
 
+    const fitViewport = () => {
+        popupEl.style.maxWidth = Math.max(1, Math.min(900, window.innerWidth - 24)) + 'px';
+        popupEl.style.maxHeight = Math.max(1, window.innerHeight - 24) + 'px';
+        if (!popupEl.classList.contains('no-transform')) return;
+        popupEl.style.left = Math.max(0, Math.min(popupEl.offsetLeft, window.innerWidth - popupEl.offsetWidth)) + 'px';
+        popupEl.style.top = Math.max(0, Math.min(popupEl.offsetTop, window.innerHeight - popupEl.offsetHeight)) + 'px';
+    };
+    fitViewport();
+    window.addEventListener('resize', fitViewport);
+
     header.addEventListener('pointerdown', (e) => {
         if (e.button !== 0 || e.target.closest('a, button, input, select')) return;
         isDragging = true;
@@ -1555,6 +1565,7 @@ function makePopupInteractive(popupEl) {
         const newWidth = popupEl.style.width;
         const newHeight = popupEl.style.height;
         if (newWidth === __fptLastW && newHeight === __fptLastH) return; // size unchanged → ignore
+        fitViewport();
         __fptLastW = newWidth;
         __fptLastH = newHeight;
         if (__fptSizeSaveTimer) clearTimeout(__fptSizeSaveTimer);

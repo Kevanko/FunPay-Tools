@@ -438,8 +438,8 @@ function isBuyerOrderPage() {
     }
 }
 
-async function addChatTemplateButtons() {
-    await loadTemplateSettings();
+async function addChatTemplateButtons(useCurrentSettings = false) {
+    if (useCurrentSettings !== true) await loadTemplateSettings();
     const chatInput = document.querySelector('.chat-form-input .form-control');
     if (!chatInput) return;
     // Don't show buttons when no conversation is selected (placeholder state)

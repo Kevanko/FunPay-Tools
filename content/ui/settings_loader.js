@@ -9,6 +9,33 @@ function fptNotificationVolume(value) {
     return Math.max(0, Math.min(1, value > 1 && value <= 100 ? value / 100 : value));
 }
 
+function fptRestorePopupGeometry(popup, settings) {
+    if (!popup) return;
+    const size = settings.fpToolsPopupSize;
+    for (const [key, viewport, minimum] of [['width', window.innerWidth, 320], ['height', window.innerHeight, 240]]) {
+        const raw = size?.[key];
+        if (typeof raw !== 'string' || !/^\d+(?:\.\d+)?px$/.test(raw)) continue;
+        const value = Number.parseFloat(raw);
+        if (!Number.isFinite(value) || value <= 0) continue;
+        const maximum = Math.max(1, viewport - 24);
+        popup.style[key] = Math.min(maximum, Math.max(Math.min(minimum, maximum), value)) + 'px';
+    }
+    // Position must be checked against the final restored size, not the default.
+    const position = settings.fpToolsPopupPosition;
+    const coordinate = value => typeof value === 'string' && /^\d+(?:\.\d+)?px$/.test(value) ? Number.parseFloat(value) : NaN;
+    const left = coordinate(position?.left), top = coordinate(position?.top);
+    if (settings.fpToolsPopupDragged && Number.isFinite(left) && Number.isFinite(top) &&
+        left + popup.offsetWidth <= window.innerWidth && top + popup.offsetHeight <= window.innerHeight) {
+        popup.style.left = left + 'px';
+        popup.style.top = top + 'px';
+        popup.classList.add('no-transform');
+    } else {
+        popup.style.removeProperty('left');
+        popup.style.removeProperty('top');
+        popup.classList.remove('no-transform');
+    }
+}
+
 async function renderTemplateSettings() {
     const container = document.getElementById('template-settings-container');
     if (!container) return;
@@ -117,8 +144,18 @@ async function setupTemplateSettingsHandlers() {
     // full settings save AND a full rebuild of all chat template buttons in the DOM, which made
     // editing names/colors extremely laggy. Now we update the in-memory model instantly, but
     // defer the expensive save + button rebuild until typing pauses.
-    let saveDebounce = null,dirty=false;
-    const flushEdits=async()=>{clearTimeout(saveDebounce);if(!dirty)return;dirty=false;try{await saveTemplateSettings();await addChatTemplateButtons();}catch(error){dirty=true;throw error;}};
+    let saveDebounce = null,dirty=false,pendingSave=Promise.resolve();
+    const flushEdits=()=>{
+        clearTimeout(saveDebounce);if(!dirty)return pendingSave;dirty=false;
+        const snapshot=structuredClone(templateSettings);
+        pendingSave=pendingSave.catch(()=>{}).then(async()=>{
+            if(!chrome.runtime?.id)throw Error('Расширение перезагружено');
+            await chrome.storage.local.set({fpToolsTemplateSettings:snapshot});
+            // Rebuilding buttons must not reload old storage over newer typing.
+            await addChatTemplateButtons(true);
+        }).catch(error=>{dirty=true;throw error;});
+        return pendingSave;
+    };
     // Existing delegated listeners keep this first closure; do not replace their pending save.
     if(!container.dataset.fptHandlersAttached)fptFlushTemplateEdits=flushEdits;
     const scheduleSave = () => {
@@ -182,7 +219,10 @@ async function setupTemplateSettingsHandlers() {
         container.addEventListener('fpt-attachment-changed', handleInput);
         container.addEventListener('focusout', (e) => {
             if (e.target.classList.contains('template-label')) handleInput(e);
+            flushEdits().catch(()=>showNotification('Не удалось сохранить шаблон. Повторите изменение.',true));
         });
+        window.addEventListener('pagehide',()=>flushEdits().catch(()=>{}));
+        document.addEventListener('visibilitychange',()=>{if(document.hidden)flushEdits().catch(()=>{});});
 
         container.addEventListener('click', async (e) => {
             const delBtn = e.target.closest('.delete-custom-template-btn');
@@ -331,28 +371,7 @@ async function loadSavedSettings() {
     }
     
     const toolsPopup = document.querySelector('.fp-tools-popup');
-    if (settings.fpToolsPopupDragged && settings.fpToolsPopupPosition) {
-        // Only restore a saved drag position if the window still FULLY fits there in the
-        // current viewport; otherwise fall back to CSS centering. This prevents a stale
-        // position (saved on a wider monitor / older window size) from leaving the popup
-        // shifted or partly off-screen.
-        const left = parseInt(settings.fpToolsPopupPosition.left, 10);
-        const top = parseInt(settings.fpToolsPopupPosition.top, 10);
-        const pw = toolsPopup.offsetWidth || 1040;
-        const ph = toolsPopup.offsetHeight || 720;
-        const fits = !isNaN(left) && !isNaN(top) && left >= 0 && top >= 0 &&
-                     (left + pw) <= window.innerWidth && (top + ph) <= window.innerHeight;
-        if (fits) {
-            toolsPopup.style.left = left + 'px';
-            toolsPopup.style.top = top + 'px';
-            toolsPopup.classList.add('no-transform');
-        }
-        // else: keep CSS centering (top/left 50% + translate)
-    }
-    if (settings.fpToolsPopupSize) {
-        toolsPopup.style.width = settings.fpToolsPopupSize.width;
-        toolsPopup.style.height = settings.fpToolsPopupSize.height;
-    }
+    fptRestorePopupGeometry(toolsPopup, settings);
 
     const discordSettings = settings.fpToolsDiscord || { enabled: false, webhookUrl: '', pingEveryone: false, pingHere: false };
     const discordLogEnabledEl = document.getElementById('discordLogEnabled');
