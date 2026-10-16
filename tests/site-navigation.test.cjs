@@ -22,7 +22,7 @@ test('settings pages preserve controls while separating notifications and provid
  assert.equal(root.querySelector('.support-promo').closest('[data-page]').dataset.page,'general');
  const replies=root.querySelector('.fp-tools-page-content[data-page="auto_review"]');
  assert.equal(replies.querySelectorAll('.fpt-page-sections button').length,6);
- const tabs=[...replies.querySelectorAll('[role="tab"]')],panels=[...replies.querySelectorAll('[role="tabpanel"]')];
+ const tabs=[...replies.querySelectorAll('.fpt-page-sections>[role="tab"]')],panels=[...replies.querySelectorAll('.fpt-settings-panel')];
  assert.equal(panels.length,6);assert.equal(panels.filter(panel=>!panel.hidden).length,1);
  assert.deepEqual(tabs.map(tab=>tab.textContent),['Отзывы','Бонусы','Приветствие','Новый заказ','Подтверждение','Дополнительно']);
  const themes=[...root.querySelectorAll('.fpt-theme-sw')];assert.equal(themes[0].dataset.fptTheme,'obsidian');assert.equal(themes[0].textContent,'Терминал');
@@ -58,6 +58,20 @@ test('grouped settings retain every tool and search opens the matching appearanc
  root.querySelector('.fp-tools-nav li[data-page=theme] a').click();assert.equal(blur.closest('[role=tabpanel]').hidden,false);assert.equal(dom.window.document.activeElement,blur);
  search.value='';search.dispatchEvent(new dom.window.Event('input'));assert.equal(root.querySelector('.fp-tools-nav li[data-page=theme]').closest('ul').hidden,false);
  assert.equal(root.querySelector('.fpt-variable-help').open,false);assert.equal(root.querySelectorAll('#fpt-review-5').length,1);
+ dom.window.close();
+});
+
+test('preferences keep rating drafts and synchronize compact sound choice with existing controls',async()=>{
+ const dom=new JSDOM('',{url:'https://funpay.com/'}),listeners=[];
+ const context=vm.createContext({document:dom.window.document,chrome:{runtime:{getURL:path=>path},storage:{local:{get:async()=>({notificationSound:'tg'})},onChanged:{addListener:fn=>listeners.push(fn)}}},FPTIcons:{svg:()=>'<svg></svg>'}});
+ vm.runInContext(fs.readFileSync('content/ui/main_popup.js','utf8'),context);const root=context.createMainPopup();dom.window.document.body.append(root);context.setupMenuSearch(root);await new Promise(r=>setImmediate(r));
+ const select=root.querySelector('#fpt-notification-sound-select');assert.equal(select.value,'tg');let changed=0;
+ root.querySelector('#notificationSoundGroup').addEventListener('change',()=>changed++);select.value='vk';select.dispatchEvent(new dom.window.Event('change',{bubbles:true}));assert.equal(root.querySelector('input[name=notificationSound]:checked').value,'vk');assert.equal(changed,1);
+ for(const listener of listeners)listener({notificationSound:{newValue:'discord'}},'local');assert.equal(select.value,'discord');
+ const ratings=[...root.querySelectorAll('.fpt-review-rating-tabs button')],reviews=root.querySelector('.fpt-review-editor');
+ root.querySelector('#fpt-review-5').value='Спасибо за отзыв';ratings[2].click();root.querySelector('#fpt-review-3').value='Давайте разберёмся';ratings[0].click();assert.equal(root.querySelector('#fpt-review-5').value,'Спасибо за отзыв');assert.equal(root.querySelector('#fpt-review-3').value,'Давайте разберёмся');assert.equal([...reviews.children].filter(panel=>!panel.hidden).length,1);
+ const label=root.querySelector('label[for=fpt-review-3]');label.scrollIntoView=()=>{};const search=root.querySelector('#fpToolsMenuSearch');search.value='3 звезды';search.dispatchEvent(new dom.window.Event('input'));root.querySelector('.fp-tools-nav li[data-page=auto_review] a').click();assert.equal(root.querySelector('#fpt-review-editor-3').hidden,false);assert.equal(dom.window.document.activeElement.id,'fpt-review-3');
+ root.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'k',ctrlKey:true,bubbles:true,cancelable:true}));assert.equal(dom.window.document.activeElement,search);
  dom.window.close();
 });
 test('settings search finds controls inside sections and reveals collapsed matching settings',()=>{

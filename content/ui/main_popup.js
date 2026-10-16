@@ -1272,7 +1272,90 @@ function createMainPopup() {
     const aiConnect=document.createElement('a');aiConnect.className='btn';aiConnect.href=chrome.runtime.getURL('popup/ai.html');aiConnect.target='_blank';aiConnect.rel='noopener';aiConnect.textContent='Подключить Groq';aiPage.append(aiConnect);
     toolsPopup.querySelector('main').append(aiPage);
     refineSettingsLayout(toolsPopup);
+    enhancePreferences(toolsPopup);
     return toolsPopup;
+}
+
+function enhancePreferences(root) {
+    root.classList.add('fpt-preferences');
+    const notes={
+        showSalesStatsCheckbox:['Статистика продаж','Сводка по заказам на странице «Продажи».'],
+        hideBalanceCheckbox:['Скрывать баланс','Убирает сумму из шапки сайта.'],
+        viewSellersPromoCheckbox:['Значки продвижения','Пометки платных предложений в списке лотов.'],
+        autoReviewEnabled:['Отвечать на отзывы','Готовый ответ отправляется только на отзыв без вашего ответа.'],
+        bonusForReviewEnabled:['Бонус за пять звёзд','Отправлять покупателю бонус после положительного отзыва.'],
+        greetingEnabled:['Приветствовать покупателя','Сообщение при начале общения в чате.'],
+        onlyNewChats:['Только новые чаты','Не отправлять приветствие в существующие переписки.'],
+        ignoreSystemMessages:['Пропускать системные сообщения','Заказы и отзывы сами по себе не запускают приветствие.'],
+        discordLogEnabled:['Уведомления в Discord','Новые сообщения направляются в указанный вебхук.'],
+        enableCustomThemeCheckbox:['Оформление сайта','Применять выбранную тему к страницам FunPay.'],
+        enableRedesignedHomepage:['Новая главная','Поиск, сводка и быстрые действия на главной странице.'],
+        fptMenuTransparentEnabled:['Прозрачное меню','Фон сайта просвечивает через окно настроек.'],
+        fpAutoRestoreEnabled:['Восстанавливать лоты','Включать настроенные лоты после деактивации.'],
+        fpAutoDisableEnabled:['Отключать пустые лоты','Деактивация, когда на складе не осталось товаров.']
+    };
+    for(const [id,[title,description]]of Object.entries(notes)){
+        const control=root.querySelector('#'+id),row=control?.closest('.checkbox-label-inline'),label=root.querySelector('label[for="'+id+'"]');if(!row||!label)continue;
+        label.replaceChildren();const name=document.createElement('span');name.textContent=title;
+        const help=document.createElement('small');help.className='fpt-preference-description';help.id=id+'-description';help.textContent=description;label.append(name,help);control.setAttribute('aria-describedby',help.id);row.classList.add('fpt-preference-row');
+        const next=row.nextElementSibling;if(next?.classList.contains('template-info')&&['autoReviewEnabled','bonusForReviewEnabled'].includes(id))next.hidden=true;
+    }
+    const sections=[
+        ['general',0,'На сайте','Выберите, какие сведения показывать.'],
+        ['general',1,'Заказы и история','Параметры отображения покупок и продаж.'],
+        ['general',2,'Метка расширения','Отображение FP Tools в вашем профиле.'],
+        ['notifications',0,'Звук сообщений','Мелодия и громкость для уведомлений FunPay.'],
+        ['notifications',1,'Discord','Доставка уведомлений во внешний канал.'],
+        ['auto_review',0,'Ответ на отзыв','Выберите оценку и напишите сообщение покупателю.'],
+        ['auto_review',1,'Бонус за покупку','Сообщение, которое получит покупатель за пять звёзд.'],
+        ['auto_review',2,'Начало диалога','Текст приветствия и условия отправки.'],
+        ['auto_review',3,'После заказа','Сообщение после создания нового заказа.'],
+        ['auto_review',4,'После подтверждения','Сообщение после подтверждения выполнения заказа.'],
+        ['auto_review',5,'Правила обработки','Дополнительные условия работы автоответчика.'],
+        ['theme',0,'Выберите тему','Готовая палитра, шрифт и форма элементов.'],
+        ['theme',1,'Фон страницы','Готовые обои или ваше изображение.'],
+        ['theme',2,'Шрифт и размеры','Текст и скругления элементов интерфейса.'],
+        ['theme',3,'Тонкая настройка','Собственные цвета и дополнительные эффекты.'],
+        ['settings_io',0,'Между устройствами','Подключение облака и перенос между аккаунтами.'],
+        ['settings_io',1,'Файл настроек','Резервная копия и восстановление из файла.'],
+        ['settings_io',2,'Сброс данных','Действия по очистке настроек и истории автоматизации.']
+    ];
+    for(const [pageId,index,title,description]of sections){
+        const panel=root.querySelector('#fpt-panel-'+pageId+'-'+index);if(!panel)continue;
+        const heading=document.createElement('div');heading.className='fpt-preference-section-head';const name=document.createElement('h4'),help=document.createElement('p');name.textContent=title;help.textContent=description;heading.append(name,help);panel.prepend(heading);
+    }
+    const soundGroup=root.querySelector('#notificationSoundGroup');
+    if(soundGroup){
+        const row=document.createElement('div');row.className='fpt-preference-field';
+        const label=document.createElement('label');label.htmlFor='fpt-notification-sound-select';label.textContent='Мелодия';
+        const select=document.createElement('select');select.id=label.htmlFor;
+        soundGroup.querySelectorAll('label').forEach(option=>{const radio=option.querySelector('input'),item=document.createElement('option');item.value=radio.value;item.textContent=option.querySelector('span').textContent;select.append(item);});
+        select.addEventListener('change',()=>{const radio=[...soundGroup.querySelectorAll('input')].find(input=>input.value===select.value);if(radio){radio.checked=true;radio.dispatchEvent(new document.defaultView.Event('change',{bubbles:true}));}});
+        soundGroup.before(row);row.append(label,select);soundGroup.hidden=true;
+        const sync=value=>{select.value=select.querySelector('option[value="'+String(value||'default').replace(/[^a-z]/g,'')+'"]')?value||'default':'default';};
+        chrome.storage?.local?.get('notificationSound').then(data=>sync(data.notificationSound));
+        chrome.storage?.onChanged?.addListener((changes,area)=>{if(area==='local'&&changes.notificationSound)sync(changes.notificationSound.newValue);});
+    }
+    const reviews=root.querySelector('.review-templates-grid');
+    if(reviews){
+        reviews.classList.add('fpt-review-editor');
+        const nav=document.createElement('div');nav.className='fpt-review-rating-tabs';nav.setAttribute('role','tablist');nav.setAttribute('aria-label','Оценка покупателя');
+        const panels=[...reviews.children],buttons=[];
+        panels.forEach((panel,index)=>{
+            const rating=5-index,input=panel.querySelector('textarea'),label=panel.querySelector('label');panel.hidden=index!==0;panel.id='fpt-review-editor-'+rating;panel.setAttribute('role','tabpanel');
+            if(label){label.className='fpt-review-editor-label';label.textContent='Ответ на '+rating+' '+(rating===1?'звезду':rating<5?'звезды':'звёзд');}
+            input.placeholder='Напишите короткий ответ покупателю…';
+            const button=document.createElement('button');button.type='button';button.id=panel.id+'-tab';button.setAttribute('role','tab');button.setAttribute('aria-controls',panel.id);button.setAttribute('aria-selected',String(index===0));button.tabIndex=index===0?0:-1;button.textContent=rating+' ★';panel.setAttribute('aria-labelledby',button.id);
+            button.addEventListener('click',()=>{panels.forEach((node,i)=>{node.hidden=i!==index;buttons[i].setAttribute('aria-selected',String(i===index));buttons[i].tabIndex=i===index?0:-1;});});
+            button.addEventListener('keydown',event=>{const next=event.key==='ArrowRight'?(index+1)%5:event.key==='ArrowLeft'?(index+4)%5:event.key==='Home'?0:event.key==='End'?4:-1;if(next>=0){event.preventDefault();buttons[next].click();buttons[next].focus();}});buttons.push(button);nav.append(button);
+        });reviews.before(nav);
+    }
+    root.querySelectorAll('.fpt-settings-pagehead').forEach(heading=>{
+        const back=heading.querySelector('.fpt-category-back');if(back){back.textContent=back.textContent.replace(/^‹ /,'');back.title='Вернуться в категорию';}
+    });
+    root.querySelectorAll('.fpt-nav-group-toggle').forEach((button,index)=>{const icon=document.createElement('span');icon.className='fpt-category-nav-icon';icon.innerHTML=FPTIcons.svg(['home','bolt','palette','settings','terminal','document'][index],18);button.append(icon);});
+    const note=document.createElement('div');note.className='fpt-preferences-note';note.textContent='Изменения сохраняются автоматически';root.querySelector('.fp-tools-nav').append(note);
+    root.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'){event.preventDefault();root.querySelector('#fpToolsMenuSearch').focus();}});
 }
 
 function refineSettingsLayout(root) {
@@ -1610,9 +1693,10 @@ function setupMenuSearch(toolsPopup) {
         if(!query)return;
         if(normalize(item.textContent).includes(query)||normalize(item.dataset.page).includes(query))return;
         const page=pageById.get(item.dataset.page);if(!page)return;
-        const words=query.split(' '),match=[...page.querySelectorAll('label,h3,h4,summary')].find(node=>words.every(word=>normalize(node.textContent).includes(word)));
+        const words=query.split(' '),match=[...page.querySelectorAll('label'),...page.querySelectorAll('h3,h4,summary')].find(node=>words.every(word=>normalize(node.textContent).includes(word)));
         if(!match)return;
-        const panel=match.closest('.fpt-settings-panel');if(panel?.hidden)page.querySelector('[aria-controls="'+panel.id+'"]')?.click();
+        const panels=[];for(let parent=match.parentElement;parent&&parent!==page;parent=parent.parentElement)if(parent.getAttribute('role')==='tabpanel')panels.unshift(parent);
+        for(const panel of panels)if(panel.hidden)page.querySelector('[aria-controls="'+panel.id+'"]')?.click();
         for(let parent=match.parentElement;parent&&parent!==page;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
         match.scrollIntoView({block:'center',behavior:'instant'});
         const control=match.tagName==='LABEL'&&match.htmlFor?page.querySelector('[id="'+match.htmlFor.replace(/["\\]/g,'\\$&')+'"]'):null;
