@@ -20,6 +20,12 @@ test('login QR encrypts session and expires in five minutes, separate code is no
 test('unauthenticated or malformed session never produces QR', async () => {
  for(const bad of [{},{...auth,userId:0},{...auth,golden_key:'bad; Path=/'},{...auth,userId:'other'}])await assert.rejects(createLoginTransfer(bad));
 });
+test('QR carries only encrypted account-bound sync capability and rejects another account',async()=>{
+ const cloud={schema:1,accountId:String(auth.userId),id:'p_'+'a'.repeat(64),token:'b'.repeat(64)};
+ const value=await createLoginTransfer(auth,1700000000000,cloud),decoded=await decode(value);
+ assert.deepEqual(decoded.cloud,cloud);assert.ok(!value.qr.includes(cloud.token));
+ await assert.rejects(createLoginTransfer(auth,1700000000000,{...cloud,accountId:'43'}));
+});
 test('session export allowed only from own popup, never site content scripts', () => {
  const runtime={id:'fixture',getURL:p=>'chrome-extension://fixture/'+p},sender={id:'fixture',url:'chrome-extension://fixture/popup/popup.html'};
  assert.equal(trustedLoginSender(sender,runtime),true);

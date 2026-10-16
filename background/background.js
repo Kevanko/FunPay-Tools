@@ -984,7 +984,7 @@ async function fptCloudPush(accountId, settings, updatedAt, baseVersion) {
     // on 409 the server returns the CURRENT bundle — decode it so the client can field-merge
     if (res.status === 409 && typeof j.bundle === 'string') {
         try { j.settings = JSON.parse(await _fptGunzipB64(j.bundle));
-        settings.s = globalThis.FPTSettingsSchema.sanitize(settings.s || {}, { cloud: true }); } catch (_) {}
+        j.settings.s = globalThis.FPTSettingsSchema.sanitize(j.settings.s || {}, { cloud: true }); } catch (_) {}
     }
     return { ok: res.ok, status: res.status, ...j };
 }
@@ -992,7 +992,10 @@ async function fptCloudPull(accountId) {
     const { id, token } = await fptGetCloudCapability(accountId);
     if (!id) return { ok: false, error: 'no_id' };
     const res = await fetch(`${FPT_CLOUD_ENDPOINT}/v2/s/${encodeURIComponent(id)}`, { headers: { Authorization: 'Bearer ' + token }, signal: AbortSignal.timeout(30000), redirect: 'error' });
-    if (res.status === 404) return { ok: true, exists: false };
+    if (res.status === 404) {
+        const missing = await res.json().catch(() => ({}));
+        return missing.exists === false ? { ok: true, exists: false } : { ok: false, error: 'server_upgrade_required', status: 404 };
+    }
     if (!res.ok) return { ok: false, status: res.status };
     const j = await res.json();
     let settings = {};
@@ -1012,7 +1015,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 const auth = await getAuthDetailsForBackground();
                 const current = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
                 if (!current?.value || current.value !== auth.golden_key || request.deadline < Date.now()) throw Error('Аккаунт изменился или запрос истёк');
-                return createLoginTransfer(auth);
+                const capability = await fptCloudCapability(String(auth.userId));
+                const latest = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
+                if (!latest?.value || latest.value !== auth.golden_key || request.deadline < Date.now()) throw Error('Аккаунт изменился или запрос истёк');
+                const transfer = await createLoginTransfer(auth, Date.now(), { schema: 1, accountId: String(auth.userId), ...capability });
+                await chrome.storage.local.set({ fptCloudSyncEnabled: true });
+                return transfer;
             });
         })
             .then(value => sendResponse({ ok: true, ...value }), () => sendResponse({ ok: false, error: 'Не удалось подтвердить аккаунт. Откройте FunPay и завершите вход.' }));

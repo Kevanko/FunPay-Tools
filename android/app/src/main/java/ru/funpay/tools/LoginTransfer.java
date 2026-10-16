@@ -30,6 +30,7 @@ final class LoginTransfer {
         long issued=value.getLong("issued"),expires=value.getLong("expires");
         if(issued>now+30000||issued<now-300000||expires<=now||expires<=issued||expires-issued>300000)throw new IOException("Срок QR истёк. Создайте новый на компьютере. Проверьте время на устройствах.");
         if(!value.getString("uid").matches("[1-9][0-9]{0,19}")||!value.getString("golden_key").matches("[A-Za-z0-9_-]{16,256}")||value.optString("name").length()>80)throw new IOException("Повреждён QR входа");
+        if(value.has("cloud"))value.put("cloud",CloudProtocol.capability(value.getJSONObject("cloud").toString(),value.getString("uid")));
         return value;
     }
     private static JSONObject pending;

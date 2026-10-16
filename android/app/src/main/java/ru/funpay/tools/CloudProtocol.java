@@ -18,6 +18,13 @@ final class CloudProtocol {
         "fpToolsShowPaymentType","fpToolsShowUnconfirmed","fpToolsMyEpicNick")));
     static final String[] LOCAL_THEME={"bgVideo","bgData","bgVideoData"};
     static final String[] LOCAL_REPLY_IMAGES={"greetingImages","newOrderReplyImages","orderConfirmReplyImages","reviewTemplateImages"};
+    static boolean equal(Object a,Object b) {
+        if(a==b)return true;if(a==null||b==null)return false;
+        if(a instanceof Number x&&b instanceof Number y)return Double.compare(x.doubleValue(),y.doubleValue())==0;
+        if(a instanceof JSONObject x&&b instanceof JSONObject y){if(x.length()!=y.length())return false;Iterator<String> keys=x.keys();while(keys.hasNext()){String k=keys.next();if(!y.has(k)||!equal(x.opt(k),y.opt(k)))return false;}return true;}
+        if(a instanceof JSONArray x&&b instanceof JSONArray y){if(x.length()!=y.length())return false;for(int i=0;i<x.length();i++)if(!equal(x.opt(i),y.opt(i)))return false;return true;}
+        return a.equals(b);
+    }
 
     static JSONObject capability(String text,String uid) throws Exception {
         if(text==null||text.length()>4096)throw new IOException("Неверный ключ синхронизации");

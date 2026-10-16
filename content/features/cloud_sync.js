@@ -50,6 +50,11 @@ let _fptCloudPushTimer = null;
 let _fptCloudRetryTimer = null;
 let _fptCloudIntervalSet = false;
 let _fptCloudChain = Promise.resolve();
+let _fptCloudLastError = '';
+function _fptCloudReportFailure(result) {
+    _fptCloudLastError = result?.error === 'server_upgrade_required' || result?.status === 404 ? 'Сервер синхронизации требует обновления. Локальные настройки сохранены.' : result?.status === 401 || result?.status === 403 ? 'Ключ синхронизации отклонён. Подключите его заново.' : result?.status === 413 ? 'Настройки превышают лимит облака. Уменьшите фото фона.' : 'Облако недоступно. Локальные настройки сохранены; повторим позже.';
+    _fptCloudSay(_fptCloudLastError);
+}
 
 function _fptCloudRun(fn) { const p = _fptCloudChain.then(() => fn()).catch(() => {}); _fptCloudChain = p.catch(() => {}); return p; }
 function _fptCloudAlive() { try { return !!(chrome && chrome.runtime && chrome.runtime.id); } catch (_) { return false; } }
@@ -190,13 +195,15 @@ async function _fptCloudPushCAS() {
     for (let attempt = 0; attempt < 4; attempt++) {
         const localS = await _fptCloudCollect();
         const r = await _fptCloudPushNet(_fptC.key, { s: localS, t: _fptC.fieldTs }, baseVersion).catch(() => null);
-        if (!r) { _fptCloudScheduleRetry(); return { ok: false, network: true }; }
+        if (!r) { _fptCloudReportFailure(null); _fptCloudScheduleRetry(); return { ok: false, network: true }; }
         if (r.ok && typeof r.version === 'number') {
+            _fptCloudLastError = '';
             _fptC.ver = r.version; _fptC.lastHash = _fptCloudCanonHash(localS); await _fptCloudPersist();
             if (_fptCloudRetryTimer) { clearTimeout(_fptCloudRetryTimer); _fptCloudRetryTimer = null; }
             return { ok: true, version: r.version };
         }
         if (r.status === 413) {                                        // oversized -> stop re-pushing this payload
+            _fptCloudReportFailure(r);
             _fptC.lastHash = _fptCloudCanonHash(localS); await _fptCloudPersist();
             _fptCloudNotifyTooLarge();
             return { ok: false, tooLarge: true };
@@ -211,7 +218,7 @@ async function _fptCloudPushCAS() {
             _fptC.ver = cloudVer; baseVersion = cloudVer; await _fptCloudPersist();
             continue;
         }
-        _fptCloudScheduleRetry(); return { ok: false, status: r.status };
+        _fptCloudReportFailure(r); _fptCloudScheduleRetry(); return { ok: false, status: r.status };
     }
     _fptCloudScheduleRetry(); return { ok: false, conflictExhausted: true };
 }
@@ -229,6 +236,8 @@ async function _fptCloudReconcile(trigger) {
         _fptCloudOn = true;
         if (!_fptC.key) _fptC.key = await _fptCloudDeriveKey(_fptC.uid);
         const r = await _fptCloudPullNet(_fptC.key).catch(() => null);
+        if (!r?.ok) { _fptCloudReportFailure(r); _fptCloudReadyFlag = true; return; }
+        _fptCloudLastError = '';
         const localS = await _fptCloudCollect();
         const localHash = _fptCloudCanonHash(localS);
 
@@ -264,7 +273,7 @@ async function _fptCloudReconcile(trigger) {
 
         _fptCloudReadyFlag = true;
         if (r && r.ok && !r.exists) await _fptCloudPushCAS();   // no cloud record yet -> baseline
-    } catch (_) { _fptCloudReadyFlag = true; }
+    } catch (_) { _fptCloudReportFailure(null); _fptCloudReadyFlag = true; }
 }
 
 function _fptCloudSchedulePush() {
@@ -306,11 +315,13 @@ async function _fptCloudRefreshUI() {
     const t = document.getElementById('fpt-cloud-toggle'); if (!t) return;
     const on = await _fptCloudEnabled(); t.checked = on;
     const panel = document.getElementById('fpt-cloud-panel'); if (panel) panel.style.display = on ? 'flex' : 'none';
-    if (on) { const u = _fptCloudUser(); _fptCloudSay(u.id ? `Аккаунт: ${u.name || '—'} (id ${u.id}) · облачная версия ${_fptC.ver || 0}` : 'Войдите в аккаунт FunPay, чтобы синхронизировать.'); }
+    if (on) { const u = _fptCloudUser(); _fptCloudSay(_fptCloudLastError || (u.id ? `Аккаунт: ${u.name || '—'} (id ${u.id}) · облачная версия ${_fptC.ver || 0}` : 'Войдите в аккаунт FunPay, чтобы синхронизировать.')); }
 }
 // Включить/выключить синхронизацию из ЛЮБОГО места (тумблер в «Настройках» или
 // строка «Синхронизация» в дропдауне профиля). Возвращает {ok, noUser?}.
 async function fptCloudSetSync(on) {
+    _fptCloudOn = on;
+    if (on) _fptCloudReadyFlag = false;
     await chrome.storage.local.set({ fptCloudSyncEnabled: on });
     _fptCloudSyncRing(on);
     const panel = document.getElementById('fpt-cloud-panel'); if (panel) panel.style.display = on ? 'flex' : 'none';
@@ -331,6 +342,7 @@ async function fptCloudSetSync(on) {
         await _fptCloudRun(() => _fptCloudReconcile('focus'));
         _fptCloudStartInterval();
         await _fptCloudRefreshUI();
+        if (_fptCloudLastError) { _fptCloudSay(_fptCloudLastError); return { ok: false, error: _fptCloudLastError }; }
         _fptCloudSay('Готово ✓ Приватная синхронизация включена. Для другого устройства перенесите ключ доступа.');
         return { ok: true };
     }
@@ -419,7 +431,7 @@ function _fptCloudSyncRing(on) {
 // ===================== boot =====================
 try { if (_fptCloudAlive() && chrome.storage && chrome.storage.onChanged) chrome.storage.onChanged.addListener(_fptCloudOnChanged); } catch (_) {}
 try { document.addEventListener('visibilitychange', () => { if (_fptCloudOn && document.visibilityState === 'visible') _fptCloudRun(() => _fptCloudReconcile('focus')); }); } catch (_) {}
-try { chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && changes.fptCloudSyncEnabled) _fptCloudSyncRing(!!changes.fptCloudSyncEnabled.newValue); }); } catch (_) {}
+try { chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && changes.fptCloudSyncEnabled) { const on=!!changes.fptCloudSyncEnabled.newValue;_fptCloudSyncRing(on);if(on!==_fptCloudOn)fptCloudSetSync(on).catch(()=>_fptCloudReportFailure(null)); } }); } catch (_) {}
 (async () => { try { _fptCloudSyncRing(await _fptCloudEnabled()); } catch (_) {} })();
 (async () => {
     try {

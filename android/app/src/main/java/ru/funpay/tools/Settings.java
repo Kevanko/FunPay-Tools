@@ -12,35 +12,68 @@ final class Settings {
     String theme(){return p.getString("theme","obsidian");}
     int font(){return p.getInt("font",Palette.themeFont(theme()));}
     Palette palette(){JSONObject custom=config().optJSONObject("fpToolsTheme");return new Palette(theme(),custom!=null&&theme().equals(custom.optString("sitePreset",theme()))?custom:null);}
-    void appearance(String key,Object value){try{JSONObject cfg=config(),theme=cfg.optJSONObject("fpToolsTheme");if(theme==null)theme=new JSONObject();theme.put("sitePreset",theme()).put(key,value);if(key.equals("bgColor1"))theme.put("linkColor",value).put("accentMode","static");cfg.put("fpToolsTheme",theme);save(cfg);}catch(JSONException ignored){}}
+    interface Change {void apply(JSONObject config) throws JSONException;}
+    private void edit(Change change){synchronized(Settings.class){synchronized(SessionStore.class){try{JSONObject cfg=config();change.apply(cfg);save(cfg);}catch(JSONException e){throw new IllegalStateException("Не удалось изменить настройки",e);}}}}
+    void appearance(String key,Object value){edit(cfg->{JSONObject theme=cfg.optJSONObject("fpToolsTheme");if(theme==null)theme=new JSONObject();theme.put("sitePreset",theme()).put(key,value);if(key.equals("bgColor1"))theme.put("linkColor",value).put("accentMode","static");cfg.put("fpToolsTheme",theme);});}
     void theme(String id){p.edit().putString("theme",id).apply();}
     void font(int index){p.edit().putInt("font",index).apply();}
-    void chooseFont(int index){font(index);try{JSONObject cfg=config(),theme=cfg.optJSONObject("fpToolsTheme");if(theme==null)theme=new JSONObject();theme.put("font",new String[]{"Manrope","Trebuchet MS","Georgia","Consolas","Tahoma","Segoe UI"}[Math.max(0,Math.min(5,index))]);cfg.put("fpToolsTheme",theme);save(cfg);}catch(JSONException ignored){}}
+    void chooseFont(int index){edit(cfg->{font(index);JSONObject theme=cfg.optJSONObject("fpToolsTheme");if(theme==null)theme=new JSONObject();theme.put("font",new String[]{"Manrope","Trebuchet MS","Georgia","Consolas","Tahoma","Segoe UI"}[Math.max(0,Math.min(5,index))]);cfg.put("fpToolsTheme",theme);});}
     void applyImportedAppearance(JSONObject cfg){JSONObject theme=cfg.optJSONObject("fpToolsTheme");if(theme==null)return;String id=theme.optString("sitePreset");if(java.util.Arrays.asList(Palette.IDS).contains(id))theme(id);String family=theme.optString("font","Manrope");font(switch(family){case "Consolas","Courier New"->3;case "Georgia","Palatino Linotype","Cambria"->2;case "Trebuchet MS"->1;case "Tahoma"->4;case "Manrope"->0;default->5;});}
     void chooseTheme(String id){
-        if(!java.util.Arrays.asList(Palette.IDS).contains(id))return;theme(id);font(Palette.themeFont(id));
-        try{Palette palette=new Palette(id);JSONObject cfg=config(),theme=cfg.optJSONObject("fpToolsTheme");if(theme==null)theme=new JSONObject();
+        if(!java.util.Arrays.asList(Palette.IDS).contains(id))return;
+        edit(cfg->{theme(id);font(Palette.themeFont(id));Palette palette=new Palette(id);JSONObject theme=cfg.optJSONObject("fpToolsTheme");if(theme==null)theme=new JSONObject();
             theme.put("sitePreset",id).put("containerBgColor",String.format(java.util.Locale.ROOT,"#%06x",palette.surface&0xffffff)).put("textColor",String.format(java.util.Locale.ROOT,"#%06x",palette.text&0xffffff)).put("bgColor1",String.format(java.util.Locale.ROOT,"#%06x",palette.accent&0xffffff)).put("linkColor",String.format(java.util.Locale.ROOT,"#%06x",palette.accent&0xffffff)).put("font",id.equals("obsidian")?"Consolas":id.equals("paper")?"Verdana":id.equals("light")?"Arial":id.equals("forest")||id.equals("slate")?"Trebuchet MS":"Manrope").put("borderRadius",palette.radius).put("wallpaper","none").put("bgImage","").put("bgVideo","").put("accentMode","static").put("menuTransparent",false);
-            cfg.put("fpToolsTheme",theme).put("enableCustomTheme",true);save(cfg);
-        }catch(JSONException ignored){}
+            cfg.put("fpToolsTheme",theme).put("enableCustomTheme",true);
+        });
     }
     static final String[] WALL_IDS={"none","dunes","mesh","grid","cobalt","aurora","drift"};
     static final String[] WALL_NAMES={"Без обоев","Дюны","Мягкие формы","Сетка","Кобальт","Сияние","Дрейф"};
     String wallpaper(){JSONObject theme=config().optJSONObject("fpToolsTheme");String id=theme==null?"none":theme.optString("wallpaper","none");return java.util.Arrays.asList(WALL_IDS).contains(id)?id:"none";}
     boolean wallpaperMotion(){return p.getBoolean("wallpaperMotion",true);}
     void wallpaperMotion(boolean on){p.edit().putBoolean("wallpaperMotion",on).apply();}
-    void wallpaper(String id){if(!java.util.Arrays.asList(WALL_IDS).contains(id))return;try{JSONObject cfg=config(),theme=cfg.optJSONObject("fpToolsTheme");if(theme==null)theme=new JSONObject();theme.put("wallpaper",id).put("bgImage","").put("bgVideo","");cfg.put("fpToolsTheme",theme);save(cfg);}catch(JSONException ignored){}}
+    void wallpaper(String id){if(!java.util.Arrays.asList(WALL_IDS).contains(id))return;edit(cfg->{JSONObject theme=cfg.optJSONObject("fpToolsTheme");if(theme==null)theme=new JSONObject();theme.put("wallpaper",id).put("bgImage","").put("bgVideo","");cfg.put("fpToolsTheme",theme);});}
     String uid(){JSONObject s=new SessionStore(context).read();return s==null?"":s.optString("uid");}
-    synchronized JSONObject config() {
+    JSONObject config() { synchronized(Settings.class){
         try{return new JSONObject(p.getString("config_"+uid(),"{}"));}catch(Exception e){return new JSONObject();}
+    }}
+    void save(JSONObject o){
+        synchronized(Settings.class){synchronized(SessionStore.class){
+            String account=uid();JSONObject previous=config(),times=syncTimes(account);
+            try{for(String key:CloudProtocol.KEYS)if(previous.has(key)!=o.has(key)||!CloudProtocol.equal(previous.opt(key),o.opt(key)))times.put(key,Math.max(System.currentTimeMillis(),times.optLong(key)+1));}
+            catch(JSONException e){throw new IllegalStateException(e);}
+            if(!p.edit().putString("config_"+account,o.toString()).putString("cloudTimes_"+account,times.toString()).commit())throw new IllegalStateException("Не удалось сохранить настройки");
+        }}CloudSyncWorker.enqueue(context);
     }
-    synchronized void save(JSONObject o){p.edit().putString("config_"+uid(),o.toString()).commit();}
+    JSONObject syncTimes(String account){try{return new JSONObject(p.getString("cloudTimes_"+account,"{}"));}catch(Exception e){return new JSONObject();}}
+    void resetSyncTimes(String account){if(!p.edit().putString("cloudTimes_"+account,"{}").commit())throw new IllegalStateException("Не удалось подготовить синхронизацию");}
+    JSONObject reconcile(String account,JSONObject remote) throws Exception { synchronized(Settings.class){synchronized(SessionStore.class){
+        if(!account.equals(uid()))throw new java.io.IOException("Аккаунт изменился. Синхронизация отменена.");
+        JSONObject local=config(),packet=new JSONObject().put("s",CloudProtocol.settings(local)).put("t",syncTimes(account));
+        JSONObject merged=CloudProtocol.merge(packet,remote),values=new JSONObject(merged.getJSONObject("s").toString());
+        JSONObject next=new JSONObject(local.toString());
+        for(String key:CloudProtocol.KEYS){if(values.has(key))next.put(key,values.get(key));else next.remove(key);}
+        JSONObject oldTheme=local.optJSONObject("fpToolsTheme"),newTheme=next.optJSONObject("fpToolsTheme");
+        if(oldTheme!=null&&newTheme!=null)for(String key:CloudProtocol.LOCAL_THEME)if(oldTheme.has(key))newTheme.put(key,oldTheme.get(key));
+        JSONObject oldReplies=local.optJSONObject("fpToolsAutoReplies"),newReplies=next.optJSONObject("fpToolsAutoReplies");
+        if(oldReplies!=null&&newReplies!=null)for(String key:CloudProtocol.LOCAL_REPLY_IMAGES)if(oldReplies.has(key))newReplies.put(key,oldReplies.get(key));
+        if(oldReplies!=null&&newReplies!=null){
+            JSONArray oldRules=oldReplies.optJSONArray("keywords"),newRules=newReplies.optJSONArray("keywords");
+            if(oldRules!=null&&newRules!=null)for(int i=0;i<newRules.length();i++){
+                JSONObject rule=newRules.optJSONObject(i);if(rule==null)continue;
+                for(int j=0;j<oldRules.length();j++){JSONObject old=oldRules.optJSONObject(j);if(old!=null&&old.has("images")&&old.optString("keyword").equals(rule.optString("keyword"))&&old.optString("matchMode","exact").equals(rule.optString("matchMode","exact"))){rule.put("images",old.get("images"));break;}}
+            }
+        }
+        if(!p.edit().putString("config_"+account,next.toString()).putString("cloudTimes_"+account,merged.getJSONObject("t").toString()).commit())throw new java.io.IOException("Не удалось сохранить настройки из облака");
+        if(next.has("fpToolsTheme"))applyImportedAppearance(next);
+        else if(local.has("fpToolsTheme"))p.edit().remove("theme").remove("font").commit();
+        return merged;
+    }}}
     boolean enabled(String key){return config().optBoolean(key,false);}
-    void toggle(String key,boolean value) {try{JSONObject c=config();c.put(key,value);save(c);}catch(Exception ignored){} }
+    void toggle(String key,boolean value) {edit(cfg->cfg.put(key,value));}
     int cooldown(){return Math.max(5,Math.min(240,config().optInt("autoBumpCooldown",30)));}
-    void cooldown(int minutes){try{JSONObject c=config();c.put("autoBumpCooldown",Math.max(5,Math.min(240,minutes)));save(c);}catch(Exception ignored){} }
+    void cooldown(int minutes){edit(cfg->cfg.put("autoBumpCooldown",Math.max(5,Math.min(240,minutes))));}
     JSONObject replies(){JSONObject c=config().optJSONObject("fpToolsAutoReplies");return c==null?new JSONObject():c;}
-    void replies(JSONObject ar){try{JSONObject c=config();c.put("fpToolsAutoReplies",ar);save(c);}catch(Exception ignored){} }
+    void replies(JSONObject ar){edit(cfg->cfg.put("fpToolsAutoReplies",ar));}
     String status(){return p.getString("status_"+uid(),"Фоновая работа остановлена");}
     long lastCheck(){return p.getLong("lastCheck_"+uid(),0);}
     void status(String uid,String text,boolean success){var e=p.edit().putString("status_"+uid,text);if(success)e.putLong("lastCheck_"+uid,System.currentTimeMillis());e.apply();}
