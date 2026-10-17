@@ -30,8 +30,18 @@ final class LoginTransfer {
         long issued=value.getLong("issued"),expires=value.getLong("expires");
         if(issued>now+30000||issued<now-300000||expires<=now||expires<=issued||expires-issued>300000)throw new IOException("Срок QR истёк. Создайте новый на компьютере. Проверьте время на устройствах.");
         if(!value.getString("uid").matches("[1-9][0-9]{0,19}")||!value.getString("golden_key").matches("[A-Za-z0-9_-]{16,256}")||value.optString("name").length()>80)throw new IOException("Повреждён QR входа");
+        if(value.has("cookies"))value.put("cookies",sessionCookies(value.getJSONObject("cookies")));
         if(value.has("cloud"))value.put("cloud",CloudProtocol.capability(value.getJSONObject("cloud").toString(),value.getString("uid")));
         return value;
+    }
+    static JSONObject sessionCookies(JSONObject supplied) throws Exception {
+        JSONObject safe=new JSONObject();
+        for(java.util.Iterator<String> it=supplied.keys();it.hasNext();){
+            String name=it.next();if(!name.equals("golden_seal")&&!name.equals("PHPSESSID"))throw new IOException("Недопустимая cookie в QR");
+            Object raw=supplied.get(name);if(!(raw instanceof String cookie)||!cookie.matches("[A-Za-z0-9_~.%+/-]{1,512}"))throw new IOException("Повреждена сессия QR");
+            safe.put(name,cookie);
+        }
+        return safe;
     }
     private static JSONObject pending;
     static synchronized void stage(JSONObject value){pending=value;}

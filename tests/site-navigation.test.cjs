@@ -3,11 +3,17 @@ const assert=require('node:assert/strict');
 const {JSDOM}=require('jsdom');
 const fs=require('node:fs');
 const vm=require('node:vm');
-test('site AI button asks the background to open settings instead of navigating to a blocked extension URL',async()=>{
- const dom=new JSDOM('',{url:'https://funpay.com/'}),requests=[];
- const context=vm.createContext({document:dom.window.document,chrome:{runtime:{getURL:path=>path,sendMessage:async message=>{requests.push(message);return {success:true};}}},FPTIcons:{svg:()=>'<svg></svg>'}});
- try{vm.runInContext(fs.readFileSync('content/ui/main_popup.js','utf8'),context);const root=context.createMainPopup();root.querySelector('[data-page=ai_connection].fp-tools-page-content button.btn').click();await new Promise(r=>setImmediate(r));assert.equal(requests[0].action,'fptOpenSettingsPanel');assert.equal(requests[0].panel,'ai');assert.equal(root.querySelector('[data-page=ai_connection].fp-tools-page-content a'),null);}finally{dom.window.close();}
+test('site AI settings use an extension-owned frame and never place API key controls in the site DOM',()=>{
+ const dom=new JSDOM('',{url:'https://funpay.com/'});
+ const context=vm.createContext({document:dom.window.document,chrome:{runtime:{getURL:path=>'chrome-extension://fixture/'+path}},FPTIcons:{svg:()=>'<svg></svg>'}});
+ try{vm.runInContext(fs.readFileSync('content/ui/main_popup.js','utf8'),context);const root=context.createMainPopup(),page=root.querySelector('[data-page=ai_connection].fp-tools-page-content');assert.equal(page.querySelector('iframe').getAttribute('src'),'chrome-extension://fixture/popup/ai.html');assert.equal(page.querySelector('input[type=password]'),null);assert.equal(page.querySelector('a'),null);}finally{dom.window.close();}
 });
+
+test('preference rows toggle once from their padding, label and switch while help remains separate',()=>{
+ const dom=new JSDOM('',{url:'https://funpay.com/'}),context=vm.createContext({document:dom.window.document,chrome:{runtime:{getURL:path=>path}},FPTIcons:{svg:()=>'<svg></svg>'}});
+ try{vm.runInContext(fs.readFileSync('content/ui/main_popup.js','utf8'),context);const root=context.createMainPopup();dom.window.document.body.append(root);const control=root.querySelector('#hideBalanceCheckbox'),row=control.closest('.checkbox-label-inline'),label=row.querySelector('label');assert.equal(control.checked,false);row.click();assert.equal(control.checked,true);label.click();assert.equal(control.checked,false);control.click();assert.equal(control.checked,true);assert.ok(root.querySelector('#autoBumpCooldown').closest('.template-container').querySelector('.fpt-help-note'));assert.equal(root.querySelectorAll('.fpt-help-note input').length,0);assert.equal(root.querySelector('li[data-page=phone]').parentElement,root.querySelector('.fp-tools-nav>ul'));assert.equal(root.querySelectorAll('.fp-tools-nav li[data-page=phone]').length,1);assert.equal(root.querySelector('li[data-page=phone]').querySelector('span:last-child').textContent,'На телефон');}finally{dom.window.close();}
+});
+
 test('settings pages preserve controls while separating notifications and providing section navigation',()=>{
  const dom=new JSDOM('',{url:'https://funpay.com/'});
  const context=vm.createContext({document:dom.window.document,chrome:{runtime:{getURL:path=>path}},FPTIcons:{svg:()=>'<svg aria-hidden="true"></svg>'}});
@@ -17,7 +23,7 @@ test('settings pages preserve controls while separating notifications and provid
  const nav=[...root.querySelectorAll('.fp-tools-nav li[data-page]')];
  assert.equal(pages.length,28);assert.equal(new Set(pages.map(p=>p.dataset.page)).size,28);
  assert.equal(root.querySelector('[data-page="ai_connection"] a').textContent,'ИИ');
- assert.equal(root.querySelector('.fp-tools-page-content[data-page="ai_connection"] button.btn').textContent,'Подключить сервис');
+ assert.equal(root.querySelector('.fp-tools-page-content[data-page="ai_connection"] iframe').title,'Провайдер и основная модель ИИ');
  for(const item of nav)assert.equal(pages.filter(p=>p.dataset.page===item.dataset.page).length,1,item.dataset.page);
  for(const id of ['notificationSoundGroup','notificationVolume','fptCustomSoundInput','discordWebhookUrl']){
   const control=root.querySelector('#'+id);assert.ok(control,id);assert.equal(root.querySelectorAll('#'+id).length,1);assert.equal(control.closest('[data-page]').dataset.page,'notifications');
@@ -50,7 +56,7 @@ test('grouped settings retain every tool and search opens the matching appearanc
  vm.runInContext(fs.readFileSync('content/ui/main_popup.js','utf8'),context);
  const root=context.createMainPopup();dom.window.document.body.append(root);context.setupMenuSearch(root);
  assert.equal(root.querySelectorAll('.fpt-nav-group').length,6);assert.equal(root.querySelectorAll('.fpt-command-center').length,0);
- assert.equal(root.querySelector('.fp-tools-page-content[data-page=general] .fpt-settings-pagehead h2').textContent,'Обзор');
+ assert.equal(root.querySelector('.fp-tools-page-content[data-page=general] .fpt-settings-pagehead h2').textContent,'Сайт и продажи');
  const groups=[...root.querySelectorAll('.fpt-nav-group')],automation=groups[1],button=automation.querySelector('button'),list=automation.querySelector('ul');
  assert.equal(list.hidden,true);assert.equal(root.querySelector('.fpt-settings-catalog').hidden,false);
  assert.equal(root.querySelectorAll('.fpt-settings-category').length,6);button.click();

@@ -15,29 +15,79 @@ final class FunPayClient {
     static final String BASE="https://funpay.com";
     static final String UA="Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36";
     final SessionStore store;
-    final String uid,name,cookies;
+    final String uid,name,userAgent,sessionId;
+    String cookies;
     String csrf;
     private static long lastRequest;
     static long backoffUntil;
     FunPayClient(Context c) throws IOException {
-        store=new SessionStore(c); JSONObject s=store.read(); if(s==null)throw new IOException("Войдите в FunPay");
-        uid=s.optString("uid");name=s.optString("name");cookies=s.optString("cookies");
-        if(uid.isEmpty()||cookies.isEmpty())throw new IOException("Сессия отсутствует. Войдите снова.");
+        store=new SessionStore(c); JSONObject s;try{s=store.session();}catch(Exception e){throw new IOException("Не удалось открыть сохранённую сессию",e);} if(s==null)throw new IOException("Войдите в FunPay");
+        uid=s.optString("uid");name=s.optString("name");cookies=s.optString("cookies");userAgent=s.optString("userAgent",UA);sessionId=s.optString("sessionId");
+        if(!uid.matches("\\d+")||!hasSessionCookie(cookies))throw new IOException("Сессия отсутствует. Войдите снова.");
     }
     static JSONObject authData(String html) throws Exception {
-        Element body=Jsoup.parse(html).selectFirst("[data-app-data]");
-        if(body==null)throw new IOException("FunPay не вернул данные входа");
-        String raw=body.attr("data-app-data");
-        JSONObject d=raw.trim().startsWith("[")?new JSONArray(raw).getJSONObject(0):new JSONObject(raw);
-        if(d.optLong("userId",0)==0||d.optString("csrf-token").isEmpty())throw new IOException("Сессия истекла. Войдите снова.");
-        return d;
+        for(Element element:Jsoup.parse(html).select("[data-app-data]")){
+            try{
+                String raw=element.attr("data-app-data");
+                JSONArray candidates=raw.trim().startsWith("[")?new JSONArray(raw):new JSONArray().put(new JSONObject(raw));
+                for(int i=0;i<candidates.length();i++){
+                    JSONObject data=candidates.optJSONObject(i);
+                    if(data!=null&&data.optLong("userId",0)>0&&!data.optString("csrf-token").isEmpty())return data;
+                }
+            }catch(org.json.JSONException ignored){}
+        }
+        throw new IOException("Сессия FunPay не подтверждена. Откройте вход ещё раз.");
     }
+    static boolean hasSessionCookie(String cookies){return cookieValue(cookies,"golden_key").length()>0;}
+    static String cookieValue(String cookies,String name){
+        if(cookies==null)return "";
+        for(String part:cookies.split(";")){int equals=part.indexOf('=');if(equals>0&&name.equals(part.substring(0,equals).trim()))return part.substring(equals+1).trim();}
+        return "";
+    }
+    static String mergeCookies(String current,List<String> headers){
+        Map<String,String> jar=new LinkedHashMap<>();
+        for(String part:current.split(";")){int equals=part.indexOf('=');if(equals>0)jar.put(part.substring(0,equals).trim(),part.substring(equals+1).trim());}
+        if(headers!=null)for(String header:headers)try{for(HttpCookie cookie:HttpCookie.parse(header)){
+            String domain=cookie.getDomain();
+            if(domain!=null&&!domain.equalsIgnoreCase("funpay.com")&&!domain.equalsIgnoreCase(".funpay.com"))continue;
+            if(!cookie.getName().matches("[A-Za-z0-9_!#$%&'*+.^`|~-]+"))continue;
+            if(cookie.hasExpired()||cookie.getValue().isEmpty())jar.remove(cookie.getName());else jar.put(cookie.getName(),cookie.getValue());
+        }}catch(IllegalArgumentException ignored){}
+        List<String> result=new ArrayList<>();for(var entry:jar.entrySet())result.add(entry.getKey()+"="+entry.getValue());return String.join("; ",result);
+    }
+
+    static final class CookieRefresh {
+        final String cookies;final List<String> acceptedHeaders;
+        CookieRefresh(String cookies,List<String> acceptedHeaders){this.cookies=cookies;this.acceptedHeaders=acceptedHeaders;}
+    }
+    static CookieRefresh mergeCookieUpdates(String current,String sent,List<String> headers){
+        List<String> accepted=new ArrayList<>();
+        if(headers!=null)for(String header:headers)try{for(HttpCookie cookie:HttpCookie.parse(header)){
+            String domain=cookie.getDomain(),name=cookie.getName();
+            if(domain!=null&&!domain.equalsIgnoreCase("funpay.com")&&!domain.equalsIgnoreCase(".funpay.com"))continue;
+            if(!name.matches("[A-Za-z0-9_!#$%&'*+.^`|~-]+"))continue;
+            // Another request already changed this cookie; ignore only this stale name.
+            if(!cookieValue(current,name).equals(cookieValue(sent,name)))continue;
+            StringBuilder value=new StringBuilder(name).append('=').append(cookie.getValue());
+            if(cookie.getPath()!=null)value.append("; Path=").append(cookie.getPath());
+            if(domain!=null)value.append("; Domain=").append(domain);
+            if(cookie.getMaxAge()>=0)value.append("; Max-Age=").append(cookie.getMaxAge());
+            if(cookie.getSecure())value.append("; Secure");
+            if(cookie.isHttpOnly())value.append("; HttpOnly");
+            accepted.add(value.toString());
+        }}catch(IllegalArgumentException ignored){}
+        return new CookieRefresh(mergeCookies(current,accepted),accepted);
+    }
+
     void assertSession() throws IOException {
         if(Thread.currentThread().isInterrupted())throw new IOException("Операция остановлена");
         JSONObject s=store.read();
-        if(s==null||!uid.equals(s.optString("uid"))||!cookies.equals(s.optString("cookies")))throw new IOException("Аккаунт изменился. Запрос отменён.");
+        if(s==null||!uid.equals(s.optString("uid"))||!sessionId.equals(s.optString("sessionId")))throw new IOException("Аккаунт изменился. Запрос отменён.");
+        cookies=s.optString("cookies");
+        if(!hasSessionCookie(cookies))throw new IOException("Сессия истекла. Войдите снова.");
     }
-    String request(String path,String method,Map<String,String> form) throws Exception {
+    String request(String path,String method,Map<String,String> form) throws Exception {return request(path,method,form,0);}
+    private String request(String path,String method,Map<String,String> form,int redirects) throws Exception {
         if(!path.startsWith("/")||path.startsWith("//"))throw new IOException("Недопустимый адрес");
         assertSession();
         synchronized(FunPayClient.class) {
@@ -47,10 +97,11 @@ final class FunPayClient {
             lastRequest=System.currentTimeMillis();
         }
         assertSession();
+        final String sentCookies=cookies;
         HttpURLConnection con=(HttpURLConnection)new URL(BASE+path).openConnection();
         con.setConnectTimeout(15000);con.setReadTimeout(20000);con.setInstanceFollowRedirects(false);con.setRequestMethod(method);
-        con.setRequestProperty("User-Agent",UA);con.setRequestProperty("Cookie",cookies);
-        con.setRequestProperty("X-Requested-With","XMLHttpRequest");
+        con.setRequestProperty("User-Agent",userAgent);con.setRequestProperty("Accept-Language","ru-RU,ru;q=0.9,en;q=0.7");con.setRequestProperty("Referer",BASE+"/");con.setRequestProperty("Cookie",sentCookies);
+        if(!"GET".equals(method)||path.startsWith("/runner/"))con.setRequestProperty("X-Requested-With","XMLHttpRequest");
         if(csrf!=null)con.setRequestProperty("X-Csrf-Token",csrf);
         try {
             if(form!=null) {
@@ -59,6 +110,20 @@ final class FunPayClient {
                 try(OutputStream out=con.getOutputStream()){out.write(bytes);}
             }
             int code=con.getResponseCode();
+            List<String> updates=new ArrayList<>();for(var header:con.getHeaderFields().entrySet())if(header.getKey()!=null&&header.getKey().equalsIgnoreCase("Set-Cookie"))updates.addAll(header.getValue());
+            if(!updates.isEmpty())synchronized(SessionStore.class){
+                assertSession();
+                CookieRefresh refreshed=store.refreshCookies(uid,sessionId,sentCookies,updates);
+                cookies=refreshed.cookies;
+                for(String header:refreshed.acceptedHeaders)android.webkit.CookieManager.getInstance().setCookie(BASE+"/",header);
+                if(!refreshed.acceptedHeaders.isEmpty())android.webkit.CookieManager.getInstance().flush();
+            }
+            if(code>=300&&code<400&&"GET".equals(method)&&redirects<4){
+                URI destination=new URI(BASE+path).resolve(con.getHeaderField("Location"));
+                if(!"https".equals(destination.getScheme())||!"funpay.com".equalsIgnoreCase(destination.getHost())||destination.getRawUserInfo()!=null||destination.getPort()>0)throw new IOException("Недопустимое перенаправление FunPay");
+                con.disconnect();
+                return request(destination.getRawPath()+(destination.getRawQuery()==null?"":"?"+destination.getRawQuery()),method,null,redirects+1);
+            }
             if(code==429||code>=500) { synchronized(FunPayClient.class){backoffUntil=System.currentTimeMillis()+60000;}throw new IOException("FunPay временно недоступен ("+code+")"); }
             if(code>=300&&code<400)throw new IOException("FunPay перенаправил запрос. Проверьте вход.");
             if(code!=200)throw new IOException("Ошибка FunPay: "+code);
@@ -70,7 +135,7 @@ final class FunPayClient {
     static String encode(Map<String,String> m) throws Exception {
         List<String> p=new ArrayList<>();for(var e:m.entrySet())p.add(URLEncoder.encode(e.getKey(),"UTF-8")+"="+URLEncoder.encode(e.getValue(),"UTF-8"));return String.join("&",p);
     }
-    void authenticate() throws Exception { JSONObject a=authData(request("/","GET",null));if(!uid.equals(a.optString("userId")))throw new IOException("FunPay вернул другой аккаунт. Фоновая работа остановлена.");csrf=a.getString("csrf-token"); }
+    void authenticate() throws Exception { JSONObject a=authData(request("/chat/","GET",null));if(!uid.equals(a.optString("userId")))throw new IOException("FunPay вернул другой аккаунт. Фоновая работа остановлена.");csrf=a.getString("csrf-token"); }
     static JSONObject object(String type,String id) throws Exception {return new JSONObject().put("type",type).put("id",id).put("tag",UUID.randomUUID().toString().replace("-","").substring(0,8)).put("data",false);}
     JSONObject runner(JSONArray objects,Object req) throws Exception {
         Map<String,String> f=new LinkedHashMap<>();f.put("objects",objects.toString());f.put("request",req==null?"false":req.toString());f.put("csrf_token",csrf);
@@ -79,7 +144,7 @@ final class FunPayClient {
     static boolean hasError(JSONObject result) {Object e=result.opt("error");return Boolean.TRUE.equals(e)||(e instanceof Number n&&n.intValue()!=0)||(e instanceof String s&&!s.equals("0")&&!s.equals("false")&&!s.isEmpty())||(result.optJSONArray("errors")!=null&&result.optJSONArray("errors").length()>0);}
     List<Chat> chats() throws Exception {
         JSONObject r=runner(new JSONArray().put(object("chat_bookmarks",uid)),null);JSONArray a=r.optJSONArray("objects");
-        if(a!=null)for(int i=0;i<a.length();i++) {JSONObject o=a.getJSONObject(i);if(o.optString("type").equals("chat_bookmarks"))return parseChats(o.optJSONObject("data").optString("html"));}
+        if(a!=null)for(int i=0;i<a.length();i++) {JSONObject o=a.getJSONObject(i);if(o.optString("type").equals("chat_bookmarks")){JSONObject data=o.optJSONObject("data");if(data!=null&&data.has("html"))return parseChats(data.optString("html"));}}
         throw new IOException("Список чатов не получен. Обновите или откройте сайт.");
     }
     static final class Chat {String id,name,text,msgId;boolean unread,bot;}

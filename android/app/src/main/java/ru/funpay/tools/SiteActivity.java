@@ -12,6 +12,7 @@ import java.io.*;
 public final class SiteActivity extends Activity {
     WebView web;TextView status;Button accountButton;android.graphics.Typeface font;boolean login,capturing,resumed,probePending,destroyed;
     String expectedUid;long pairingExpires;JSONObject pairingCloud;
+    static final String ACCOUNT_SCRIPT="(()=>{for(const e of document.querySelectorAll('[data-app-data]')){try{const raw=JSON.parse(e.getAttribute('data-app-data'));for(const d of (Array.isArray(raw)?raw:[raw]))if(d&&Number(d.userId)>0)return JSON.stringify(d);}catch(_){}}const a=document.querySelector('a.user-link-dropdown[href*=\"/users/\"]');const m=a&&a.getAttribute('href').match(/\\/users\\/(\\d+)/);const n=document.querySelector('.user-link-name');return m&&n&&n.textContent.trim()?JSON.stringify({userId:m[1],userName:n.textContent.trim()}):null;})()";
     final android.os.Handler handler=new android.os.Handler(android.os.Looper.getMainLooper());
     final Runnable accountProbe=new Runnable(){public void run(){if(!resumed||destroyed||!login)return;probeAccount();handler.postDelayed(this,1500);}};
     @Override public void onCreate(Bundle state){
@@ -34,42 +35,73 @@ public final class SiteActivity extends Activity {
                 w.evaluateJavascript("(()=>{let s=document.getElementById('pocket-style');if(!s){s=document.createElement('style');s.id='pocket-style';document.head.appendChild(s);}s.textContent="+JSONObject.quote(css)+";})()",null);
                 if(login)probeAccount();
             }
+            @Override public void onPageCommitVisible(WebView w,String url){if(login)probeAccount();}
+            @Override public void doUpdateVisitedHistory(WebView w,String url,boolean reload){if(login)handler.postDelayed(()->probeAccount(),250);}
             @Override public void onReceivedError(WebView v,WebResourceRequest r,WebResourceError e){if(r.isForMainFrame())status.setText("Не удалось загрузить. Проверьте сеть.");}
         });
         root.addView(web,new LinearLayout.LayoutParams(-1,0,1));
         if(login){accountButton=new Button(this);accountButton.setText("Проверить вход");decorate(accountButton,R.drawable.ic_ui_user,p);accountButton.setOnClickListener(v->capture(accountButton));root.addView(accountButton);}
         setContentView(root);String path=getIntent().getStringExtra("path");if(path==null||!path.startsWith("/")||path.startsWith("//"))path=login?"/account/login":"/";final String address=FunPayClient.BASE+path;
-        if(pairing!=null){final String cookie="golden_key="+pairing.optString("golden_key")+"; Path=/; Secure; HttpOnly; SameSite=Lax";CookieManager.getInstance().removeAllCookies(done->{if(!destroyed)CookieManager.getInstance().setCookie(FunPayClient.BASE,cookie,accepted->{if(!destroyed){if(!accepted){status.setText("Не удалось подключить сессию. Повторите вход.");return;}CookieManager.getInstance().flush();web.loadUrl(address);}});});}
+        if(pairing!=null){
+            final JSONObject account=pairing;
+            CookieManager.getInstance().removeAllCookies(done->{if(!destroyed){
+                java.util.List<String> cookies=new java.util.ArrayList<>();cookies.add("golden_key="+account.optString("golden_key"));
+                JSONObject extra=account.optJSONObject("cookies");
+                if(extra!=null)for(String name:new String[]{"golden_seal","PHPSESSID"})if(extra.has(name))cookies.add(name+"="+extra.optString(name));
+                installPairingCookies(cookies,0,address);
+            }});
+        }
         else if(login&&getIntent().getBooleanExtra("switchAccount",false))CookieManager.getInstance().removeAllCookies(done->{if(!destroyed){CookieManager.getInstance().flush();web.loadUrl(address);}});else web.loadUrl(address);
+    }
+    void installPairingCookies(java.util.List<String> cookies,int index,String address){
+        if(destroyed)return;
+        if(index>=cookies.size()){CookieManager.getInstance().flush();web.loadUrl(address);return;}
+        CookieManager.getInstance().setCookie(FunPayClient.BASE+"/",cookies.get(index)+"; Path=/; Secure; HttpOnly; SameSite=Lax",accepted->{
+            if(destroyed)return;
+            if(!accepted){status.setText("Не удалось подключить сессию. Повторите вход.");return;}
+            installPairingCookies(cookies,index+1,address);
+        });
     }
     void probeAccount(){
         if(destroyed||capturing||probePending||accountButton==null||!isFunPayPage())return;
-        String cookies=CookieManager.getInstance().getCookie(FunPayClient.BASE);if(cookies==null||!cookies.contains("golden_key="))return;
-        probePending=true;web.evaluateJavascript("(()=>{try{const raw=document.querySelector('[data-app-data]')?.getAttribute('data-app-data');if(!raw)return false;const value=JSON.parse(raw),data=Array.isArray(value)?value[0]:value;return Number(data?.userId)>0&&!!data['csrf-token'];}catch{return false;}})()",value->{probePending=false;if(!destroyed&&resumed&&"true".equals(value))capture(accountButton);});
+        String cookies=CookieManager.getInstance().getCookie(FunPayClient.BASE);if(!FunPayClient.hasSessionCookie(cookies))return;
+        probePending=true;web.evaluateJavascript(ACCOUNT_SCRIPT,value->{
+            probePending=false;
+            if(destroyed||!resumed||!isFunPayPage())return;
+            try{Object raw=new org.json.JSONTokener(value).nextValue();if(raw instanceof String account){JSONObject data=new JSONObject(account);if(data.optLong("userId")>0)completeCapture(accountButton,data);}}catch(Exception ignored){}
+        });
     }
     boolean isFunPayPage(){Uri current=Uri.parse(web.getUrl()==null?"":web.getUrl());return "https".equals(current.getScheme())&&"funpay.com".equals(current.getHost());}
     int dp(int size){return Math.round(size*getResources().getDisplayMetrics().density);}
     void decorate(Button b,int resource,Palette p){int size=dp(20);android.graphics.drawable.Drawable d=getDrawable(resource).mutate();d.setTint(p.accent);d.setBounds(0,0,size,size);b.setCompoundDrawablesRelative(d,null,null,null);b.setCompoundDrawablePadding(size/2);b.setAllCaps(false);b.setTypeface(Palette.weight(font,550));b.setTextAlignment(android.view.View.TEXT_ALIGNMENT_GRAVITY);b.setGravity(android.view.Gravity.CENTER_VERTICAL|android.view.Gravity.START);b.setMinHeight(dp(48));b.setPadding(dp(16),dp(8),dp(16),dp(8));b.setTextColor(p.text);b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(p.surface));b.setStateListAnimator(null);b.setElevation(0);}
     void capture(Button button){
         if(destroyed||capturing)return;
-        String cookies=CookieManager.getInstance().getCookie(FunPayClient.BASE);if(cookies==null||!cookies.contains("golden_key=")){status.setText("Сначала войдите на сайте");return;}
+        String cookies=CookieManager.getInstance().getCookie(FunPayClient.BASE);if(!FunPayClient.hasSessionCookie(cookies)){status.setText("Сначала войдите на сайте");return;}
         Uri current=Uri.parse(web.getUrl()==null?"":web.getUrl());if(!"https".equals(current.getScheme())||!"funpay.com".equals(current.getHost())){status.setText("Откройте страницу FunPay после входа");return;}
-        capturing=true;button.setEnabled(false);status.setText("Проверяю аккаунт…");
-        // Read the authenticated page already loaded by WebView. A second HTTP client
-        // may receive a challenge or different session despite successful browser login.
-        web.evaluateJavascript("(()=>{const e=document.querySelector('[data-app-data]');return e?e.outerHTML:null;})()",raw->{
-            if(destroyed)return;
+        probePending=true;
+        web.evaluateJavascript(ACCOUNT_SCRIPT,raw->{
+            probePending=false;
+            if(destroyed||!isFunPayPage())return;
             try{
-                if(!isFunPayPage())throw new IOException("Откройте страницу FunPay после входа");
-                Object value=new org.json.JSONTokener(raw).nextValue();if(!(value instanceof String html))throw new IOException("Дождитесь загрузки FunPay и завершите вход на сайте");
-                JSONObject account=FunPayClient.authData(html);
-                if(expectedUid!=null&&(!expectedUid.equals(account.get("userId").toString())||pairingExpires<=System.currentTimeMillis())){login=false;CookieManager.getInstance().removeAllCookies(null);throw new IOException("Аккаунт не совпал или срок QR истёк. Вернитесь и создайте новый QR.");}
-                String latest=CookieManager.getInstance().getCookie(FunPayClient.BASE);if(latest==null||!latest.matches("(?s).*(?:^|;\\s*)golden_key=[^;]+.*"))throw new IOException("Сайт ещё не сохранил сессию. Завершите вход.");
-                new SessionStore(this).save(latest,account.get("userId").toString(),account.optString("userName","Аккаунт FunPay"));
-                if(pairingCloud!=null)try{CloudSync.connect(this,pairingCloud.toString());}catch(Exception e){Toast.makeText(this,"Вход выполнен. Подключите синхронизацию ключом в настройках.",Toast.LENGTH_LONG).show();}
-                CookieManager.getInstance().flush();setResult(RESULT_OK);finish();
-            }catch(Exception e){capturing=false;status.setText(e.getMessage());button.setEnabled(login);}
+                Object value=new org.json.JSONTokener(raw).nextValue();
+                if(!(value instanceof String account))throw new IOException("Завершите вход и дождитесь главной страницы FunPay");
+                completeCapture(button,new JSONObject(account));
+            }catch(Exception e){status.setText(e.getMessage());}
         });
+    }
+    void completeCapture(Button button,JSONObject account){
+        if(destroyed||capturing||!isFunPayPage()||account.optLong("userId")<=0)return;
+        capturing=true;button.setEnabled(false);status.setText("Сохраняю вход…");
+        try{
+            String uid=account.get("userId").toString();
+            if(expectedUid!=null&&(!expectedUid.equals(uid)||pairingExpires<=System.currentTimeMillis())){login=false;CookieManager.getInstance().removeAllCookies(null);throw new IOException("Аккаунт не совпал или срок QR истёк. Вернитесь и создайте новый QR.");}
+            CookieManager.getInstance().flush();
+            String latest=CookieManager.getInstance().getCookie(FunPayClient.BASE+"/");
+            if(!FunPayClient.hasSessionCookie(latest))throw new IOException("Сайт ещё не сохранил сессию. Завершите вход.");
+            new SessionStore(this).save(latest,uid,account.optString("userName","Аккаунт FunPay"),web.getSettings().getUserAgentString());
+            if(pairingCloud!=null)try{CloudSync.connect(this,pairingCloud.toString());}catch(Exception e){Toast.makeText(this,"Вход выполнен. Подключите синхронизацию ключом в настройках.",Toast.LENGTH_LONG).show();}
+            setResult(RESULT_OK);finish();
+        }catch(Exception e){capturing=false;status.setText(e.getMessage());button.setEnabled(login);}
     }
     @Override protected void onResume(){super.onResume();resumed=true;if(login)handler.post(accountProbe);}
     @Override protected void onPause(){resumed=false;handler.removeCallbacks(accountProbe);super.onPause();}

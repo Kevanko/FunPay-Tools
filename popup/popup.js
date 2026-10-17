@@ -90,7 +90,7 @@
   ];
   const PAGES = {
     home: ["Обзор", "general"],
-    phone: ["Телефон", "phone"],
+    phone: ["На телефон", "phone"],
     lots: ["Лоты", "lot_io"],
     autobump: ["Поднятие лотов", "autobump"],
     delivery: ["Выдача товаров", "auto_delivery"],
@@ -107,7 +107,7 @@
     settings: ["Уведомления", "notifications"],
   };
   const NAV_GROUPS = [
-    ['work','Работа',['home','phone','lots','templates','blacklist']],
+    ['work','Продажи',['home','lots','templates','blacklist']],
     ['automation','Автоматизация',['autobump','delivery','replies','commands']],
     ['appearance','Оформление',['appearance']],
     ['settings','Настройки',['settings','ai','accounts']],
@@ -239,7 +239,7 @@
             ">" +
             FPTIcons.svg(({home:"home",phone:"qr",lots:"lots",autobump:"bump",delivery:"bolt",templates:"document",replies:"reply",commands:"terminal",blacklist:"block",currency:"exchange",piggy:"wallet",calc:"calculator",appearance:"palette",accounts:"users",ai:"sparkles",settings:"bell"})[id],19) + "<span>" + esc(name) +
             "</span></button>";
-    el.innerHTML = NAV_GROUPS.map(([key,title,ids])=>{
+    el.innerHTML = ((!query||normalize(PAGES.phone[0]+' QR установка приложение Android').includes(query))?navButton(['phone',PAGES.phone]):'') + NAV_GROUPS.map(([key,title,ids])=>{
       const entries=ids.filter(id=>!query||normalize(PAGES[id][0]+' '+title).includes(query)).map(id=>[id,PAGES[id]]);
       if(!entries.length)return '';
       const open=Boolean(query)||expandedGroups.has(key)||ids.includes(state.page);
@@ -465,7 +465,7 @@
           : "Прослушать") +
         "</button>" +
         editButton(id, "Все настройки уведомлений") + '<hr><button class="btn btn-soft" id="check-app-update">'+FPTIcons.svg("refresh")+'Проверить обновления</button><p id="app-update-result" class="fpt-desc" role="status"></p>';
-    else if(id === "ai")body='<p class="fpt-desc">Корректировка сообщений, переводы и описания. Ключ хранится только в этом браузере; в QR и облако он не попадает.</p><a class="btn btn-soft" href="'+chrome.runtime.getURL('popup/ai.html')+'" target="_blank" rel="noopener">Подключить Groq</a>';
+    else if(id === "ai")body='<iframe id="fpt-popup-ai-frame" title="Провайдер и основная модель ИИ" src="'+chrome.runtime.getURL('popup/ai.html')+'" scrolling="no" style="display:block;width:100%;height:850px;border:0;background:transparent"></iframe>';
     else if(id === "phone")body="";
     else
       body =
@@ -534,6 +534,7 @@
     if (focusId) document.getElementById(focusId)?.focus?.();
     else if (focusToggle)
       root.querySelector?.('[data-toggle="' + focusToggle + '"]')?.focus?.();
+    if(id === "ai"){const frame=document.getElementById('fpt-popup-ai-frame');frame.addEventListener('load',()=>{const main=frame.contentDocument?.querySelector('main');if(main){const resize=()=>frame.style.height=Math.max(500,Math.ceil(main.getBoundingClientRect().height)+8)+'px';new ResizeObserver(resize).observe(main);resize();}});}
     if(id === "phone"){const area=document.createElement("div");area.id="phone-transfer";root.querySelector('.fpt-page').appendChild(area);FPTPhoneTransfer.mount(area,state.data);}
     if (id === "calc") {
       ["price", "fee"].forEach(
@@ -732,7 +733,7 @@
           applyAppearance();
           // Keep an in-progress QR transfer intact when runtime counters change.
           // Settings QR reads storage on demand, so a full redraw is unnecessary.
-          if(state.page === "phone")return;
+          if(state.page === "phone" || state.page === "ai")return;
           render();
         }
       });

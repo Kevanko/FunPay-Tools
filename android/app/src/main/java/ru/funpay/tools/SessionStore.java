@@ -27,9 +27,20 @@ final class SessionStore {
         return (SecretKey)ks.getKey(alias,null);
     }
     synchronized void save(String cookies,String uid,String name) throws Exception {
-        JSONObject o=new JSONObject().put("cookies",cookies).put("uid",uid).put("name",name);
+        save(cookies,uid,name,FunPayClient.UA);
+    }
+    void save(String cookies,String uid,String name,String userAgent) throws Exception {
+        if(!uid.matches("\\d+")||!FunPayClient.hasSessionCookie(cookies))throw new java.io.IOException("Неполные данные входа");
+        JSONObject o=new JSONObject().put("cookies",cookies).put("uid",uid).put("name",name).put("userAgent",userAgent).put("sessionId",java.util.UUID.randomUUID().toString());
         write(o);
     }
+    FunPayClient.CookieRefresh refreshCookies(String uid,String sessionId,String expectedCookies,java.util.List<String> headers) throws Exception {synchronized(SessionStore.class){
+        JSONObject current=read();
+        if(current==null||!uid.equals(current.optString("uid"))||!sessionId.equals(current.optString("sessionId")))throw new java.io.IOException("Аккаунт изменился. Запрос отменён.");
+        FunPayClient.CookieRefresh refreshed=FunPayClient.mergeCookieUpdates(current.optString("cookies"),expectedCookies,headers);
+        if(!refreshed.cookies.equals(current.optString("cookies"))){current.put("cookies",refreshed.cookies);write(current);}
+        return refreshed;
+    }}
     void write(JSONObject o) throws Exception { synchronized(SessionStore.class){
         Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding"); cipher.init(Cipher.ENCRYPT_MODE,key());
         String encrypted=Base64.encodeToString(cipher.doFinal(o.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)),Base64.NO_WRAP);
@@ -41,6 +52,11 @@ final class SessionStore {
             Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding"); cipher.init(Cipher.DECRYPT_MODE,key(),new GCMParameterSpec(128,Base64.decode(prefs.getString("iv",""),Base64.NO_WRAP)));
             return new JSONObject(new String(cipher.doFinal(Base64.decode(payload,Base64.NO_WRAP)),java.nio.charset.StandardCharsets.UTF_8));
         } catch(Exception e) { return null; }
+    }}
+    JSONObject session() throws Exception {synchronized(SessionStore.class){
+        JSONObject value=read();
+        if(value!=null&&value.optString("sessionId").isEmpty()){value.put("sessionId",java.util.UUID.randomUUID().toString());write(value);}
+        return value;
     }}
     void clear() { synchronized(SessionStore.class){prefs.edit().clear().commit();} }
 }

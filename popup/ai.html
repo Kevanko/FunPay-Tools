@@ -9,10 +9,12 @@
 <select id="saved"><option value="">Новое подключение</option></select>
 <label for="provider">Сервис</label><select id="provider"><option value="groq">Groq</option><option value="openai">OpenAI</option><option value="openrouter">OpenRouter</option><option value="deepseek">DeepSeek</option><option value="plakcel">Plakcel · GLM</option><option value="custom">Другой сервис · совместимый API</option><option value="author">Сервер автора</option></select>
 <div id="groq-fields">
+<div id="endpoint-fields">
 <label for="base-url">Адрес API</label><input id="base-url" type="url" maxlength="2048" autocomplete="off" spellcheck="false" placeholder="https://example.com/v1" aria-describedby="endpoint-help">
 <p class="hint" id="endpoint-help">Базовый URL из инструкции сервиса. Можно вставить полный адрес /chat/completions. Ссылка на страницу ключа сюда не подходит.</p>
-<div class="field-heading"><label for="model">Модель</label><button type="button" class="text-button" id="models">Загрузить список</button></div><input id="model" type="text" list="model-options" autocomplete="off" spellcheck="false" maxlength="200" placeholder="Идентификатор модели из кабинета сервиса"><datalist id="model-options"></datalist>
-<p class="hint">Укажите точное имя модели, доступной вашему ключу. Например, glm-5.3 для сервиса, который её предоставляет.</p>
+</div>
+<div class="field-heading"><label for="model">Основная модель</label><button type="button" class="text-button" id="models">Загрузить список</button></div><input id="model" type="text" list="model-options" autocomplete="off" spellcheck="false" maxlength="200" placeholder="Идентификатор модели из кабинета сервиса"><datalist id="model-options"></datalist>
+<p class="hint">Эта модель используется для корректировки сообщений, переводов и описаний.</p>
 <div class="field-heading"><label for="key">API-ключ</label><a id="key-link" href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Кабинет сервиса ↗</a></div>
 <input id="key" type="password" autocomplete="off" spellcheck="false" maxlength="4096" placeholder="Вставьте API-ключ" aria-describedby="key-help">
 <p class="hint" id="key-help">Ключ остаётся в этом браузере. В QR, файлы настроек и облако он не попадает.</p>

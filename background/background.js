@@ -263,10 +263,16 @@ async function getAuthDetailsForBackground() {
     const phpSessIdCookie = await chrome.cookies.get({ url: 'https://funpay.com', name: 'PHPSESSID' });
     const phpsessid = phpSessIdCookie?.value || '';
 
+    for (const tab of await chrome.tabs.query({url:'https://funpay.com/*'})) {
+        try {
+            const data=await chrome.tabs.sendMessage(tab.id,{action:'fptReadAuthenticatedPage'});
+            const current=await chrome.cookies.get({url:'https://funpay.com',name:'golden_key'});
+            if(current?.value===golden_key&&/^[1-9]\d{0,19}$/.test(String(data?.userId||''))&&typeof data.csrf_token==='string'&&data.csrf_token.length>0)return {golden_key,phpsessid,csrf_token:data.csrf_token,userId:data.userId,username:data.username};
+        }catch(_){}
+    }
+
     try {
-        const response = await fetch("https://funpay.com/", {
-            headers: { "cookie": `golden_key=${golden_key}` }
-        });
+        const response = await fetch("https://funpay.com/chat/", {cache:'no-store'});
         if (!response.ok) throw new Error(`Статус ответа: ${response.status}`);
         const text = await response.text();
 
@@ -950,9 +956,9 @@ async function _fptGunzipB64(b64) {
 function fptRandomSecret() {
     return Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, '0')).join('');
 }
-async function fptCloudCapability(accountId) {
+async function fptCloudCapability(accountId, verifiedAuth = null) {
     if (!/^\d+$/.test(String(accountId || ''))) throw new Error('Недопустимый аккаунт');
-    const auth = await getAuthDetailsForBackground();
+    const auth = verifiedAuth || await getAuthDetailsForBackground();
     if (String(auth.userId) !== String(accountId)) throw new Error('Аккаунт страницы больше не активен');
     const { fptCloudCapabilities = {} } = await chrome.storage.local.get('fptCloudCapabilities');
     let cap = fptCloudCapabilities[accountId];
@@ -1037,15 +1043,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 const auth = await getAuthDetailsForBackground();
                 const current = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
                 if (!current?.value || current.value !== auth.golden_key || request.deadline < Date.now()) throw Error('Аккаунт изменился или запрос истёк');
-                const capability = await fptCloudCapability(String(auth.userId));
+                const capability = await fptCloudCapability(String(auth.userId), auth);
                 const latest = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
                 if (!latest?.value || latest.value !== auth.golden_key || request.deadline < Date.now()) throw Error('Аккаунт изменился или запрос истёк');
+                const sessionCookies = await chrome.cookies.getAll({url: 'https://funpay.com/'});
+                auth.cookies = Object.fromEntries(sessionCookies.filter(c => ['golden_seal', 'PHPSESSID'].includes(c.name)).map(c => [c.name, c.value]));
                 const transfer = await createLoginTransfer(auth, Date.now(), { schema: 1, accountId: String(auth.userId), ...capability });
                 await chrome.storage.local.set({ fptCloudSyncEnabled: true });
                 return transfer;
             });
         })
-            .then(value => sendResponse({ ok: true, ...value }), () => sendResponse({ ok: false, error: 'Не удалось подтвердить аккаунт. Откройте FunPay и завершите вход.' }));
+            .then(value => sendResponse({ ok: true, ...value }), error => {console.warn('FP Tools: login QR failed',error?.name,error?.message);sendResponse({ ok: false, error: 'Не удалось подтвердить аккаунт. Откройте FunPay и завершите вход.' });});
         return true;
     }
     if (request?.action === 'fptOffscreenIdle' && sender.url === chrome.runtime.getURL('offscreen/offscreen.html')) {

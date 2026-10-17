@@ -1268,8 +1268,9 @@ function createMainPopup() {
     const aiLink=document.createElement('a');aiLink.innerHTML=FPTIcons.svg('sparkles',20)+'<span>ИИ</span>';aiNav.append(aiLink);
     toolsPopup.querySelector('.fp-tools-nav li[data-page="ai_audit"]')?.before(aiNav);
     const aiPage=document.createElement('div');aiPage.className='fp-tools-page-content';aiPage.dataset.page='ai_connection';aiPage.setAttribute('aria-label','ИИ');
-    aiPage.innerHTML='<h3>ИИ</h3><p class="template-info">Корректировка сообщений, переводы и описания через выбранный ИИ-сервис. Платные провайдеры, бесплатные квоты и свой совместимый API.</p><p class="template-info">Ключ хранится отдельно на этом устройстве и не переносится вместе с настройками.</p>';
-    const aiConnect=document.createElement('button');aiConnect.type='button';aiConnect.className='btn';aiConnect.textContent='Подключить сервис';aiConnect.addEventListener('click',async()=>{try{const result=await chrome.runtime.sendMessage({action:'fptOpenSettingsPanel',panel:'ai'});if(!result?.success)throw Error(result?.error||'Не удалось открыть подключение ИИ');}catch(error){aiConnect.textContent=error.message;}});aiPage.append(aiConnect);
+    aiPage.innerHTML='<h3>ИИ</h3>';
+    const aiFrame=document.createElement('iframe');aiFrame.className='fpt-ai-frame';aiFrame.title='Провайдер и основная модель ИИ';aiFrame.src=chrome.runtime.getURL('popup/ai.html');aiFrame.setAttribute('scrolling','no');aiPage.append(aiFrame);
+    document.defaultView.addEventListener('message',event=>{if(event.origin!==chrome.runtime.getURL('').replace(/\/$/,'')||(event.source!==aiFrame.contentWindow&&event.source!==null)||event.data?.type!=='fpt-ai-resize')return;const height=Number(event.data.height);if(Number.isFinite(height))aiFrame.style.height=Math.max(500,Math.min(2200,height+8))+'px';});
     toolsPopup.querySelector('main').append(aiPage);
     refineSettingsLayout(toolsPopup);
     enhancePreferences(toolsPopup);
@@ -1326,7 +1327,7 @@ function enhancePreferences(root) {
         ['auto_review',3,'После заказа','Сообщение после создания нового заказа.'],
         ['auto_review',4,'После подтверждения','Сообщение после подтверждения выполнения заказа.'],
         ['auto_review',5,'Правила обработки','Дополнительные условия работы автоответчика.'],
-        ['theme',0,'Выберите тему','Готовая палитра, шрифт и форма элементов.'],
+        ['theme',0,'Тема сайта','Готовая палитра, шрифт и форма элементов.'],
         ['theme',1,'Фон страницы','Готовые обои или ваше изображение.'],
         ['theme',2,'Шрифт и размеры','Текст и скругления элементов интерфейса.'],
         ['theme',3,'Палитра интерфейса','Акценты, поверхности и цвет текста. Можно выбрать оттенок или ввести HEX.'],
@@ -1369,11 +1370,16 @@ function enhancePreferences(root) {
     root.querySelectorAll('.fpt-settings-pagehead').forEach(heading=>{
         const back=heading.querySelector('.fpt-category-back');if(back){back.textContent=back.textContent.replace(/^‹ /,'');back.title='Вернуться в категорию';}
     });
-    root.querySelectorAll('.fpt-nav-group-toggle').forEach((button,index)=>{const icon=document.createElement('span');icon.className='fpt-category-nav-icon';icon.innerHTML=FPTIcons.svg(['home','bolt','palette','settings','terminal','document'][index],18);button.append(icon);});
+    root.querySelectorAll('.fpt-nav-group-toggle').forEach((button,index)=>{const icon=document.createElement('span');icon.className='fpt-category-nav-icon';icon.innerHTML=FPTIcons.svg(['lots','bolt','palette','settings','terminal','document'][index],18);button.append(icon);});
     const note=document.createElement('div');note.className='fpt-preferences-note';note.textContent='Изменения сохраняются автоматически';root.querySelector('.fp-tools-nav').append(note);
     root.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'){event.preventDefault();root.querySelector('#fpToolsMenuSearch').focus();}});
     const effects=root.querySelector('[data-page="effects"].fp-tools-page-content');
     if(effects){const groups=[['Частицы',[]],['Свой курсор',[]]];let current=-1;for(const node of [...effects.children]){if(node.classList.contains('fpt-blocklabel')){current++;node.remove();continue;}if(current>=0)groups[Math.min(current,1)][1].push(node);}addSettingsSectionTabs(effects,groups);}
+    root.querySelectorAll('.checkbox-label-inline').forEach(row=>row.addEventListener('click',event=>{const control=row.querySelector('input[type=checkbox]');if(event.target===row&&control&&!control.disabled)control.click();}));
+    root.querySelectorAll('.template-info,.fpt-setting-help,.fpt-callout-info').forEach(info=>{
+        if(info.hidden||info.closest('.fpt-help-note,.fpt-variable-help')||info.querySelector('input,select,textarea,button')||!info.textContent.trim())return;
+        const note=document.createElement('aside');note.className='fpt-help-note';const icon=document.createElement('span');icon.className='fpt-help-icon';icon.innerHTML=FPTIcons.svg('info',18);const original=info.querySelector(':scope > .fpt-callout-icon');if(original)icon.replaceChildren(original);info.before(note);note.append(icon,info);
+    });
 }
 
 function refineSettingsLayout(root) {
@@ -1381,7 +1387,7 @@ function refineSettingsLayout(root) {
     const subtitle=root.querySelector('.fpt-brand-subtitle');if(subtitle)subtitle.textContent='Настройки и инструменты';
     root.querySelector('.fpt-command-center')?.remove();
     const groups=[
-        ['Работа',['general','phone','lot_io','templates','blacklist','notes']],
+        ['Продажи',['general','lot_io','templates','blacklist','notes']],
         ['Автоматизация',['autobump','auto_delivery','auto_review','slash_commands']],
         ['Оформление',['theme','effects','epic_nicks']],
         ['Настройки',['notifications','ai_connection','accounts','settings_io','needs']],
@@ -1390,6 +1396,8 @@ function refineSettingsLayout(root) {
     ];
     const nav=root.querySelector('.fp-tools-nav'),list=nav.querySelector('ul'),items=new Map([...list.querySelectorAll('li[data-page]')].map(item=>[item.dataset.page,item]));
     list.replaceChildren();nav.querySelector('.fpt-nav-more')?.remove();
+    const phoneItem=items.get('phone');
+    if(phoneItem){phoneItem.dataset.group='';phoneItem.querySelector('a>span:last-child').textContent='На телефон';list.append(phoneItem);items.delete('phone');}
     groups.forEach(([title,ids],index)=>{
         const group=document.createElement('li');group.className='fpt-nav-group';
         const button=document.createElement('button');button.type='button';button.className='fpt-nav-group-toggle';button.dataset.expanded=String(index===0||index===2);button.setAttribute('aria-expanded',button.dataset.expanded);
@@ -1401,7 +1409,7 @@ function refineSettingsLayout(root) {
     });
     // Keep any future tools discoverable if they were not assigned a group yet.
     for(const item of items.values())list.lastElementChild.querySelector('ul').append(item);
-    const descriptions={general:'Основные настройки сайта и продаж.',phone:'Установка приложения и перенос настроек.',lot_io:'Импорт, экспорт и массовое редактирование.',templates:'Готовые сообщения и быстрые ответы.',blacklist:'Покупатели, для которых отключена автоматизация.',notes:'Ваши записи и напоминания.',autobump:'Когда и какие категории поднимать.',auto_delivery:'Товары и правила отправки после оплаты.',auto_review:'Сообщения для событий и ответы на отзывы.',slash_commands:'Команды для быстрых действий в чате.',theme:'Тема, фон и шрифт на ваших устройствах.',effects:'Анимации и эффекты указателя.',epic_nicks:'Внешний вид вашего ника.',notifications:'Мелодии, громкость и Discord.',ai_connection:'Подключение ИИ для сообщений и описаний.',accounts:'Переключение между аккаунтами FunPay.',settings_io:'Облако, файл настроек и восстановление.',needs:'Выберите функции, которые нужны в работе.',currency_calc:'Курсы и пересчёт сумм.',piggy_banks:'Цели и накопления с продаж.',calculator:'Расчёты без выхода с сайта.',ai_audit:'Проверка описаний и рекомендаций для лотов.',vps:'Подключение вашего сервера автоматизации.',telegram:'Уведомления и управление через Telegram.',global_chat:'Общение с пользователями расширения.',overview:'Как пользоваться инструментами FP Tools.',tickets:'Ваши обращения и ответы.',support:'Версия, ссылки и поддержка проекта.'};
+    const descriptions={general:'Основные настройки сайта и продаж.',phone:'Установка приложения и перенос настроек.',lot_io:'Импорт, экспорт и массовое редактирование.',templates:'Готовые сообщения и быстрые ответы.',blacklist:'Покупатели, для которых отключена автоматизация.',notes:'Ваши записи и напоминания.',autobump:'Когда и какие категории поднимать.',auto_delivery:'Товары и правила отправки после оплаты.',auto_review:'Сообщения для событий и ответы на отзывы.',slash_commands:'Команды для быстрых действий в чате.',theme:'Тема, фон и шрифт на ваших устройствах.',effects:'Анимации и эффекты указателя.',epic_nicks:'Внешний вид вашего ника.',notifications:'Мелодии, громкость и Discord.',ai_connection:'Провайдер, основная модель и ключ доступа.',accounts:'Переключение между аккаунтами FunPay.',settings_io:'Облако, файл настроек и восстановление.',needs:'Выберите функции, которые нужны в работе.',currency_calc:'Курсы и пересчёт сумм.',piggy_banks:'Цели и накопления с продаж.',calculator:'Расчёты без выхода с сайта.',ai_audit:'Проверка описаний и рекомендаций для лотов.',vps:'Подключение вашего сервера автоматизации.',telegram:'Уведомления и управление через Telegram.',global_chat:'Общение с пользователями расширения.',overview:'Как пользоваться инструментами FP Tools.',tickets:'Ваши обращения и ответы.',support:'Версия, ссылки и поддержка проекта.'};
     root.querySelectorAll('.fp-tools-page-content').forEach(page=>{
         const item=root.querySelector('.fp-tools-nav li[data-page="'+page.dataset.page+'"]');
         const heading=document.createElement('header');heading.className='fpt-settings-pagehead';
@@ -1411,8 +1419,9 @@ function refineSettingsLayout(root) {
     });
     const catalog=document.createElement('section');catalog.className='fpt-settings-catalog';catalog.hidden=true;catalog.setAttribute('aria-label','Каталог настроек');
     root.querySelector('main').prepend(catalog);
-    const categoryIcons=['home','bolt','palette','settings','terminal','document'];
+    const categoryIcons=['lots','bolt','palette','settings','terminal','document'];
     function showCatalog(category) {
+        const note=root.querySelector('.fpt-preferences-note');if(note)note.textContent='Изменения сохраняются автоматически';
         const group=groups.find(([title])=>title===category);
         root.querySelectorAll('.fp-tools-page-content').forEach(page=>page.classList.remove('active'));
         root.querySelectorAll('.fp-tools-nav li[data-page]').forEach(item=>item.classList.remove('active'));
@@ -1438,9 +1447,9 @@ function refineSettingsLayout(root) {
             const button=document.createElement('button');button.type='button';button.className='fpt-settings-category';button.dataset.category=name;
             const icon=document.createElement('span');icon.className='fpt-catalog-icon';icon.innerHTML=FPTIcons.svg(categoryIcons[index],22);
             const label=document.createElement('strong');label.textContent=name;
-            const hint=document.createElement('span');hint.textContent=ids.slice(0,3).map(id=>root.querySelector('.fp-tools-nav li[data-page="'+id+'"] a>span:last-child')?.textContent).filter(Boolean).join(' · ');
+            const hint=document.createElement('span');hint.textContent=({'Продажи':'Сайт, лоты, шаблоны и покупатели','Автоматизация':'Поднятие, выдача и ответы','Оформление':'Темы, фон и эффекты','Настройки':'Уведомления, аккаунты и ИИ','Инструменты':'Курсы, расчёты и сервер','Помощь':'Справка и поддержка'})[name]||'';
             const count=document.createElement('small'),total=ids.filter(id=>root.querySelector('.fp-tools-nav li[data-page="'+id+'"]')).length;count.textContent=total+' '+(total===1?'раздел':total<5?'раздела':'разделов');
-            button.append(icon,label,hint,count);button.addEventListener('click',()=>showCatalog(name));grid.append(button);
+            const arrow=document.createElement('span');arrow.className='fpt-category-open';arrow.setAttribute('aria-hidden','true');arrow.innerHTML=FPTIcons.svg('back',18);button.setAttribute('aria-label','Открыть раздел «'+name+'»');button.append(icon,label,hint,count,arrow);button.addEventListener('click',()=>showCatalog(name));grid.append(button);
         });
         catalog.append(grid);root.querySelector('.fp-tools-content').scrollTop=0;title.tabIndex=-1;title.focus({preventScroll:true});
     }
@@ -1500,7 +1509,7 @@ function organizeSettingsPages(root) {
         const item=document.createElement('li');item.dataset.page='notifications';const anchor=document.createElement('a');anchor.innerHTML=FPTIcons.svg('bell',20)+'<span>Уведомления</span>';item.append(anchor);
         root.querySelector('.fp-tools-nav li[data-page="theme"]')?.before(item);
     }
-    const titles={general:'Обзор',phone:'Телефон',lot_io:'Лоты',autobump:'Поднятие лотов',auto_delivery:'Выдача товаров',templates:'Шаблоны',auto_review:'Автоответы',slash_commands:'Команды',global_chat:'Общий чат',blacklist:'Блокировки',ai_audit:'Проверка лотов ИИ',currency_calc:'Курсы валют',piggy_banks:'Цели накопления',calculator:'Калькулятор',theme:'Оформление',effects:'Эффекты',accounts:'Аккаунты',vps:'Сервер',needs:'Видимость функций',epic_nicks:'Профиль и ник',telegram:'Telegram',notes:'Заметки',overview:'Справка',settings_io:'Перенос и синхронизация',tickets:'Обращения',support:'О проекте',notifications:'Уведомления'};
+    const titles={general:'Сайт и продажи',phone:'Телефон',lot_io:'Лоты',autobump:'Поднятие лотов',auto_delivery:'Выдача товаров',templates:'Шаблоны',auto_review:'Автоответы',slash_commands:'Команды',global_chat:'Общий чат',blacklist:'Блокировки',ai_audit:'Проверка лотов ИИ',currency_calc:'Курсы валют',piggy_banks:'Цели накопления',calculator:'Калькулятор',theme:'Оформление',effects:'Эффекты',accounts:'Аккаунты',vps:'Сервер',needs:'Видимость функций',epic_nicks:'Профиль и ник',telegram:'Telegram',notes:'Заметки',overview:'Справка',settings_io:'Перенос и синхронизация',tickets:'Обращения',support:'О проекте',notifications:'Уведомления'};
     for(const [id,title]of Object.entries(titles)){
         const item=root.querySelector('.fp-tools-nav li[data-page="'+id+'"]');
         const caption=item?.querySelector('a>span:last-child');if(caption)caption.textContent=title;
@@ -1596,6 +1605,7 @@ function setupPopupNavigation() {
         li.addEventListener('click', (e) => {
             e.preventDefault();
             const pageId = li.dataset.page;
+            const note=toolsPopup.querySelector('.fpt-preferences-note');if(note)note.textContent=pageId==='ai_connection'?'Подключение ИИ — кнопкой «Сохранить».':'Изменения сохраняются автоматически';
             const catalog=toolsPopup.querySelector('.fpt-settings-catalog');if(catalog)catalog.hidden=true;
             const selectedGroup=li.dataset.group;
             toolsPopup.querySelectorAll('.fpt-nav-group-toggle').forEach(button=>button.classList.toggle('is-current',button.querySelector('span').textContent===selectedGroup));

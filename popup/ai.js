@@ -1,4 +1,7 @@
 import { AI_PROVIDERS, AI_MODELS, normalizeAIEndpoint } from '../background/ai_provider.js';
+const embedded=window.parent!==window;
+document.body.classList.toggle('embedded',embedded);
+if(embedded)new ResizeObserver(()=>{window.parent.postMessage({type:'fpt-ai-resize',height:Math.ceil(document.querySelector('main').getBoundingClientRect().height)},'https://funpay.com');}).observe(document.querySelector('main'));
 const $ = id => document.getElementById(id);
 let busy = false;
 let connections = [];
@@ -7,6 +10,7 @@ function fields(reset = false) {
     const id = $('provider').value, preset = AI_PROVIDERS[id];
     $('groq-fields').hidden = id === 'author'; $('author-note').hidden = id !== 'author';
     $('base-url').readOnly = id !== 'custom';
+    $('endpoint-fields').hidden = id !== 'custom';
     if (reset) { $('base-url').value = preset.baseUrl; $('model').value = id === 'groq' ? AI_MODELS[0] : id === 'plakcel' ? 'glm-5.3' : ''; $('key').value = ''; $('key').placeholder = 'Вставьте API-ключ'; $('saved').value = ''; }
     $('model-options').replaceChildren(...(id === 'groq' ? AI_MODELS : []).map(value => new Option(value, value)));
     $('key-link').hidden = id !== 'groq';
@@ -64,7 +68,7 @@ $('remove').addEventListener('click', async () => {
     try { await call('fptAISave', { provider: $('provider').value, baseUrl: $('base-url').value, model: $('model').value.trim(), clearKey: true }); $('key').value = ''; await load(); show('Ключ выбранного подключения удалён из этого браузера.'); }
     catch (error) { show(error.message); } finally { lock(false); }
 });
-chrome.storage.local.get('fpToolsTheme').then(({ fpToolsTheme: theme }) => {
+function applyTheme(theme) {
     theme = fptNormalizeToPreset({ ...DEFAULT_THEME, ...theme });
     const valid = value => /^#[a-f\d]{6}$/i.test(value || '');
     const root = document.documentElement;
@@ -77,5 +81,8 @@ chrome.storage.local.get('fpToolsTheme').then(({ fpToolsTheme: theme }) => {
         root.style.setProperty('--muted', `color-mix(in srgb, ${theme.textColor} 65%, transparent)`);
         root.style.setProperty('--line', `color-mix(in srgb, ${theme.textColor} 22%, transparent)`);
     }
-}).catch(() => {});
-load().catch(error => show(error.message));
+}
+chrome.storage.local.get('fpToolsTheme').then(data=>applyTheme(data.fpToolsTheme)).catch(()=>{});
+chrome.storage.onChanged.addListener((changes,area)=>{if(area==='local'&&changes.fpToolsTheme)applyTheme(changes.fpToolsTheme.newValue);});
+lock(true);show('Загружаю подключение…');
+load().catch(error => show(error.message)).finally(()=>lock(false));

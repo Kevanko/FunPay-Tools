@@ -749,3 +749,25 @@
     }
     
 })();
+chrome.runtime.onMessage.addListener((request,sender,reply)=>{
+    if(request?.action!=='fptReadAuthenticatedPage'||sender.id!==chrome.runtime.id)return;
+    // Existing tabs may still show the account used before a cookie switch.
+    // Read a fresh authenticated response instead of trusting the visible DOM.
+    (async()=>{
+        try{
+            const response=await fetch('https://funpay.com/chat/',{credentials:'include',cache:'no-store',signal:AbortSignal.timeout(10000)});
+            if(!response.ok)throw Error('Authentication request failed');
+            const doc=new DOMParser().parseFromString(await response.text(),'text/html');
+            for(const element of doc.querySelectorAll('[data-app-data]')){
+                const raw=JSON.parse(element.getAttribute('data-app-data'));
+                for(const data of Array.isArray(raw)?raw:[raw]){
+                    if(Number(data?.userId)>0&&typeof data['csrf-token']==='string'&&data['csrf-token']){
+                        reply({userId:data.userId,csrf_token:data['csrf-token'],username:data.userName});return;
+                    }
+                }
+            }
+        }catch(_){}
+        reply({});
+    })();
+    return true;
+});

@@ -135,22 +135,55 @@ public final class MainActivity extends Activity {
         TextView caption=text("Скругления · "+p.radius,13,p.muted);colors.addView(caption);SeekBar radius=new SeekBar(this);radius.setTag("appearance-radius");radius.setMax(28);radius.setProgress(p.radius);radius.setContentDescription("Скругления");radius.setProgressTintList(android.content.res.ColorStateList.valueOf(p.accent));radius.setThumbTintList(android.content.res.ColorStateList.valueOf(p.accent));radius.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onStartTrackingTouch(SeekBar bar){}public void onProgressChanged(SeekBar bar,int value,boolean user){caption.setText("Скругления · "+value);}public void onStopTrackingTouch(SeekBar bar){prefs.appearance("borderRadius",bar.getProgress());render();}});colors.addView(radius,new LinearLayout.LayoutParams(-1,dp(48)));
         colors.addView(action("Сбросить оформление темы",()->{prefs.chooseTheme(prefs.theme());render();}));
     }
+    String settingsCategory="";
+    void openSettingsCategory(String id){settingsCategory=id;render();}
+    @Override public void onBackPressed(){if(page.equals("settings")&&!settingsCategory.isEmpty()){openSettingsCategory("");return;}super.onBackPressed();}
+    void settingsCatalogEntry(String id,String title,String detail){
+        Button row=action(title+"\n"+detail,()->openSettingsCategory(id));
+        android.text.SpannableString label=new android.text.SpannableString(title+"\n"+detail);
+        label.setSpan(new android.text.style.StyleSpan(Typeface.BOLD),0,title.length(),0);
+        label.setSpan(new android.text.style.RelativeSizeSpan(.84f),title.length()+1,label.length(),0);
+        label.setSpan(new android.text.style.ForegroundColorSpan(p.muted),title.length()+1,label.length(),0);
+        row.setText(label);row.setLineSpacing(dp(4),1.1f);
+        String glyph=switch(id){case "appearance"->"palette";case "replies"->"reply";case "transfer"->"qr";case "background"->"clock";default->"user";};
+        row.setCompoundDrawablesRelative(icon(glyph,p.accent,20),null,null,null);
+        row.setMinHeight(dp(68));row.setTag("settings-category-"+id);body.addView(row);
+    }
     void settings(){
+        if(settingsCategory.isEmpty()){
+            note("Выберите раздел. Настройки сохраняются на этом телефоне и для подключённого аккаунта.");
+            settingsCatalogEntry("appearance","Оформление","Тема, цвета, шрифт и обои");
+            settingsCatalogEntry("replies","Автоответы","Приветствие и правила по ключевым словам");
+            settingsCatalogEntry("transfer","Перенос и синхронизация","QR, облако и файлы настроек");
+            settingsCatalogEntry("background","Фоновая работа","Периодические проверки, батарея и журнал");
+            settingsCatalogEntry("account","Приложение и аккаунт","Обновления, смена аккаунта и выход");
+            return;
+        }
+        body.addView(action("Все настройки",()->openSettingsCategory("")));
+        if(settingsCategory.equals("appearance")){
+
         section("ОФОРМЛЕНИЕ");themePicker();customAppearance();
         LinearLayout fonts=card("Шрифт");Spinner select=new Spinner(this);select.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,Palette.FONT_NAMES){ @Override public View getView(int pos,View old,ViewGroup parent){TextView v=(TextView)super.getView(pos,old,parent);v.setTextColor(p.text);v.setTypeface(font);return v;} @Override public View getDropDownView(int pos,View old,ViewGroup parent){TextView v=(TextView)super.getDropDownView(pos,old,parent);v.setTextColor(p.text);v.setBackgroundColor(p.surface);v.setPadding(dp(16),dp(12),dp(16),dp(12));return v;} });select.setSelection(prefs.font());select.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onNothingSelected(android.widget.AdapterView<?> a){}public void onItemSelected(android.widget.AdapterView<?> a,View v,int pos,long id){if(pos!=prefs.font()){prefs.chooseFont(pos);render();}}});fonts.addView(select);
         LinearLayout walls=card("Обои");Spinner wall=new Spinner(this);wall.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,ru.funpay.tools.Settings.WALL_NAMES){@Override public View getView(int position,View old,ViewGroup parent){TextView view=(TextView)super.getView(position,old,parent);view.setTypeface(font);view.setTextColor(p.text);return view;}@Override public View getDropDownView(int position,View old,ViewGroup parent){TextView view=(TextView)super.getDropDownView(position,old,parent);view.setTextColor(p.text);view.setBackgroundColor(p.surface);view.setTypeface(font);view.setPadding(dp(16),dp(12),dp(16),dp(12));return view;}});wall.setSelection(java.util.Arrays.asList(ru.funpay.tools.Settings.WALL_IDS).indexOf(prefs.wallpaper()));wall.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> parent){}public void onItemSelected(AdapterView<?> parent,View view,int position,long id){String value=ru.funpay.tools.Settings.WALL_IDS[position];if(!value.equals(prefs.wallpaper())){prefs.wallpaper(value);render();}}});walls.addView(wall);toggle(walls,"Движение обоев",prefs.wallpaperMotion(),on->{prefs.wallpaperMotion(on);render();});walls.addView(text("Движение отключается при энергосбережении и системном ограничении анимаций.",12,p.muted));
+        }else if(settingsCategory.equals("replies")){
         section("АВТООТВЕТЫ");JSONObject ar=prefs.replies();LinearLayout replies=card("Приветствие и правила");toggle(replies,"Приветствие новым собеседникам",ar.optBoolean("greetingEnabled"),v->{try{JSONObject a=prefs.replies();a.put("greetingEnabled",v);prefs.replies(a);}catch(Exception ignored){}});
         EditText greeting=input("Текст приветствия",ar.optString("greetingText"),true);replies.addView(greeting);replies.addView(action("Сохранить приветствие",()->{try{JSONObject a=prefs.replies();a.put("greetingText",greeting.getText().toString());prefs.replies(ru.funpay.tools.Settings.cleanReplies(a));Toast.makeText(this,"Сохранено",Toast.LENGTH_SHORT).show();}catch(Exception e){alert(e.getMessage());}}));
         toggle(replies,"Ответы по ключевым словам",ar.optBoolean("keywordsEnabled"),v->{try{JSONObject a=prefs.replies();a.put("keywordsEnabled",v);prefs.replies(a);}catch(Exception ignored){}});replies.addView(action("Редактировать правила",this::rules));
         note("Первый проход запоминает текущие сообщения без ответов на старую историю. На телефоне работают приветствия и ключевые слова. Выдача, бонусы, AI, отзывы и Telegram/Discord остаются функциями расширения; их настройки не запускают скрытые действия здесь.");
-        section("СИНХРОНИЗАЦИЯ");cloudState=text(CloudSync.status(this),13,p.muted);body.addView(cloudState);
+        }else if(settingsCategory.equals("transfer")){
+        section("ПОДКЛЮЧЕНИЕ И ПЕРЕНОС");body.addView(action("Перенос по QR",()->startActivity(new Intent(this,WelcomeActivity.class).putExtra("configure",true))));
+        section("ОБЛАЧНАЯ СИНХРОНИЗАЦИЯ");cloudState=text(CloudSync.status(this),13,p.muted);body.addView(cloudState);
         if(CloudSync.enabled(this)){body.addView(action("Синхронизировать сейчас",()->run(()->{CloudSync.sync(this);return CloudSync.status(this);},result->{alert((String)result);render();})));body.addView(action("Отключить синхронизацию",()->{try{CloudSync.disconnect(this);render();}catch(Exception e){alert(e.getMessage());}}));}
         else{body.addView(text("В расширении: Перенос и синхронизация → Сохранить ключ доступа. Откройте этот .fptsync на телефоне. Аккаунт на обоих устройствах должен совпадать.",13,p.muted));body.addView(action("Подключить ключ .fptsync",()->startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE),22)));}
         section("ПЕРЕНОС НАСТРОЕК");body.addView(action("Импорт .fpconfig из расширения",()->{if(!connected()){alert("Сначала подключите аккаунт");return;}startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE),20);}));body.addView(action("Экспорт настроек",()->startActivityForResult(new Intent(Intent.ACTION_CREATE_DOCUMENT).setType("application/json").putExtra(Intent.EXTRA_TITLE,"FunPayPocket.fpconfig"),21)));
-        section("ПЕРЕНОС ПО QR");body.addView(action("Подключение и перенос настроек",()->startActivity(new Intent(this,WelcomeActivity.class).putExtra("configure",true))));
+        }else if(settingsCategory.equals("background")){
+        section("ФОНОВАЯ РАБОТА");LinearLayout bg=card("Режим обслуживания");toggle(bg,"Периодические проверки, около 15 минут",prefs.scheduled(),v->PeriodicPresence.schedule(this,v));body.addView(action("Настройки батареи Android",()->{try{startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));}catch(Exception e){alert("Откройте настройки батареи вручную");}}));
+        body.addView(action("Журнал и незавершённые ответы",this::pending));
+        }else if(settingsCategory.equals("account")){
         section("ОБНОВЛЕНИЯ");body.addView(action("Проверить обновления",()->AppUpdates.check(this,true)));if(UpdateInstaller.hasPending(this))body.addView(action("Установить скачанное обновление",()->UpdateInstaller.resume(this)));
-        section("ФОН И СЕССИЯ");LinearLayout bg=card("Режим обслуживания");toggle(bg,"Периодические проверки, около 15 минут",prefs.scheduled(),v->PeriodicPresence.schedule(this,v));body.addView(action("Настройки батареи Android",()->{try{startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));}catch(Exception e){alert("Откройте настройки батареи вручную");}}));
-        body.addView(action("Журнал и незавершённые ответы",this::pending));body.addView(action("Сменить аккаунт",()->site("/account/login",true)));body.addView(action("Выйти и очистить сессию",()->new AlertDialog.Builder(this).setTitle("Выйти?").setMessage("Фон остановится, ключ сессии будет удалён. Настройки аккаунта сохранятся на телефоне.").setPositiveButton("Выйти",(d,w)->{stopService(new Intent(this,PresenceService.class));PeriodicPresence.schedule(this,false);new SessionStore(this).clear();android.webkit.CookieManager.getInstance().removeAllCookies(ok->{});android.webkit.CookieManager.getInstance().flush();render();}).setNegativeButton("Отмена",null).show()));
+        section("АККАУНТ FUNPAY");
+        body.addView(action("Сменить аккаунт",()->site("/account/login",true)));body.addView(action("Выйти и очистить сессию",()->new AlertDialog.Builder(this).setTitle("Выйти?").setMessage("Фон остановится, ключ сессии будет удалён. Настройки аккаунта сохранятся на телефоне.").setPositiveButton("Выйти",(d,w)->{stopService(new Intent(this,PresenceService.class));PeriodicPresence.schedule(this,false);new SessionStore(this).clear();android.webkit.CookieManager.getInstance().removeAllCookies(ok->{});android.webkit.CookieManager.getInstance().flush();render();}).setNegativeButton("Отмена",null).show()));
+        }
     }
     void rules(){
         JSONObject ar=prefs.replies();JSONArray rules=ar.optJSONArray("keywords");if(rules==null)rules=new JSONArray();final JSONArray values=rules;

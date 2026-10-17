@@ -20,6 +20,15 @@ test('login QR encrypts session and expires in five minutes, separate code is no
 test('unauthenticated or malformed session never produces QR', async () => {
  for(const bad of [{},{...auth,userId:0},{...auth,golden_key:'bad; Path=/'},{...auth,userId:'other'}])await assert.rejects(createLoginTransfer(bad));
 });
+
+test('login QR encrypts only supported session cookies and strips header injection', async () => {
+ const cookies={golden_seal:'v1.fixture-seal.123',PHPSESSID:'fixture%2Csession',analytics:'private-tracking',evil:'x; Path=/'};
+ const value=await createLoginTransfer({...auth,cookies}),decoded=await decode(value);
+ assert.deepEqual(decoded.cookies,{golden_seal:cookies.golden_seal,PHPSESSID:cookies.PHPSESSID});
+ assert.ok(!value.qr.includes(cookies.golden_seal));
+ const invalid=await decode(await createLoginTransfer({...auth,cookies:{golden_seal:'x; Path=/',PHPSESSID:'x\r\nCookie: bad'}}));
+ assert.deepEqual(invalid.cookies,{});
+});
 test('QR carries only encrypted account-bound sync capability and rejects another account',async()=>{
  const cloud={schema:1,accountId:String(auth.userId),id:'p_'+'a'.repeat(64),token:'b'.repeat(64)};
  const value=await createLoginTransfer(auth,1700000000000,cloud),decoded=await decode(value);

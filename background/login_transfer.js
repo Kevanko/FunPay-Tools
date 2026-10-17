@@ -20,7 +20,7 @@ export async function createLoginTransfer(auth, now = Date.now(), cloud = null) 
     const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 210000, hash: 'SHA-256' }, material, { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
     const expires = now + 5 * 60 * 1000;
     if(cloud && (cloud.schema!==1 || cloud.accountId!==String(auth.userId) || !/^p_[a-f0-9]{64}$/.test(cloud.id||'') || !/^[a-f0-9]{64}$/.test(cloud.token||'')))throw Error('Ключ синхронизации не соответствует аккаунту');
-    const payload = new TextEncoder().encode(JSON.stringify({ uid: String(auth.userId), name: String(auth.username || 'Аккаунт FunPay').slice(0, 80), golden_key: auth.golden_key, issued: now, expires, ...(cloud?{cloud:{schema:1,accountId:cloud.accountId,id:cloud.id,token:cloud.token}}:{}) }));
+    const payload = new TextEncoder().encode(JSON.stringify({ uid: String(auth.userId), name: String(auth.username || 'Аккаунт FunPay').slice(0, 80), golden_key: auth.golden_key, cookies: Object.fromEntries(Object.entries(auth.cookies || {}).filter(([name,value]) => ['golden_seal','PHPSESSID'].includes(name) && typeof value === 'string' && /^[A-Za-z0-9_~.%+\/-]{1,512}$/.test(value))), issued: now, expires, ...(cloud?{cloud:{schema:1,accountId:cloud.accountId,id:cloud.id,token:cloud.token}}:{}) }));
     const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: AAD }, key, payload));
     return { qr: PREFIX + JSON.stringify({ salt: b64(salt), iv: b64(iv), ct: b64(ciphertext) }), code: plainCode.match(/.{4}/g).join('-'), expires };
 }
