@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "FunPay Tools",
-    "version": "3.23.0",
+    "version": "3.24.0",
     "description": "Инструменты продавца для FunPay: статистика продаж, автоматизация, авто-выдача, массовые действия с лотами, темы оформления.",
     "permissions": [
         "storage",
@@ -32,7 +32,9 @@
         "https://fonts.gstatic.com/*",
         "https://support.funpay.com/*",
         "https://api.telegram.org/*",
-        "http://*/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*",
+        "http://[::1]/*",
         "https://github.com/*",
         "https://release-assets.githubusercontent.com/*"
     ],

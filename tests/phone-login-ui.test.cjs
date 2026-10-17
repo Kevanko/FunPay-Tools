@@ -11,11 +11,11 @@ function screen(response){
 }
 test('missing account leaves login QR hidden and allows retry',async()=>{
  const dom=screen({ok:false,error:'Сначала войдите в FunPay'}),w=dom.window;
- try{await w.FPTPhoneTransfer.mount(w.document.querySelector('#root'),{});await w.document.querySelector('#login-create').onclick();assert.equal(w.document.querySelector('#login-transfer').hidden,true);assert.equal(w.document.querySelector('#login-code').textContent,'');assert.equal(w.document.querySelector('#login-create').disabled,false);assert.match(w.document.querySelector('#login-status').textContent,/Сначала войдите/);}finally{w.close();}
+ try{await w.FPTPhoneTransfer.mount(w.document.querySelector('#root'),{});await w.document.querySelector('#login-create').onclick();assert.equal(w.document.querySelector('#login-transfer').hidden,true);assert.equal(w.document.querySelector('#login-code'),null);assert.equal(w.document.querySelector('#login-create').disabled,false);assert.match(w.document.querySelector('#login-status').textContent,/Сначала войдите/);}finally{w.close();}
 });
-test('hiding extension clears both session QR and separate code from DOM',async()=>{
- const dom=screen({ok:true,qr:'FPTLOGIN1:synthetic-fixture',code:'ABCD-EFGH-JKLM-NPQR',expires:Date.now()+300000}),w=dom.window;
- try{await w.FPTPhoneTransfer.mount(w.document.querySelector('#root'),{});await w.document.querySelector('#login-create').onclick();assert.equal(w.document.querySelector('#login-transfer').hidden,false);assert.match(w.document.querySelector('#login-code').textContent,/ABCD/);Object.defineProperty(w.document,'hidden',{value:true,configurable:true});w.document.dispatchEvent(new w.Event('visibilitychange'));assert.equal(w.document.querySelector('#login-transfer').hidden,true);assert.equal(w.document.querySelector('#login-code').textContent,'');assert.equal(w.document.querySelector('#login-create').disabled,false);}finally{w.close();}
+test('scan-only login has no code field and hides session QR when extension loses visibility',async()=>{
+ const dom=screen({ok:true,qr:'FPTLOGIN2:synthetic-fixture',accounts:2,expires:Date.now()+300000}),w=dom.window;
+ try{await w.FPTPhoneTransfer.mount(w.document.querySelector('#root'),{});await w.document.querySelector('#login-create').onclick();assert.equal(w.document.querySelector('#login-transfer').hidden,false);assert.equal(w.document.querySelector('#login-code'),null);assert.match(w.document.querySelector('#login-position').textContent,/Наведите/);Object.defineProperty(w.document,'hidden',{value:true,configurable:true});w.document.dispatchEvent(new w.Event('visibilitychange'));assert.equal(w.document.querySelector('#login-transfer').hidden,true);assert.equal(w.document.querySelector('#login-code'),null);assert.equal(w.document.querySelector('#login-create').disabled,false);}finally{w.close();}
 });
 
 test('failed settings encoding hides empty canvas and exposes a readable error',async()=>{

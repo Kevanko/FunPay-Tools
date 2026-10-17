@@ -26,7 +26,8 @@ export const SMART_BUMP_ALARM = 'fpToolsSmartBump';
 // тикает сам по себе каждые N минут, а сам цикл поднимает только «созревшие» категории
 // (nextRaiseAt), поэтому лишних запросов нет. Просто и надёжно — как обычное авто-поднятие.
 const SMART_BUMP_PERIOD_MIN = 10;
-const STATE_KEY = 'fpToolsSmartBumpState'; // { [categoryUrl]: { nextRaiseAt, name } }
+const STATE_KEY = 'fpToolsSmartBumpState'; // legacy (общий для всех аккаунтов)
+const stateKeyFor = uid => STATE_KEY + '__' + uid;   // { [categoryUrl]: { nextRaiseAt, name } } — по userId
 
 // Ported from FP Tools utils.parse_wait_time - returns seconds to wait.
 function parseWaitTime(msg) {
@@ -43,11 +44,18 @@ function parseWaitTime(msg) {
 
 const parseHtmlViaOffscreen = parseOffscreen;
 
+let _authMemo = null;   // { gk, ts, val } — кэш на 5 мин по значению golden_key (смена аккаунта = другой ключ)
 async function getAuth() {
     // Авторизация идёт ambient-кукой активного аккаунта (credentials:'include'). Ручной
     // заголовок Cookie в service worker браузер ВЫРЕЗАЕТ (forbidden header).
     const gk = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
     if (!gk?.value) return null;
+    if (_authMemo && _authMemo.gk === gk.value && Date.now() - _authMemo.ts < 300000) return _authMemo.val;
+    const val = await getAuthFresh(gk.value);
+    if (val) _authMemo = { gk: gk.value, ts: Date.now(), val };
+    return val;
+}
+async function getAuthFresh(goldenKey) {
 
     // ИСТОЧНИК ИСТИНЫ об АКТИВНОМ аккаунте — главная с ambient-кукой: она всегда отдаёт
     // данные того аккаунта, чьим golden_key мы залогинены сейчас. Раньше первым шёл перебор
@@ -63,7 +71,7 @@ async function getAuth() {
         if (m) {
             const d = JSON.parse(m[1].replace(/&quot;/g, '"'));
             const u = Array.isArray(d) ? d[0] : d;
-            if (u?.['csrf-token'] && u.userId) return { csrfToken: u['csrf-token'], userId: u.userId };
+            if (u?.['csrf-token'] && u.userId) return { csrfToken: u['csrf-token'], userId: u.userId, goldenKey };
         }
     } catch (_) {}
 
@@ -75,7 +83,7 @@ async function getAuth() {
             const r = await chrome.tabs.sendMessage(tab.id, { action: 'getAppData' });
             if (r?.success) {
                 const d = Array.isArray(r.data) ? r.data[0] : r.data;
-                if (d?.['csrf-token'] && d.userId) return { csrfToken: d['csrf-token'], userId: d.userId };
+                if (d?.['csrf-token'] && d.userId) return { csrfToken: d['csrf-token'], userId: d.userId, goldenKey };
             }
         } catch (_) {}
     }
@@ -146,12 +154,13 @@ async function raiseCategory(categoryUrl, auth) {
     return { ok: false, waitSec: 600, name };
 }
 
-async function getState() {
-    const { [STATE_KEY]: st = {} } = await chrome.storage.local.get(STATE_KEY);
+async function getState(uid) {
+    const k = stateKeyFor(uid);
+    const { [k]: st = {} } = await chrome.storage.local.get(k);
     return st;
 }
-async function setState(st) {
-    await chrome.storage.local.set({ [STATE_KEY]: st });
+async function setState(uid, st) {
+    await chrome.storage.local.set({ [stateKeyFor(uid)]: st });
 }
 
 function logToTabs(message) {
@@ -185,7 +194,9 @@ export async function runSmartBumpCycle() {
             return;
         }
 
-        const state = await getState();
+        const auth = await getAuth();
+        if (!auth) { logToTabs('Умное поднятие: нет авторизации (откройте вкладку FunPay).'); return; }
+        const state = await getState(auth.userId);
         const now = Date.now();
 
         // Дешёвый ранний выход: если по сохранённому состоянию ни одна категория ещё не созрела,
@@ -199,11 +210,8 @@ export async function runSmartBumpCycle() {
         const { fpToolsSelectiveBumpEnabled, fpToolsSelectedBumpCategories, fpToolsBumpOnlyAutoDelivery } =
             await chrome.storage.local.get(['fpToolsSelectiveBumpEnabled', 'fpToolsSelectedBumpCategories', 'fpToolsBumpOnlyAutoDelivery']);
 
-        const auth = await getAuth();
-        if (!auth) { logToTabs('Умное поднятие: нет авторизации (откройте вкладку FunPay).'); return; }
-
         const userUrl = `https://funpay.com/users/${auth.userId}/`;
-        const userHtml = await (await fpFetch(userUrl, { credentials: 'include', cache: 'no-store' })).text();
+        const userHtml = await (await withCookieLock(() => fpFetch(userUrl, { credentials: 'include', cache: 'no-store' }))).text();
         let categories = await parseHtmlViaOffscreen(userHtml, 'parseUserCategories');
         if (!Array.isArray(categories)) categories = [];
 
@@ -229,7 +237,13 @@ export async function runSmartBumpCycle() {
             if (entry && entry.nextRaiseAt > now) continue; // ещё не созрело
 
             try {
-                const { ok, waitSec, name } = await raiseCategory(url, auth);
+                // страница категории + raise под общим замком и с перепроверкой куки: heartbeat/переключение
+                // аккаунта не должны подменить golden_key посреди поднятия (иначе поднимем чужой аккаунт)
+                const { ok, waitSec, name } = await withCookieLock(async () => {
+                    const cur = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
+                    if (!cur?.value || cur.value !== auth.goldenKey) throw new Error('аккаунт изменился');
+                    return raiseCategory(url, auth);
+                });
                 state[url] = { nextRaiseAt: now + Math.max(waitSec, 30) * 1000, name };
                 if (ok) {
                     raisedNames.push(name);
@@ -244,7 +258,7 @@ export async function runSmartBumpCycle() {
             // Персистим ПОСЛЕ КАЖДОЙ категории: если MV3 усыпит воркер в середине прохода,
             // уже поднятые категории сохранят свой nextRaiseAt и не будут подняты повторно
             // (раньше state писался только в конце → eviction приводил к двойному поднятию → 429).
-            await setState(state);
+            await setState(auth.userId, state);
             await new Promise(r => setTimeout(r, 3000)); // pacing between categories
         }
     } catch (e) {
@@ -263,5 +277,6 @@ export async function startSmartBump() {
 
 export async function stopSmartBump() {
     await chrome.alarms.clear(SMART_BUMP_ALARM);
-    await chrome.storage.local.remove(STATE_KEY);
+    const all = await chrome.storage.local.get(null);
+    await chrome.storage.local.remove([STATE_KEY, ...Object.keys(all).filter(k => k.startsWith(STATE_KEY + '__'))]);
 }

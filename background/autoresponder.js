@@ -46,6 +46,8 @@ export async function fpFetch(url, options) {
         if (gap > 0) await _sleep(gap);
         _fpLastReq = Date.now();
         let res;
+        // один зависший запрос не должен вечно держать всю очередь _fpReqChain
+        if (!options?.signal) options = { ...(options || {}), signal: AbortSignal.timeout(30000) };
         try { res = await fetch(url, options); }
         catch (e) { _fpRlUntil = Math.max(_fpRlUntil, Date.now() + 4000); throw e; }   // сетевой сбой — тоже притормозим
         if (res.status === 429 || res.status >= 500) {
@@ -228,7 +230,7 @@ async function sendChatMessageRaw(chatId, text, auth) {
     if (!res.ok) throw new Error(`sendMessage HTTP ${res.status}`);
     const json = await res.json();
     if (!json || typeof json !== 'object') throw new Error('Некорректное подтверждение отправки');
-    if (json?.error) throw new Error(`FunPay runner error: ${json.error}`);
+    if (json?.error) { invalidateAmbientAuth(); throw new Error(`FunPay runner error: ${json.error}`); }
     console.log(`FP Tools AR: → чат ${chatId}`);
 }
 
@@ -647,7 +649,7 @@ async function handleOrderConfirmed(msg, auth, settings) {
 
 async function verifyPaidOrder(orderId) {
     let cursor = null;
-    for (let page = 0; page < 60; page++) {
+    for (let page = 0; page < 5; page++) {
         const url = 'https://funpay.com/orders/trade?state=paid' + (cursor ? '&continue=' + encodeURIComponent(cursor) : '');
         const res = await fetchWithRetry(url, {});
         if (!res.ok) throw new Error('Не удалось проверить оплату заказа');
@@ -690,7 +692,8 @@ async function handleAutoDelivery(msg, auth, settings) {
 
         const { secrets, lotId, nodeId, buyerChatId } = orderInfo;
         if (!buyerChatId || String(msg.chatId) !== String(buyerChatId)) throw new Error('Чат покупателя не подтверждён');
-        if (!(await verifyPaidOrder(orderId))) throw new Error('Оплаченный статус заказа не подтверждён');
+        // заказ не оплачен / возвращён — финальный пропуск, ретраить бессмысленно
+        if (!(await verifyPaidOrder(orderId))) { console.log(`FP Tools AR: заказ #${orderId} не в статусе «оплачен» — автовыдача пропущена`); return; }
         const chatId = buyerChatId;
 
         
@@ -821,7 +824,7 @@ async function _runAutoResponderCycleInner() {
             body: new URLSearchParams(runnerPayload)
         }, { retries: 2, baseDelay: 600 });
 
-        if (!res.ok) throw new Error(`Runner HTTP ${res.status}`);
+        if (!res.ok) { invalidateAmbientAuth(); throw new Error(`Runner HTTP ${res.status}`); }
         const data = await res.json();
         const chatObj = data.objects?.find(o => o.type === 'chat_bookmarks');
         if (!chatObj || !chatObj.data?.html) return;
@@ -841,13 +844,20 @@ async function _runAutoResponderCycleInner() {
         for (const chat of discovered) {
             if (!isFirstRun && !chat.lastByBot && (chat.nodeMsg != null ? chat.nodeMsg > (lastSeen[chat.chatId] || 0) : chat.isUnread)) {
                 const id = chat.chatId + ':' + (chat.nodeMsg ?? chat.msgId);
-                if (!pending[id]) pending[id] = { ...chat, retryAt: 0 };
+                if (!pending[id]) pending[id] = { ...chat, retryAt: 0, attempts: 0, firstSeenAt: Date.now() };
             }
         }
         await atomicUpdate(s => { s.pendingEvents = pending; });
         const chats = isFirstRun ? discovered : Object.values(pending).filter(c => (c.retryAt || 0) <= Date.now());
         for (const chat of chats) {
             const eventId = chat.chatId + ':' + (chat.nodeMsg ?? chat.msgId);
+            // событие, которое не удаётся обработать ~5 раз или целый час, бросаем (иначе вечный ретрай)
+            if (!isFirstRun && ((chat.attempts || 0) >= 5 || (chat.firstSeenAt && Date.now() - chat.firstSeenAt > 3600000))) {
+                console.warn('FP Tools AR: событие отброшено после неудачных попыток', eventId);
+                delete pending[eventId];
+                if (chat.nodeMsg != null) updates[chat.chatId] = Math.max(lastSeen[chat.chatId] || 0, updates[chat.chatId] || 0, chat.nodeMsg);
+                continue;
+            }
             _eventFailed = false;
             _outgoingScope = eventId;
             const nodeMsg = chat.nodeMsg;            // last message id in the chat
@@ -910,7 +920,7 @@ async function _runAutoResponderCycleInner() {
 
             } catch (e) { _eventFailed = true; console.warn('FP Tools: событие отложено', e.message); }
             if (_eventFailed) {
-                pending[eventId] = { ...chat, retryAt: Date.now() + 30000 };
+                pending[eventId] = { ...chat, attempts: (chat.attempts || 0) + 1, firstSeenAt: chat.firstSeenAt || Date.now(), retryAt: Date.now() + 30000 * ((chat.attempts || 0) + 1) };
                 delete updates[chat.chatId];
                 continue;
             }
@@ -949,6 +959,7 @@ async function _runAutoResponderCycleInner() {
 
     } catch (e) {
         console.error('FP Tools AR: ошибка цикла', e.message);
+        invalidateAmbientAuth();   // ошибка раннера/4xx — csrf мог протухнуть, перечитаем
     }
 }
 
@@ -1033,7 +1044,21 @@ async function withAccountCookie(key, fn) {
 }
 
 // csrf + userId текущего (ambient) аккаунта.
+// Кэш csrf/userId на ~5 минут по значению golden_key (+PHPSESSID для активного аккаунта):
+// главная страница больше не качается на каждый 3-секундный опрос. Смена аккаунта меняет ключ.
+const _authCache = new Map();    // key -> { ts, csrf_token, userId, username }
+const AUTH_CACHE_TTL = 5 * 60 * 1000;
+export function invalidateAmbientAuth() { _authCache.clear(); }
 async function _ambientAuth() {
+    const gk0 = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
+    const php0 = await chrome.cookies.get({ url: 'https://funpay.com', name: 'PHPSESSID' });
+    const cacheKey = _dnrCtx ? 'dnr:' + _dnrCtx : (gk0?.value ? 'amb:' + gk0.value + '|' + (php0?.value || '') : '');
+    const hit = cacheKey && _authCache.get(cacheKey);
+    // для DNR-контекста нужен ещё свежий PHPSESSID из _phpCache (его даёт прогревочный запрос)
+    const phpFresh = !_dnrCtx || (_phpCache[_dnrCtx] && Date.now() - _phpCache[_dnrCtx].ts < 20 * 60 * 1000);
+    if (hit && phpFresh && Date.now() - hit.ts < AUTH_CACHE_TTL) {
+        return { csrf_token: hit.csrf_token, userId: hit.userId, username: hit.username, golden_key: _dnrCtx || gk0?.value || '', phpsessid: _dnrCtx ? (_phpCache[_dnrCtx]?.php || '') : (php0?.value || '') };
+    }
     const res = await fetchWithRetry('https://funpay.com/', { credentials: 'include', cache: 'no-store' });
     const text = await res.text();
     const m = text.match(/<body[^>]*data-app-data="([^"]+)"/);
@@ -1043,6 +1068,8 @@ async function _ambientAuth() {
     if (!u || !u['csrf-token'] || !u.userId) return null;
     const gk = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
     const php = await chrome.cookies.get({ url: 'https://funpay.com', name: 'PHPSESSID' });
+    const ck = _dnrCtx ? 'dnr:' + _dnrCtx : (gk?.value ? 'amb:' + gk.value + '|' + (php?.value || '') : '');
+    if (ck) _authCache.set(ck, { ts: Date.now(), csrf_token: u['csrf-token'], userId: u.userId, username: u.userName });
     return { csrf_token: u['csrf-token'], userId: u.userId, username: u.userName, golden_key: _dnrCtx || gk?.value || '', phpsessid: _dnrCtx ? (_phpCache[_dnrCtx]?.php || '') : (php?.value || '') };
 }
 
@@ -1057,7 +1084,7 @@ async function _ambientChats(auth) {
         headers: { 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8', 'x-requested-with': 'XMLHttpRequest' },
         body: new URLSearchParams(payload)
     }, { retries: 2, baseDelay: 600 });
-    if (!res.ok) throw new Error(`runner HTTP ${res.status}`);
+    if (!res.ok) { invalidateAmbientAuth(); throw new Error(`runner HTTP ${res.status}`); }
     const data = await res.json();
     const chatObj = data.objects?.find(o => o.type === 'chat_bookmarks');
     if (!chatObj?.data?.html) return [];

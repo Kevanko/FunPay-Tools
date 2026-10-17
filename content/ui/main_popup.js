@@ -74,6 +74,7 @@ function createMainPopup() {
     const toolsPopup = document.createElement('div');
     toolsPopup.className = 'fp-tools-popup';
     toolsPopup.setAttribute('role', 'dialog');
+    toolsPopup.setAttribute('aria-modal', 'true');
     toolsPopup.setAttribute('aria-label', 'Настройки FP Tools');
     toolsPopup.innerHTML = `
         <div class="fp-tools-header">
@@ -1424,7 +1425,7 @@ function refineSettingsLayout(root) {
         const note=root.querySelector('.fpt-preferences-note');if(note)note.textContent='Изменения сохраняются автоматически';
         const group=groups.find(([title])=>title===category);
         root.querySelectorAll('.fp-tools-page-content').forEach(page=>page.classList.remove('active'));
-        root.querySelectorAll('.fp-tools-nav li[data-page]').forEach(item=>item.classList.remove('active'));
+        root.querySelectorAll('.fp-tools-nav li[data-page]').forEach(item=>{item.classList.remove('active');item.removeAttribute('aria-current');});
         root.querySelectorAll('.fpt-nav-group-toggle').forEach(button=>button.classList.toggle('is-current',button.querySelector('span').textContent===category));
         catalog.replaceChildren();catalog.hidden=false;
         const header=document.createElement('header');header.className='fpt-settings-pagehead';
@@ -1611,8 +1612,9 @@ function setupPopupNavigation() {
             toolsPopup.querySelectorAll('.fpt-nav-group-toggle').forEach(button=>button.classList.toggle('is-current',button.querySelector('span').textContent===selectedGroup));
             if(li.hidden&&li.dataset.secondary==='true')toolsPopup.querySelector('.fpt-nav-more')?.click();
 
-            navItems.forEach(item => item.classList.remove('active'));
+            navItems.forEach(item => { item.classList.remove('active'); item.removeAttribute('aria-current'); });
             li.classList.add('active');
+            li.setAttribute('aria-current', 'page');
             
             contentPages.forEach(page => {
                 page.classList.toggle('active', page.dataset.page === pageId);

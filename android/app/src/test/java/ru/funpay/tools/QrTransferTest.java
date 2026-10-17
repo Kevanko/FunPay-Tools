@@ -15,4 +15,9 @@ public class QrTransferTest {
     }
     @Test public void mixedTransferRejected() throws Exception{QrTransfer t=new QrTransfer();t.accept("FPTQR1:transfer-one:1:2:AAAA");try{t.accept("FPTQR1:transfer-two:2:2:AAAA");fail();}catch(IOException expected){assertTrue(expected.getMessage().contains("другого"));}}
     @Test public void downloadQrIsNotSettings() throws Exception{try{new QrTransfer().accept("https://github.com/Kevanko/FunPay-Tools/releases/latest/download/FunPay-Pocket-latest.apk");fail();}catch(IOException expected){}}
+    @Test public void multipartLoginReturnsLoginMarkerAndResetsFrames() throws Exception {
+        String raw="FPTLOGIN2:{\"key\":\"fixture\"}";QrTransfer transfer=new QrTransfer();JSONObject result=null;
+        for(String frame:encode(raw))result=transfer.accept(frame);
+        assertEquals(raw,result.getString("_loginQR"));assertEquals(0,transfer.total);assertTrue(transfer.chunks.isEmpty());
+    }
 }

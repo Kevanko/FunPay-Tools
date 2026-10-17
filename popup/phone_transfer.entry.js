@@ -18,10 +18,13 @@ export async function mountPhoneTransfer(root,data){
  root.querySelector('#qr-prev').onclick=()=>{if(index>0){index--;draw();}};root.querySelector('#qr-next').onclick=()=>{if(index<payload.length-1){index++;draw();}};
  root.querySelector('#qr-hide').onclick=()=>{area.hidden=true;payload=[];const canvas=root.querySelector('#settings-qr');canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);};
  const section=document.createElement('section');section.className='fpt-phone-section';
- section.innerHTML='<p class="fpt-phone-step">02 / Аккаунт и синхронизация</p><h2 class="fpt-h2">Войдите на телефоне</h2><p class="fpt-desc">Выберите «Войти по QR с компьютера» в приложении и введите код рядом с QR. Настройки переносятся отдельным QR ниже. Показывайте код только своему телефону.</p><button class="btn btn-soft" id="login-create">Создать QR входа</button><p id="login-status" class="fpt-desc" role="status"></p><div id="login-transfer" hidden><canvas id="login-qr" aria-label="QR входа на телефоне"></canvas><p class="fpt-desc">Код подтверждения</p><code id="login-code"></code><button id="login-hide" class="btn btn-ghost">Скрыть QR и код</button></div>';
+ section.innerHTML='<p class="fpt-phone-step">02 / Аккаунты и настройки</p><h2 class="fpt-h2">Войдите на телефоне</h2><p class="fpt-desc">Отсканируйте QR в приложении и подтвердите вход. Сохранённые аккаунты и настройки добавятся вместе. QR содержит доступ к аккаунтам: не сохраняйте и не пересылайте его.</p><button class="btn btn-soft" id="login-create">Создать QR входа</button><p id="login-status" class="fpt-desc" role="status"></p><div id="login-transfer" hidden><canvas id="login-qr" aria-label="QR входа на телефоне"></canvas><p id="login-position" class="fpt-desc"></p><div class="fpt-qr-controls"><button id="login-prev" class="btn btn-ghost" hidden>← Предыдущий</button><button id="login-next" class="btn btn-ghost" hidden>Следующий →</button></div><button id="login-hide" class="btn btn-ghost">Скрыть QR</button></div>';
  root.insertBefore(section,root.querySelector('#phone-settings-section'));
- const loginArea=section.querySelector('#login-transfer'),loginStatus=section.querySelector('#login-status'),create=section.querySelector('#login-create');let timer,epoch=0;
- const clear=()=>{epoch++;clearInterval(timer);document.removeEventListener('visibilitychange',onVisibility);loginArea.hidden=true;section.querySelector('#login-code').textContent='';const c=section.querySelector('#login-qr');c.getContext('2d').clearRect(0,0,c.width,c.height);create.disabled=false;};
+ const loginArea=section.querySelector('#login-transfer'),loginStatus=section.querySelector('#login-status'),create=section.querySelector('#login-create');let timer,epoch=0,loginFrames=[],loginIndex=0;
+ const clear=()=>{epoch++;clearInterval(timer);document.removeEventListener('visibilitychange',onVisibility);loginArea.hidden=true;loginFrames=[];loginIndex=0;section.querySelector('#login-position').textContent='';const c=section.querySelector('#login-qr');c.getContext('2d').clearRect(0,0,c.width,c.height);create.disabled=false;};
+ const drawLogin=async()=>{await paint(section.querySelector('#login-qr'),loginFrames[loginIndex]);section.querySelector('#login-position').textContent=loginFrames.length>1?`QR ${loginIndex+1} из ${loginFrames.length}. Отсканируйте все части.`:'Наведите камеру телефона на QR';for(const id of ['login-prev','login-next'])section.querySelector('#'+id).hidden=loginFrames.length<2;section.querySelector('#login-prev').disabled=loginIndex===0;section.querySelector('#login-next').disabled=loginIndex===loginFrames.length-1;};
+ section.querySelector('#login-prev').onclick=()=>{if(loginIndex>0){loginIndex--;drawLogin();}};
+ section.querySelector('#login-next').onclick=()=>{if(loginIndex<loginFrames.length-1){loginIndex++;drawLogin();}};
  const onVisibility=()=>{if(document.hidden){clear();loginStatus.textContent='QR скрыт. Для входа создайте новый.';}};
  section.querySelector('#login-hide').onclick=()=>{clear();loginStatus.textContent='';};
  const popup=['popup/popup.html','popup/phone.html'].some(path=>globalThis.location?.href===chrome.runtime.getURL(path));
@@ -33,10 +36,10 @@ export async function mountPhoneTransfer(root,data){
    if(current!==epoch)return;
    if(!result?.ok)throw Error(result?.error||'Не удалось создать QR');
    if(document.hidden||!root.isConnected){clear();loginStatus.textContent='Для входа создайте новый QR.';return;}
-   await paint(section.querySelector('#login-qr'),result.qr);
+   loginFrames=result.qr.length>1800?frames(result.qr):[result.qr];loginIndex=0;loginArea.hidden=false;await drawLogin();
    if(current!==epoch)return;
-   section.querySelector('#login-code').textContent=result.code;loginArea.hidden=false;document.addEventListener('visibilitychange',onVisibility);
-   const tick=()=>{if(!root.isConnected||Date.now()>=result.expires){clear();loginStatus.textContent='Срок QR истёк. Создайте новый.';return;}const seconds=Math.ceil((result.expires-Date.now())/1000);loginStatus.textContent=`Действует ещё ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;};
+   loginArea.hidden=false;document.addEventListener('visibilitychange',onVisibility);
+   const tick=()=>{if(!root.isConnected||Date.now()>=result.expires){clear();loginStatus.textContent='Срок QR истёк. Создайте новый.';return;}const seconds=Math.ceil((result.expires-Date.now())/1000);loginStatus.textContent=`Для импорта осталось ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;};
    tick();if(!loginArea.hidden)timer=setInterval(tick,1000);
   }catch(e){if(current===epoch){clear();loginStatus.textContent=e.message;}}
   finally{clearTimeout(timeout);}

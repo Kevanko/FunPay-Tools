@@ -1,4 +1,5 @@
 let bottomBarObserver = null;
+let bottomBarHeaderTimer = null;
 const BOTTOM_BAR_STYLE_ID = 'fp-tools-bottom-bar-style';
 const THEME_OVERRIDE_STYLE_ID = 'fp-tools-theme-override';
 
@@ -80,6 +81,7 @@ function enableBottomBar() {
 
     applyDropupClassForBottomBar();
 
+    if (bottomBarObserver) bottomBarObserver.disconnect();
     bottomBarObserver = new MutationObserver((mutationsList) => {
         for(const mutation of mutationsList) {
             if (mutation.type === 'childList' && document.querySelector('#header li.dropdown:not(.dropup)')) {
@@ -88,17 +90,24 @@ function enableBottomBar() {
         }
     });
 
-    const ensureHeaderExists = setInterval(() => {
+    if (bottomBarHeaderTimer) clearInterval(bottomBarHeaderTimer);
+    let headerTries = 0;
+    bottomBarHeaderTimer = setInterval(() => {
         const header = document.getElementById('header');
-        if (header) {
-            clearInterval(ensureHeaderExists);
+        if (header && bottomBarObserver) {
+            clearInterval(bottomBarHeaderTimer);
+            bottomBarHeaderTimer = null;
             applyDropupClassForBottomBar();
             bottomBarObserver.observe(header, { childList: true, subtree: true });
+        } else if (++headerTries > 100 || !bottomBarObserver) { // ~10 c
+            clearInterval(bottomBarHeaderTimer);
+            bottomBarHeaderTimer = null;
         }
     }, 100);
 }
 
 function disableBottomBar() {
+    if (bottomBarHeaderTimer) { clearInterval(bottomBarHeaderTimer); bottomBarHeaderTimer = null; }
     const styleEl = document.getElementById(BOTTOM_BAR_STYLE_ID);
     if (styleEl) styleEl.remove();
 

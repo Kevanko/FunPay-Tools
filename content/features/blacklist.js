@@ -31,8 +31,8 @@ function initializeBlacklist() {
         listEl.innerHTML = fpToolsBlacklist.map((entry, i) => `
             <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#0e0f16;border:1px solid #1e2030;border-radius:7px;margin-bottom:6px;">
                 <span style="flex:1;font-size:13px;color:#d8dae8;font-weight:600;">
-                    ${entry.username}
-                    ${entry.note ? `<span style="color:#7a7f9a; font-weight:normal; font-size:11px; margin-left:6px;">(${entry.note})</span>` : ''}
+                    ${_blEsc(entry.username)}
+                    ${entry.note ? `<span style="color:#7a7f9a; font-weight:normal; font-size:11px; margin-left:6px;">(${_blEsc(entry.note)})</span>` : ''}
                 </span>
                 <label title="Блокировать авто-выдачу" style="display:flex;align-items:center;gap:4px;font-size:11px;color:#5a5f7a;cursor:pointer;">
                     <input type="checkbox" class="fp-bl-delivery" data-username="${_blEsc(entry.username)}" ${entry.blockDelivery ? 'checked' : ''} style="accent-color:#e05252;"> Выдача

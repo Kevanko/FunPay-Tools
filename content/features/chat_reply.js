@@ -323,11 +323,12 @@
 
         // SPA-навигация между чатами: сбрасываем активный ответ при смене чата (node=),
         // чтобы плашка-цитата не «переехала» к другому покупателю.
-        let _replyLastNode = _fptReplyNode();
+        // Дешёвый опрос: без активного ответа тик — no-op.
         setInterval(() => {
+            if (!activeReply) return;
             const n = _fptReplyNode();
-            if (n !== _replyLastNode) { _replyLastNode = n; if (activeReply) cancelReply(); }
-        }, 800);
+            if (activeReply.node && activeReply.node !== n) cancelReply();
+        }, 1000);
     }
 
     function applyReplyToInput(inp) {
@@ -511,13 +512,14 @@
     // строкой. Заменяем на иконку ответа + сам ответ (часть после ╰).
     function renderContactPreviews(scope) {
         const root = scope && scope.querySelectorAll ? scope : document;
-        const items = root.querySelectorAll('.contact-item-message:not([data-fpt-prev])');
+        const items = root.querySelectorAll('.contact-item-message');
         items.forEach(el => {
             const raw = el.textContent || '';
+            // флаг привязан к тексту: FunPay перезаписывает превью новым сообщением
+            if (el.dataset.fptPrev === raw) return;
             // допускаем как многострочный, так и однострочный вариант
             const m = raw.match(/╭─\s*⤸\s*([\s\S]*?)\s*╰\s*([\s\S]*)$/);
-            if (!m) { el.dataset.fptPrev = '1'; return; }
-            el.dataset.fptPrev = '1';
+            if (!m) { el.dataset.fptPrev = raw; return; }
             const replyText = (m[2] || '').replace(/\s+/g, ' ').trim() || '…';
             el.innerHTML = '';
             const ico = document.createElement('span');
@@ -528,6 +530,7 @@
             txt.textContent = replyText;
             el.appendChild(ico);
             el.appendChild(txt);
+            el.dataset.fptPrev = el.textContent;
         });
     }
 

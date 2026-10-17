@@ -12,7 +12,7 @@ final class CloudProtocol {
     static final Set<String> KEYS=Collections.unmodifiableSet(new LinkedHashSet<>(Arrays.asList(
         "fpToolsAutoReplies","reviewTemplates","fpToolsSlashCommands","fpToolsTemplateSettings",
         "fpToolsTheme","enableCustomTheme","notificationSound","notificationVolume","fpToolsCursorFx",
-        "keywords","greetingText","autoBumpEnabled","autoBumpCooldown","fpToolsSmartBumpEnabled",
+        "autoBumpEnabled","autoBumpCooldown","fpToolsSmartBumpEnabled",
         "fpToolsBumpNotifyEnabled","fpToolsLiveStyles","enableRedesignedHomepage","showSalesStats",
         "hideBalance","viewSellersPromo","fpToolsDisabledFeatures","fpToolsHeaderButtonStyles",
         "fpToolsShowPaymentType","fpToolsShowUnconfirmed","fpToolsMyEpicNick")));

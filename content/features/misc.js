@@ -689,7 +689,10 @@ async function initializeQuickGamesMenu() {
     renderList(initialGames);
 } 
 
+let _fptMarkAllInit = false;
 function initializeMarkAllAsRead() {
+    if (_fptMarkAllInit || !location.pathname.startsWith('/chat')) return;
+    _fptMarkAllInit = true;
     const observer = new MutationObserver(async (mutationsList, obs) => {
         const header = document.querySelector('.chat-full-header');
         if (!header || document.getElementById('fp-tools-read-all-btn')) {

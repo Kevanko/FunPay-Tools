@@ -16,30 +16,34 @@ const fetch = (url, options = {}) => {
 
 import { fetchAIResponse, fetchAILotGeneration, fetchAITranslation, fetchAIImageGeneration } from './ai.js';
 import { aiConnectionStatus, saveAIConnection, isAISettingsSender, requestGroq, listAIModels } from './ai_provider.js';
-import { BUMP_ALARM_NAME, startAutoBump, stopAutoBump, runBumpCycle } from './autobump.js';
+import { BUMP_ALARM_NAME, startAutoBump, stopAutoBump, runBumpCycle, validBumpPeriod } from './autobump.js';
 import { runAutoResponderCycle, resetAutoResponderState, runMultiAccountAutoReply, withCookieLock, fpIsRateLimited, fpFetch, fetchAccountPage } from './autoresponder.js';
-import { createLoginTransfer, trustedLoginSender } from './login_transfer.js';
+import { createQuickLoginTransfer, trustedLoginSender } from './login_transfer.js';
 import { startEngine, stopEngine, onHeartbeat, onKeepalivePing, ENGINE_HEARTBEAT_ALARM } from './fpt_engine.js';
 import { startSmartBump, stopSmartBump, runSmartBumpCycle, SMART_BUMP_ALARM } from './smart_bump.js';
 import {
     TELEGRAM_ALARM, telegramInit, telegramSyncAlarm, telegramPollOnce,
-    telegramValidateAndResolve, telegramNotifyNewMessages, telegramNotifyNewOrders, tgSendMessage
+    telegramValidateAndResolve, telegramNotifyNewMessages, telegramNotifyNewOrders, tgSendMessage, telegramEnsureFastPoll
 } from './telegram.js';
 
 const OFFSCREEN_DOCUMENT_PATH = 'offscreen/offscreen.html';
 const DISCORD_LOG_ALARM_NAME = 'fpToolsDiscordCheck';
 const AUTO_RESPONDER_ALARM_NAME = 'fpToolsAutoResponder';
 let lastDiscordChatTag = null;
+let lastDiscordUid = '';
 const IMPORT_PROCESS_KEY = 'fpToolsLotImportProcess';
 const RETRY_LIMIT = 5;
 const RETRY_DELAY = 5000; // 5 секунд
 
 // --- ФИНАЛЬНАЯ, ИСПРАВЛЕННАЯ ФУНКЦИЯ СБОРА СТАТИСТИКИ БЕЗ ОГРАНИЧЕНИЙ ---
-let _salesCyclePromise = null;
+const _salesCyclePromises = new Map();   // userId -> promise: цикл одного аккаунта не должен отдаваться другому
 async function runSalesUpdateCycle(expectedAccountId = null) {
-    if (expectedAccountId) { const auth = await withCookieLock(() => getAuthDetailsForBackground()); if (String(auth.userId) !== String(expectedAccountId)) throw new Error('Аккаунт изменился'); }
-    if (!_salesCyclePromise) _salesCyclePromise = runSalesUpdateCycleInner().finally(() => { _salesCyclePromise = null; });
-    return _salesCyclePromise;
+    const auth = await withCookieLock(() => getAuthDetailsForBackground());
+    const uid = String(auth.userId || '');
+    if (expectedAccountId && uid !== String(expectedAccountId)) throw new Error('Аккаунт изменился');
+    if (!/^[0-9]+$/.test(uid)) throw new Error('Не подтвержден владелец истории');
+    if (!_salesCyclePromises.has(uid)) _salesCyclePromises.set(uid, runSalesUpdateCycleInner().finally(() => { _salesCyclePromises.delete(uid); }));
+    return _salesCyclePromises.get(uid);
 }
 async function runSalesUpdateCycleInner() {
     console.log("FP Tools: Запуск полного цикла сбора статистики продаж...");
@@ -252,7 +256,19 @@ async function sendChatTextInBackground(chatId, text) {
   });
 }
 
+// Результат прямого запроса /chat/ кэшируем на 45 с по golden_key+PHPSESSID: десятки обработчиков
+// звали getAuthDetailsForBackground подряд и каждый качал страницу. Смена аккаунта меняет ключ.
+let _authDetailsMemo = null;
 async function getAuthDetailsForBackground() {
+    const gkNow = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
+    const phpNow = gkNow?.value ? await chrome.cookies.get({ url: 'https://funpay.com', name: 'PHPSESSID' }) : null;
+    const memoKey = gkNow?.value ? gkNow.value + '|' + (phpNow?.value || '') : '';
+    if (memoKey && _authDetailsMemo && _authDetailsMemo.key === memoKey && Date.now() - _authDetailsMemo.ts < 45000) return { ..._authDetailsMemo.val };
+    const val = await getAuthDetailsForBackgroundFresh();
+    if (memoKey && val && val.csrf_token && val.userId && val.golden_key === gkNow.value) _authDetailsMemo = { key: memoKey, ts: Date.now(), val: { ...val } };
+    return val;
+}
+async function getAuthDetailsForBackgroundFresh() {
     const goldenKeyCookie = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
     if (!goldenKeyCookie || !goldenKeyCookie.value) {
         console.error("FP Tools: golden_key не найден. Пользователь не авторизован.");
@@ -466,6 +482,10 @@ async function runTelegramCheckCycle() {
     const cfg = fpToolsTelegram || {};
     if (!cfg.enabled || !cfg.token) return;
 
+    // состояние уведомлений ведём по userId активного аккаунта (иначе при смене аккаунта чужие id/seeded)
+    let tgScope = '';
+    try { const a = await getAuthDetailsForBackground(); tgScope = a && a.userId ? String(a.userId) : ''; } catch (_) {}
+
     // 1) команды из бота
     try { await telegramPollOnce(); } catch (e) { console.error('FP Tools: TG poll:', e.message); }
 
@@ -477,7 +497,7 @@ async function runTelegramCheckCycle() {
             // Если Discord активен — он уже кормит Telegram внутри runDiscordCheckCycle.
             if (!discordActive) {
                 const chats = await tgFetchChatList();
-                if (chats.length) await telegramNotifyNewMessages(chats);
+                if (chats.length && tgScope) await telegramNotifyNewMessages(chats, tgScope);
             }
         } catch (e) { console.error('FP Tools: TG msg notify:', e.message); }
     }
@@ -486,7 +506,7 @@ async function runTelegramCheckCycle() {
     if (cfg.notifyOrders) {
         try {
             const orders = await tgFetchOrders(0);
-            if (orders.length) await telegramNotifyNewOrders(orders);
+            if (orders.length && tgScope) await telegramNotifyNewOrders(orders, tgScope);
         } catch (e) { console.error('FP Tools: TG order notify:', e.message); }
     }
 }
@@ -567,6 +587,7 @@ async function cloneCalcNetPrice(auth, nodeId, buyerPrice, currencyCode) {
 }
 
 // --- СЕКЦИЯ РАБОТЫ С DISCORD ---
+// Возвращает true только при успешной доставке (иначе сообщение остаётся «не обработанным»).
 async function sendDiscordNotification(chat, settings) {
     let content = "";
     if (settings.pingEveryone) content += "@everyone ";
@@ -574,6 +595,8 @@ async function sendDiscordNotification(chat, settings) {
 
     const payload = {
         content: content.trim(),
+        // текст покупателя не должен пинговать роли/всех; @everyone/@here — только если включено в настройках
+        allowed_mentions: { parse: (settings.pingEveryone || settings.pingHere) ? ['everyone'] : [] },
         embeds: [{
             author: {
                 name: chat.chatName,
@@ -596,27 +619,33 @@ async function sendDiscordNotification(chat, settings) {
         });
         if (!response.ok) {
             console.error('FP Tools: Не удалось отправить сообщение в Discord, статус:', response.status);
-        } else {
-            console.log(`FP Tools: Уведомление о сообщении от ${chat.chatName} отправлено в Discord.`);
+            return false;
         }
+        console.log(`FP Tools: Уведомление о сообщении от ${chat.chatName} отправлено в Discord.`);
+        return true;
     } catch (error) {
         console.error('FP Tools: Ошибка при отправке сообщения в Discord:', error);
+        return false;
     }
 }
 
 async function runDiscordCheckCycle() {
-    const { fpToolsDiscord, fpToolsProcessedDiscordIds } = await chrome.storage.local.get(['fpToolsDiscord', 'fpToolsProcessedDiscordIds']);
+    const { fpToolsDiscord } = await chrome.storage.local.get('fpToolsDiscord');
 
     if (!fpToolsDiscord || !fpToolsDiscord.enabled || !fpToolsDiscord.webhookUrl) {
         chrome.alarms.clear(DISCORD_LOG_ALARM_NAME);
         return;
     }
     
-    const processedDiscordMessageIds = new Set(fpToolsProcessedDiscordIds || []);
-
     try {
         const auth = await getAuthDetailsForBackground();
         if (!auth.golden_key || !auth.csrf_token || !auth.userId) throw new Error("Нет данных авторизации для Discord-цикла.");
+        // processed/seeded/runner-tag — по userId: у каждого аккаунта своё состояние
+        const uid = String(auth.userId);
+        const idsKey = 'fpToolsProcessedDiscordIds__' + uid, seededKey = 'fpToolsDiscordSeeded__' + uid;
+        if (lastDiscordUid !== uid) { lastDiscordChatTag = null; lastDiscordUid = uid; }
+        const { [idsKey]: fpToolsProcessedDiscordIds } = await chrome.storage.local.get(idsKey);
+        const processedDiscordMessageIds = new Set(fpToolsProcessedDiscordIds || []);
 
         const runnerPayload = {
             objects: JSON.stringify([{
@@ -668,14 +697,14 @@ async function runDiscordCheckCycle() {
         const parsedChats = await parseHtmlViaOffscreen(chatObject.data.html, 'parseChatList');
 
         // Telegram: уведомления о новых сообщениях (тот же источник, что и Discord).
-        try { await telegramNotifyNewMessages(parsedChats); } catch (e) { console.error('FP Tools: TG notify msgs:', e.message); }
+        try { await telegramNotifyNewMessages(parsedChats, uid); } catch (e) { console.error('FP Tools: TG notify msgs:', e.message); }
 
         // 3.0: stop Discord spam. Two fixes:
         //  (1) First-run seeding - if we've never recorded ids, just record current unread ids
         //      and DON'T notify (otherwise enabling Discord blasts every existing unread chat).
         //  (2) Only notify when the chat's last message is genuinely new inbound
         //      (nodeMsg > userMsg), not merely flagged unread.
-        const { fpToolsDiscordSeeded } = await chrome.storage.local.get('fpToolsDiscordSeeded');
+        const { [seededKey]: fpToolsDiscordSeeded } = await chrome.storage.local.get(seededKey);
         const isFirstDiscordRun = !fpToolsDiscordSeeded;
 
         let newMessagesToSend = false;
@@ -687,7 +716,8 @@ async function runDiscordCheckCycle() {
             if (processedDiscordMessageIds.has(chat.msgId)) continue;
 
             if (!isFirstDiscordRun) {
-                await sendDiscordNotification(chat, fpToolsDiscord);
+                // помечаем обработанным только после успешной доставки — иначе при сбое сообщение теряется
+                if (!(await sendDiscordNotification(chat, fpToolsDiscord))) continue;
             }
             processedDiscordMessageIds.add(chat.msgId);
             newMessagesToSend = true;
@@ -698,7 +728,7 @@ async function runDiscordCheckCycle() {
             if (idsToStore.length > 200) {
                 idsToStore = idsToStore.slice(-200);
             }
-            await chrome.storage.local.set({ fpToolsProcessedDiscordIds: idsToStore, fpToolsDiscordSeeded: true });
+            await chrome.storage.local.set({ [idsKey]: idsToStore, [seededKey]: true });
         }
 
     } catch (e) {
@@ -719,9 +749,37 @@ async function sendImportProgressUpdate(progressData) {
     });
 }
 
+let _importRunning = false;
+// Один шаг за раз: setTimeout-цепочки, resume и skip могли запускать несколько шагов параллельно
+// и дважды отправлять один и тот же лот.
 async function processNextLotImport() {
+    if (_importRunning) return;
+    _importRunning = true;
+    try { await processNextLotImportInner(); } catch (e) { console.warn('FP Tools: импорт лотов:', e?.message); }
+    finally { _importRunning = false; }
+}
+
+// После перезапуска service worker незавершённый импорт продолжается сам. Лот, отправка
+// которого началась (status 'submitting'), мог уже создаться — его повторно НЕ шлём,
+// а останавливаем импорт и просим пользователя проверить (пропустить/повторить вручную).
+async function resumeLotImportOnStartup() {
     const { [IMPORT_PROCESS_KEY]: process } = await chrome.storage.local.get(IMPORT_PROCESS_KEY);
-    
+    if (!process || process.state !== 'running') return;
+    let changed = false;
+    for (const lot of process.lots || []) {
+        if (lot.status === 'submitting') {
+            lot.status = 'error'; lot.uncertain = true;
+            lot.error = 'Результат отправки неизвестен (перезапуск расширения). Проверьте, создан ли лот, и пропустите его или повторите.';
+            changed = true;
+        }
+    }
+    if (changed) await chrome.storage.local.set({ [IMPORT_PROCESS_KEY]: process });
+    processNextLotImport();
+}
+
+async function processNextLotImportInner() {
+    const { [IMPORT_PROCESS_KEY]: process } = await chrome.storage.local.get(IMPORT_PROCESS_KEY);
+
     // Если процесса нет, или он отложен, или закончен - выходим.
     if (!process || process.state === 'postponed' || process.currentIndex >= process.lots.length) {
         if (process && process.currentIndex >= process.lots.length) {
@@ -732,15 +790,22 @@ async function processNextLotImport() {
     }
 
     const currentLot = process.lots[process.currentIndex];
-    
+
     // Если лот уже успешно создан или пропущен, переходим к следующему
     if (currentLot.status === 'success' || currentLot.status === 'skipped') {
         process.currentIndex++;
         await chrome.storage.local.set({ [IMPORT_PROCESS_KEY]: process });
-        processNextLotImport(); // Сразу переходим к следующему
+        return processNextLotImportInner(); // Сразу переходим к следующему
+    }
+
+    // Лот с неизвестным результатом отправки автоматически не повторяем
+    if (currentLot.uncertain) {
+        process.state = 'postponed';
+        await chrome.storage.local.set({ [IMPORT_PROCESS_KEY]: process });
+        sendImportProgressUpdate(process);
         return;
     }
-    
+
     // Если попытки исчерпаны, останавливаемся
     if (currentLot.retries >= RETRY_LIMIT) {
         currentLot.status = 'error';
@@ -751,28 +816,46 @@ async function processNextLotImport() {
     }
 
     try {
-        const auth = await getAuthDetailsForBackground();
-        if (!auth.csrf_token) throw new Error("Не удалось получить CSRF-токен.");
+        // Проверка аккаунта и отправка — под общим cookie-замком: смена аккаунта между ними
+        // создала бы лоты на чужом аккаунте.
+        const result = await withCookieLock(async () => {
+            const auth = await getAuthDetailsForBackground();
+            if (!auth.csrf_token) throw new Error("Не удалось получить CSRF-токен.");
+            if (process.accountId && String(auth.userId) !== String(process.accountId)) {
+                const e = new Error('Активный аккаунт изменился — импорт приостановлен. Вернитесь в исходный аккаунт и возобновите.');
+                e.accountMismatch = true; throw e;
+            }
+            if (!process.accountId && auth.userId) process.accountId = String(auth.userId);
 
-        const formData = new URLSearchParams(currentLot.data);
-        formData.set('csrf_token', auth.csrf_token);
-        formData.set('offer_id', '0'); // Всегда создаем новый лот
-        formData.set('active', 'on'); // Активируем по умолчанию
+            const formData = new URLSearchParams(currentLot.data);
+            formData.set('csrf_token', auth.csrf_token);
+            formData.set('offer_id', '0'); // Всегда создаем новый лот
+            formData.set('active', 'on'); // Активируем по умолчанию
 
-        const response = await fetch("https://funpay.com/lots/offerSave", {
-            method: "POST",
-            headers: { 
-                "X-Requested-With": "XMLHttpRequest", 
-                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                'Cookie': `golden_key=${auth.golden_key}`
-            },
-            body: formData
+            // фиксируем намерение ДО отправки: если воркер умрёт посреди запроса, лот не уйдёт повторно
+            currentLot.status = 'submitting';
+            await chrome.storage.local.set({ [IMPORT_PROCESS_KEY]: process });
+
+            let response, json;
+            try {
+                response = await fetch("https://funpay.com/lots/offerSave", {
+                    method: "POST",
+                    headers: {
+                        "X-Requested-With": "XMLHttpRequest",
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                        'Cookie': `golden_key=${auth.golden_key}`
+                    },
+                    body: formData
+                });
+                if (!response.ok) { const e = new Error(`Ошибка сети: ${response.statusText || response.status}`); e.definite = true; throw e; }
+                json = await response.json();
+            } catch (e) {
+                if (!e.definite) e.uncertain = true;   // запрос мог дойти до FunPay
+                throw e;
+            }
+            return json;
         });
 
-        if (!response.ok) throw new Error(`Ошибка сети: ${response.statusText}`);
-        
-        const result = await response.json();
-        
         if (result && (result.error === 0 || result.error === false)) {
             currentLot.status = 'success';
             process.currentIndex++;
@@ -780,16 +863,29 @@ async function processNextLotImport() {
             sendImportProgressUpdate(process);
             setTimeout(processNextLotImport, 500); // Небольшая задержка перед следующим
         } else {
-            throw new Error(result.msg || `Неизвестная ошибка API: ${JSON.stringify(result)}`);
+            throw new Error((result && result.msg) || `Неизвестная ошибка API: ${JSON.stringify(result)}`);
         }
 
     } catch (error) {
+        if (error.accountMismatch) {
+            currentLot.status = 'pending'; currentLot.error = error.message; process.state = 'postponed';
+            await chrome.storage.local.set({ [IMPORT_PROCESS_KEY]: process });
+            sendImportProgressUpdate(process);
+            return;
+        }
+        if (error.uncertain) {
+            currentLot.status = 'error'; currentLot.uncertain = true; process.state = 'postponed';
+            currentLot.error = 'Результат отправки неизвестен (' + error.message + '). Проверьте, создан ли лот, и пропустите его или повторите.';
+            await chrome.storage.local.set({ [IMPORT_PROCESS_KEY]: process });
+            sendImportProgressUpdate(process);
+            return;
+        }
         currentLot.retries++;
         currentLot.status = 'pending';
         currentLot.error = error.message;
         await chrome.storage.local.set({ [IMPORT_PROCESS_KEY]: process });
         sendImportProgressUpdate(process);
-        
+
         // Если это была не последняя попытка, делаем таймаут
         if (currentLot.retries < RETRY_LIMIT) {
             setTimeout(processNextLotImport, RETRY_DELAY);
@@ -821,7 +917,7 @@ const FPT_DNR_SNAP_RULE = 90217;
 
 async function _fptFetchAsAccount(goldenKey) {
     return withCookieLock(async () => {
-        const url = 'https://funpay.com/?_fptsnap=1';
+        const url = 'https://funpay.com/chat/?_fptsnap=1';
         try {
             await chrome.declarativeNetRequest.updateSessionRules({
                 removeRuleIds: [FPT_DNR_SNAP_RULE],
@@ -956,7 +1052,9 @@ async function _fptGunzipB64(b64) {
 function fptRandomSecret() {
     return Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, '0')).join('');
 }
-async function fptCloudCapability(accountId, verifiedAuth = null) {
+// deferPersist: новая capability НЕ записывается в storage, пока вызывающий не вызовет cap._commit()
+// (QR-вход: пока запрос не уложился в срок, ничего необратимого делать нельзя).
+async function fptCloudCapability(accountId, verifiedAuth = null, deferPersist = false) {
     if (!/^\d+$/.test(String(accountId || ''))) throw new Error('Недопустимый аккаунт');
     const auth = verifiedAuth || await getAuthDetailsForBackground();
     if (String(auth.userId) !== String(accountId)) throw new Error('Аккаунт страницы больше не активен');
@@ -964,9 +1062,16 @@ async function fptCloudCapability(accountId, verifiedAuth = null) {
     let cap = fptCloudCapabilities[accountId];
     if (!cap) {
         cap = { id: 'p_' + fptRandomSecret(), token: fptRandomSecret() };
-        fptCloudCapabilities[accountId] = cap;
-        const old = await chrome.storage.local.get(['fptCloudVer', 'fptCloudLastHash']);
-        await chrome.storage.local.set({ fptCloudCapabilities, fptCloudVer: { ...(old.fptCloudVer || {}), [accountId]: 0 }, fptCloudLastHash: { ...(old.fptCloudLastHash || {}), [accountId]: '' } });
+        const commit = async () => {
+            const cur = await chrome.storage.local.get(['fptCloudCapabilities', 'fptCloudVer', 'fptCloudLastHash']);
+            const caps = cur.fptCloudCapabilities || {};
+            if (caps[accountId]) return caps[accountId];
+            caps[accountId] = cap;
+            await chrome.storage.local.set({ fptCloudCapabilities: caps, fptCloudVer: { ...(cur.fptCloudVer || {}), [accountId]: 0 }, fptCloudLastHash: { ...(cur.fptCloudLastHash || {}), [accountId]: '' } });
+            return cap;
+        };
+        if (deferPersist) { Object.defineProperty(cap, '_commit', { value: commit, enumerable: false }); return cap; }
+        await commit();
     }
     return cap;
 }
@@ -1012,6 +1117,16 @@ async function fptCloudPull(accountId) {
     return { ok: true, exists: true, settings, updated_at: j.updated_at, version: j.version };
 }
 
+// Чувствительные действия (ключ аккаунта, VPS, удаление лотов, произвольные URL) — только из
+// контент-скриптов на https://funpay.com/ или из страниц самого расширения (popup/options).
+function isTrustedSender(sender) {
+    if (!sender || sender.id !== chrome.runtime.id) return false;
+    const url = sender.url || '';
+    if (url.startsWith(chrome.runtime.getURL(''))) return true;
+    return !!sender.tab && /^https:\/\/funpay\.com\//.test(url);
+}
+const DENIED = Object.freeze({ success: false, ok: false, error: 'Действие недоступно с этой страницы' });
+
 // --- Главный обработчик сообщений ---
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request?.action === 'fptPlayNotificationSound' && request.target !== 'offscreen') {
@@ -1036,19 +1151,41 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     if (request?.action === 'fptCreateLoginQR') {
         if (!trustedLoginSender(sender, chrome.runtime)) { sendResponse({ ok: false, error: 'Откройте окно расширения через значок в браузере' }); return; }
-        chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' }).then(cookie => {
+        chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' }).then(async cookie => {
             if (!cookie?.value) throw Error('Нет сессии');
+            if (!Number.isFinite(request.deadline) || request.deadline < Date.now()) throw Error('Запрос истёк');
+            const saved=await chrome.storage.local.get(null),linked=[];
+            const portable=value=>{
+                const strip=v=>typeof v==='string'&&/^data:(image|video|audio)\//.test(v)?'':Array.isArray(v)?v.map(strip):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).map(([k,x])=>[k,strip(x)])):v;
+                return globalThis.FPTSettingsSchema.sanitize(strip(value));
+            };
+            for(const account of saved.fpToolsAccounts||[]){
+                if(!account?.key||account.key===cookie.value)continue;
+                let uid=String(account.userId||'');
+                if(!/^[1-9]\d{0,19}$/.test(uid)){
+                    if(request.deadline<Date.now())throw Error('Запрос истёк');
+                    const snapshot=await fptSnapshotForKey(account.key);
+                    uid=String(snapshot?.userId||'');
+                }
+                if(!/^[1-9]\d{0,19}$/.test(uid))throw Error('Обновите данные сохранённых аккаунтов перед переносом');
+                linked.push({uid,name:account.name,golden_key:account.key,settings:portable(saved.fptProfiles?.[account.name]||{})});
+            }
             return withCookieLock(async () => {
                 if (!Number.isFinite(request.deadline) || request.deadline < Date.now() || request.deadline > Date.now() + 31000) throw Error('Запрос истёк');
                 const auth = await getAuthDetailsForBackground();
                 const current = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
                 if (!current?.value || current.value !== auth.golden_key || request.deadline < Date.now()) throw Error('Аккаунт изменился или запрос истёк');
-                const capability = await fptCloudCapability(String(auth.userId), auth);
+                const capability = await fptCloudCapability(String(auth.userId), auth, true);
                 const latest = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
                 if (!latest?.value || latest.value !== auth.golden_key || request.deadline < Date.now()) throw Error('Аккаунт изменился или запрос истёк');
                 const sessionCookies = await chrome.cookies.getAll({url: 'https://funpay.com/'});
                 auth.cookies = Object.fromEntries(sessionCookies.filter(c => ['golden_seal', 'PHPSESSID'].includes(c.name)).map(c => [c.name, c.value]));
-                const transfer = await createLoginTransfer(auth, Date.now(), { schema: 1, accountId: String(auth.userId), ...capability });
+                auth.settings=portable(saved);
+                const transfer = await createQuickLoginTransfer(auth, linked, Date.now(), { schema: 1, accountId: String(auth.userId), id: capability.id, token: capability.token });
+                // только теперь, когда перенос собран в срок и аккаунт тот же, фиксируем capability и включаем синхронизацию
+                const finalCookie = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
+                if (!finalCookie?.value || finalCookie.value !== auth.golden_key || request.deadline < Date.now()) throw Error('Аккаунт изменился или запрос истёк');
+                if (capability._commit) await capability._commit();
                 await chrome.storage.local.set({ fptCloudSyncEnabled: true });
                 return transfer;
             });
@@ -1074,6 +1211,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // VPS API: ходим из service worker (а не со страницы funpay.com) — так обычный
     // http://IP:8787 работает без mixed-content и без HTTPS/nginx. URL+токен в storage.
     if (request.action === 'fptVpsApi') {
+        if (!isTrustedSender(sender)) { sendResponse(DENIED); return; }
         (async () => {
             try {
                 const { fptVps } = await chrome.storage.local.get('fptVps');
@@ -1096,6 +1234,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     }
     if (request.action === 'fptRetryUncertain') {
+        if (!isTrustedSender(sender)) { sendResponse(DENIED); return; }
         (async () => {
             try {
                 await withCookieLock(async () => {
@@ -1150,23 +1289,37 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     return;
                 }
                 if (!['purchases', 'finance'].includes(request.kind)) throw new Error('Неверный источник истории');
-                const result = await withCookieLock(async () => {
-                    const checkAccount = async () => {
-                        const auth = await getAuthDetailsForBackground();
-                        if (String(auth.userId) !== String(request.accountId)) throw new Error('Аккаунт изменился');
-                        return String(auth.userId);
-                    };
-                    const fetchPage = async cursor => {
-                        const url = request.kind === 'purchases' ? 'https://funpay.com/orders/' : 'https://funpay.com/users/transactions';
-                        const params = new URLSearchParams();
-                        if (cursor) params.set('continue', cursor);
-                        if (request.kind === 'finance') { params.set('user_id', request.accountId); params.set('filter', ''); }
-                        const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body: params });
+                // Замок берём на КАЖДУЮ страницу, а не на весь сбор (сотни страниц блокировали бы всё остальное);
+                // аккаунт перепроверяется внутри замка перед каждым запросом, поэтому подмена куки между
+                // страницами не смешает данные аккаунтов.
+                const checkAccount = () => withCookieLock(async () => {
+                    const auth = await getAuthDetailsForBackground();
+                    if (String(auth.userId) !== String(request.accountId)) throw new Error('Аккаунт изменился');
+                    return String(auth.userId);
+                });
+                let pageNo = 0;
+                const fetchPage = async cursor => {
+                    if (pageNo++ > 0) await new Promise(r => setTimeout(r, 1000));   // не чаще раза в секунду
+                    const url = request.kind === 'purchases' ? 'https://funpay.com/orders/' : 'https://funpay.com/users/transactions';
+                    const params = new URLSearchParams();
+                    if (cursor) params.set('continue', cursor);
+                    if (request.kind === 'finance') { params.set('user_id', request.accountId); params.set('filter', ''); }
+                    for (let attempt = 0; attempt < 4; attempt++) {
+                        const response = await withCookieLock(async () => {
+                            const auth = await getAuthDetailsForBackground();
+                            if (String(auth.userId) !== String(request.accountId)) throw new Error('Аккаунт изменился');
+                            return fpFetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body: params });
+                        });
+                        if (response.status === 429 || response.status >= 500) {   // fpFetch уже включил общий бэк-офф
+                            await new Promise(r => setTimeout(r, 3000 * (attempt + 1) + Math.random() * 1000));
+                            continue;
+                        }
                         if (!response.ok) throw new Error('История: HTTP ' + response.status);
                         return response.text();
-                    };
-                    return collectAnalytics(request.accountId, request.kind, { fetchPage, parsePage: html => parseOffscreen(html, request.kind === 'purchases' ? 'parsePurchasesPage' : 'parseFinancePage'), checkAccount });
-                });
+                    }
+                    throw new Error('История: FunPay ограничивает запросы (429), повторите позже');
+                };
+                const result = await collectAnalytics(request.accountId, request.kind, { fetchPage, parsePage: html => parseOffscreen(html, request.kind === 'purchases' ? 'parsePurchasesPage' : 'parseFinancePage'), checkAccount });
                 sendResponse(result);
             } catch (e) { sendResponse({ ok: false, accountId: String(request.accountId), error: e.message }); }
         })();
@@ -1336,31 +1489,34 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     // AI HANDLERS
+    // любой сбой AI-вызова обязан вернуть ответ, иначе вкладка висит с «Port closed before response»
+    const aiReply = (task) => { Promise.resolve().then(task).then(sendResponse, e => sendResponse({ success: false, error: String(e?.message || e) })); return true; };
     if (request.action === "getAIProcessedText") {
-        fetchAIResponse(request.text, request.context, request.myUsername, request.type).then(sendResponse);
-        return true;
+        return aiReply(() => fetchAIResponse(request.text, request.context, request.myUsername, request.type));
     }
     if (request.action === "generateAILot") {
-        fetchAILotGeneration(request.data).then(sendResponse);
-        return true;
+        return aiReply(() => fetchAILotGeneration(request.data));
     }
     if (request.action === "translateLotText") {
-        fetchAITranslation(request.data).then(sendResponse);
-        return true;
+        return aiReply(() => fetchAITranslation(request.data));
     }
     if (request.action === "getAIImageSettings") {
-        fetchAIImageGeneration(request.prompt).then(sendResponse);
-        return true;
+        return aiReply(() => fetchAIImageGeneration(request.prompt));
     }
 
     // AUTOBUMP HANDLERS
     if (request.action === 'startAutoBump') {
-        startAutoBump(request.cooldown).then(() => sendResponse({ success: true }));
+        startAutoBump(request.cooldown).then(() => sendResponse({ success: true }), e => sendResponse({ success: false, error: String(e?.message || e) }));
         return true;
     }
     if (request.action === 'stopAutoBump') {
-        stopAutoBump().then(() => sendResponse({ success: true }));
+        stopAutoBump().then(() => sendResponse({ success: true }), e => sendResponse({ success: false, error: String(e?.message || e) }));
         return true;
+    }
+    // у этих сообщений в контент-скрипте есть вызовы, но источника объявлений в фоне нет — отвечаем no-op
+    if (request.action === 'forceCheckAnnouncements' || request.action === 'markAnnouncementsAsRead') {
+        sendResponse({ success: true });
+        return;
     }
     if (request.action === 'getUserCategories') {
         (async () => {
@@ -1622,6 +1778,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     if (request.action === 'cloneDeleteLot') {
+        if (!isTrustedSender(sender)) { sendResponse(DENIED); return; }
         (async () => {
             try {
                 const auth = await getAuthDetailsForBackground();
@@ -1752,15 +1909,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     if (request.action === 'startLotImport') {
         (async () => {
-            const importProcess = {
-                name: request.fileName || `Импорт от ${new Date().toLocaleString()}`,
-                state: 'running', // 'running', 'postponed'
-                lots: request.lots.map(lot => ({ ...lot, status: 'pending', retries: 0, error: null })),
-                currentIndex: 0
-            };
-            await chrome.storage.local.set({ [IMPORT_PROCESS_KEY]: importProcess });
-            sendResponse({ success: true });
-            processNextLotImport();
+            try {
+                if (!Array.isArray(request.lots)) throw new Error('Нет списка лотов.');
+                // импорт привязан к аккаунту, под которым запущен; каждый шаг это перепроверяет
+                const auth = await withCookieLock(() => getAuthDetailsForBackground());
+                if (!auth.userId) throw new Error('Не удалось определить аккаунт.');
+                const importProcess = {
+                    name: request.fileName || `Импорт от ${new Date().toLocaleString()}`,
+                    state: 'running', // 'running', 'postponed'
+                    accountId: String(auth.userId),
+                    lots: request.lots.map(lot => ({ ...lot, status: 'pending', retries: 0, error: null })),
+                    currentIndex: 0
+                };
+                await chrome.storage.local.set({ [IMPORT_PROCESS_KEY]: importProcess });
+                sendResponse({ success: true });
+                processNextLotImport();
+            } catch (e) { sendResponse({ success: false, error: e.message }); }
         })();
         return true;
     }
@@ -1772,7 +1936,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 process.state = 'running'; // Меняем статус на "в процессе"
                 // Сбрасываем счетчик попыток для всех лотов с ошибками
                 process.lots.forEach(lot => {
-                    if (lot.status === 'error') {
+                    if (lot.status === 'error' && !lot.uncertain) {   // «неизвестный результат» — только вручную (пропуск)
                         lot.retries = 0;
                         lot.status = 'pending';
                     }
@@ -1812,6 +1976,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             if (process && process.lots[request.index]) {
                 const lot = process.lots[request.index];
                 lot.status = 'skipped';
+                lot.uncertain = false;
                 lot.error = 'Пропущено пользователем';
                 await chrome.storage.local.set({ [IMPORT_PROCESS_KEY]: process });
                 sendImportProgressUpdate(process);
@@ -1832,6 +1997,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     // ACCOUNT & COOKIE HANDLERS
     if (request.action === 'getGoldenKey') {
+        if (!isTrustedSender(sender)) { sendResponse({ success: false, key: null }); return; }
         (async () => {
             const cookie = await chrome.cookies.get({ url: "https://funpay.com", name: "golden_key" });
             sendResponse({ success: !!cookie, key: cookie ? cookie.value : null });
@@ -1839,6 +2005,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     }
     if (request.action === 'setGoldenKey') {
+        if (!isTrustedSender(sender)) { sendResponse(DENIED); return; }
         (async () => {
             try {
                 if (!request.key) throw new Error('Пустой ключ аккаунта.');
@@ -2007,6 +2174,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     }
     if (request.action === 'getCategoryList' || request.action === 'getLotList') {
+        // произвольный URL из страницы = SSRF с правами расширения: только страницы funpay.com
+        let allowed = false;
+        try { const u = new URL(request.url); allowed = isTrustedSender(sender) && u.protocol === 'https:' && u.hostname === 'funpay.com' && !u.username && !u.password; } catch (_) {}
+        if (!allowed) { sendResponse([]); return; }
         (async () => {
             try {
                 const response = await fetch(request.url);
@@ -2190,7 +2361,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 // --- Обработчики будильников ---
-chrome.alarms.onAlarm.addListener(async (alarm) => {
+async function handleAlarm(alarm) {
     if (alarm.name === BUMP_ALARM_NAME) {
         await runBumpCycle();
     }
@@ -2198,6 +2369,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
         await runDiscordCheckCycle();
     }
     if (alarm.name === TELEGRAM_ALARM) {
+        await telegramEnsureFastPoll();   // после перезапуска SW таймера быстрого опроса нет
         await runTelegramCheckCycle();
     }
     // <-- НОВЫЙ ОБРАБОТЧИК -->
@@ -2222,18 +2394,20 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     if (alarm.name === ONLINE_ALARM) {
         await runOnlineHeartbeat();
     }
-});
+}
+// исключение одного цикла не должно оставлять необработанный reject (и не мешает следующим будильникам)
+chrome.alarms.onAlarm.addListener((alarm) => { handleAlarm(alarm).catch(e => console.warn('FP Tools: alarm', alarm?.name, e?.message)); });
 
 function setupInitialAlarms() {
-    chrome.storage.local.get(['autoBumpEnabled', 'autoBumpCooldown', 'fpToolsDiscord', 'fpToolsAutoReplies', 'fpToolsSmartBumpEnabled', 'fptMultiAccountAR'], (settings) => {
+    chrome.storage.local.get(['autoBumpEnabled', 'autoBumpCooldown', 'fpToolsDiscord', 'fpToolsAutoReplies', 'fpToolsSmartBumpEnabled', 'fptMultiAccountAR', 'fpToolsAutoRestoreEnabled', 'fpToolsAutoDisableEnabled'], (settings) => {
         if (settings.fpToolsSmartBumpEnabled) {
             // 3.0: smart raise takes over; the fixed-interval bump is disabled to avoid double-raising.
             chrome.alarms.clear(BUMP_ALARM_NAME);
             startSmartBump();
-        } else if (settings.autoBumpEnabled && settings.autoBumpCooldown) {
+        } else if (settings.autoBumpEnabled && validBumpPeriod(settings.autoBumpCooldown)) {
             chrome.alarms.create(BUMP_ALARM_NAME, {
                 delayInMinutes: 1,
-                periodInMinutes: parseInt(settings.autoBumpCooldown, 10)
+                periodInMinutes: validBumpPeriod(settings.autoBumpCooldown)
             });
             runBumpCycle();
         }
@@ -2355,8 +2529,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
             stopSmartBump();
             // re-arm the classic bump if it's still enabled
             chrome.storage.local.get(['autoBumpEnabled', 'autoBumpCooldown'], (s) => {
-                if (s.autoBumpEnabled && s.autoBumpCooldown) {
-                    chrome.alarms.create(BUMP_ALARM_NAME, { delayInMinutes: 1, periodInMinutes: parseInt(s.autoBumpCooldown, 10) });
+                if (s.autoBumpEnabled && validBumpPeriod(s.autoBumpCooldown)) {
+                    chrome.alarms.create(BUMP_ALARM_NAME, { delayInMinutes: 1, periodInMinutes: validBumpPeriod(s.autoBumpCooldown) });
                 }
             });
         }
@@ -2367,16 +2541,37 @@ chrome.storage.onChanged.addListener((changes, area) => {
     if (changes.autoBumpEnabled || changes.autoBumpCooldown) {
         chrome.storage.local.get(['autoBumpEnabled', 'autoBumpCooldown', 'fpToolsSmartBumpEnabled'], (s) => {
             if (s.fpToolsSmartBumpEnabled) return;   // умным поднятием управляет свой обработчик
-            if (s.autoBumpEnabled && s.autoBumpCooldown) {
-                chrome.alarms.create(BUMP_ALARM_NAME, { delayInMinutes: 1, periodInMinutes: parseInt(s.autoBumpCooldown, 10) });
+            if (s.autoBumpEnabled && validBumpPeriod(s.autoBumpCooldown)) {
+                chrome.alarms.create(BUMP_ALARM_NAME, { delayInMinutes: 1, periodInMinutes: validBumpPeriod(s.autoBumpCooldown) });
             } else {
                 chrome.alarms.clear(BUMP_ALARM_NAME);
             }
         });
     }
+    // Авто-восстановление/авто-отключение лотов: включение после установки тоже должно армировать будильник
+    if (changes.fpToolsAutoRestoreEnabled || changes.fpToolsAutoDisableEnabled) {
+        chrome.storage.local.get(['fpToolsAutoRestoreEnabled', 'fpToolsAutoDisableEnabled'], (s) => {
+            if (s.fpToolsAutoRestoreEnabled || s.fpToolsAutoDisableEnabled) {
+                chrome.alarms.get('fpToolsAutoRestore', (alarm) => {
+                    if (!alarm) chrome.alarms.create('fpToolsAutoRestore', { delayInMinutes: 1, periodInMinutes: 5 });
+                });
+            } else {
+                chrome.alarms.clear('fpToolsAutoRestore');
+            }
+        });
+    }
 });
 
+// Перезагрузка рвёт идущий импорт лотов/пинг аккаунтов — по возможности ждём (до ~5 мин), иначе
+// Chrome всё равно применит обновление при следующем перезапуске.
+function reloadForUpdate(attempt = 0) {
+    if ((_importRunning || _fptOnlineRunning) && attempt < 10) { setTimeout(() => reloadForUpdate(attempt + 1), 30000); return; }
+    chrome.runtime.reload();
+}
 chrome.runtime.onUpdateAvailable.addListener(function(details) {
     console.log("FP Tools: доступно обновление до версии " + details.version + ". применение...");
-    chrome.runtime.reload();
+    reloadForUpdate();
 });
+
+// продолжить импорт лотов, прерванный остановкой service worker (идемпотентно: см. _importRunning)
+resumeLotImportOnStartup().catch(e => console.warn('FP Tools: resume import:', e?.message));

@@ -189,6 +189,31 @@
       "</section>"
     );
   }
+  const HEX6 = /^#[0-9a-f]{6}$/i;
+  const hexOr = (value, fallback) => (HEX6.test(value || "") ? value : fallback);
+  const rgbOf = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  function luminance(hex) {
+    const [r, g, b] = rgbOf(hex).map((c) => {
+      c /= 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+  function contrast(a, b) {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  }
+  // Pull a secondary text colour toward the main text colour until it is readable on every surface.
+  function readableOn(color, toward, surfaces, min) {
+    if (!HEX6.test(color || "") || !HEX6.test(toward || "")) return color;
+    const bgs = surfaces.filter((x) => HEX6.test(x || ""));
+    const c = rgbOf(color), t = rgbOf(toward);
+    for (let k = 0; k <= 10; k++) {
+      const hex = "#" + c.map((v, i) => Math.round(v + (t[i] - v) * (k / 10)).toString(16).padStart(2, "0")).join("");
+      if (bgs.every((bg) => contrast(hex, bg) >= min)) return hex;
+    }
+    return toward;
+  }
   function applyAppearance() {
     const t = state.data.fpToolsTheme || {};
     const p = FPT_SITE_PRESETS[t.sitePreset] || FPT_SITE_PRESETS.obsidian;
@@ -200,19 +225,19 @@
       "--surface-3": p.pal.p3,
       "--text": t.textColor || p.pal.pTx,
       "--text-dim": p.pal.pTxDim,
-      "--text-faint": p.pal.pTxFaint,
+      "--text-faint": readableOn(p.pal.pTxFaint, p.pal.pTx, [p.pal.p1, p.pal.p2, p.pal.p3, t.containerBgColor], 4.5),
       "--line": p.pal.pLine,
       "--line-strong": p.pal.pLine,
       "--brand-filter": p.pal.pLogoFilter || "none",
       "--font-ui": fptFontStack(t.font || FPT_DESIGN_PROFILES[t.sitePreset||'obsidian']?.font || 'Consolas'),
       "--font-display": fptFontStack(t.font || FPT_DESIGN_PROFILES[t.sitePreset||'obsidian']?.font || 'Consolas'),
     };
-    const accent = t.linkColor || t.bgColor1 || "#5b86d8";
+    const accent = hexOr(t.linkColor, hexOr(t.bgColor1, "#5b86d8"));
     v["--accent"] = accent;
     v["--accent-strong"] = accent;
     v["--accent-soft"] = accent + "22";
     v["--accent-line"] = accent + "77";
-    v["--accent-fg"] = p.scheme === "light" ? "#ffffff" : "#101216";
+    v["--accent-fg"] = contrast(accent, "#ffffff") >= contrast(accent, "#101216") ? "#ffffff" : "#101216";
     Object.entries(v).forEach(([k, value]) =>
       document.documentElement.style.setProperty(k, value),
     );
@@ -252,6 +277,7 @@
     el.querySelectorAll("[data-page]").forEach((b) =>
       b.addEventListener("click", () => {
         state.page = b.dataset.page;
+        state.error = "";
         render();
         nav(filter);
         el.querySelector('[data-page="' + state.page + '"]')?.focus();
@@ -271,7 +297,7 @@
   }
   function toggle(key, label, on) {
     return (
-      '<div class="fpt-togrow"><span class="fpt-togrow-txt">' +
+      '<label class="fpt-togrow"><span class="fpt-togrow-txt">' +
       esc(label) +
       '</span><button type="button" class="tgl" role="switch" aria-label="' +
       esc(label) +
@@ -283,13 +309,19 @@
       key +
       '" ' +
       (!state.loaded ? "disabled" : "") +
-      "></button></div>"
+      "></button></label>"
     );
   }
+  let aiObserver = null;
   function render() {
     const previousFocus = document.activeElement;
     const focusId = previousFocus?.id;
     const focusToggle = previousFocus?.dataset?.toggle;
+    const focusSel = ["preset", "editor", "retryId"]
+      .filter((k) => previousFocus?.dataset?.[k] != null)
+      .map((k) => "[data-" + k.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase()) + '="' + CSS.escape(previousFocus.dataset[k]) + '"]')[0];
+    aiObserver?.disconnect();
+    aiObserver = null;
     const d = state.data,
       a = adapter(d),
       id = state.page;
@@ -406,6 +438,7 @@
         '<label>Цена лота (₽)<input class="inp" id="price" type="number" min="0" step="any" value="1000"></label><label>Комиссия (%)<input class="inp" id="fee" type="number" min="0" max="99.99" step="any" value="7"></label><p id="calc-output" role="status"></p><p class="fpt-desc">Оценка по введённой комиссии. Фактические условия проверяйте на FunPay.</p>';
     else if (id === "appearance") {
       const t = d.fpToolsTheme || {};
+      const pp = FPT_SITE_PRESETS[t.sitePreset] || FPT_SITE_PRESETS.obsidian;
       body =
         '<div class="fpt-themes">' +
         ['obsidian','graphite','light','clay','paper','forest','ink','slate']
@@ -431,7 +464,7 @@
             esc(f) +
             "</option>",
         ).join("") +
-        '</select></label><div class="fpt-appearance-fields"><label>Акцент<input id="theme-accent" type="color" value="'+esc(t.bgColor1||FPT_THEME_ACCENTS[t.sitePreset]||'#5b86d8')+'"></label><label>Панели<input id="theme-surface" type="color" value="'+esc(t.containerBgColor||'#1d2028')+'"></label><label>Текст<input id="theme-text" type="color" value="'+esc(t.textColor||'#f1f3f7')+'"></label></div><label>Скругления<input id="theme-radius" type="range" min="0" max="28" value="'+Number(t.borderRadius??10)+'"></label><label>Обои<select class="inp" id="theme-wallpaper">'+[['none','Без обоев'],['dunes','Дюны'],['mesh','Сетка цвета'],['grid','Чертёж'],['cobalt','Кобальт'],['aurora','Сияние'],['drift','Плавное движение']].map(([value,label])=>'<option value="'+value+'" '+((t.wallpaper||'none')===value?'selected':'')+'>'+label+'</option>').join('')+'</select></label><p class="fpt-desc">Профиль меняет палитру, шрифт, плотность и скругления. Индивидуальные настройки задаются после выбора профиля.</p>' +
+        '</select></label><div class="fpt-appearance-fields"><label>Акцент<input id="theme-accent" type="color" value="'+esc(hexOr(t.bgColor1,hexOr(FPT_THEME_ACCENTS[t.sitePreset],'#5b86d8')))+'"></label><label>Панели<input id="theme-surface" type="color" value="'+esc(hexOr(t.containerBgColor,hexOr(pp.containerBgColor,'#1d2028')))+'"></label><label>Текст<input id="theme-text" type="color" value="'+esc(hexOr(t.textColor,hexOr(pp.textColor,'#f1f3f7')))+'"></label></div><label>Скругления<input id="theme-radius" type="range" min="0" max="28" value="'+Number(t.borderRadius??10)+'"></label><label>Обои<select class="inp" id="theme-wallpaper">'+[['none','Без обоев'],['dunes','Дюны'],['mesh','Сетка цвета'],['grid','Чертёж'],['cobalt','Кобальт'],['aurora','Сияние'],['drift','Плавное движение']].map(([value,label])=>'<option value="'+value+'" '+((t.wallpaper||'none')===value?'selected':'')+'>'+label+'</option>').join('')+'</select></label><p class="fpt-desc">Профиль меняет палитру, шрифт, плотность и скругления. Индивидуальные настройки задаются после выбора профиля.</p>' +
         editButton(id, "Цвета, обои и дополнительные настройки");
     } else if (id === "settings")
       body =
@@ -464,20 +497,11 @@
           ? "Настроить стандартный звук"
           : "Прослушать") +
         "</button>" +
-        editButton(id, "Все настройки уведомлений") + '<hr><button class="btn btn-soft" id="check-app-update">'+FPTIcons.svg("refresh")+'Проверить обновления</button><p id="app-update-result" class="fpt-desc" role="status"></p>';
+        '<hr><button class="btn btn-soft" id="check-app-update">'+FPTIcons.svg("refresh")+'Проверить обновления</button><p id="app-update-result" class="fpt-desc" role="status"></p>';
     else if(id === "ai")body='<iframe id="fpt-popup-ai-frame" title="Провайдер и основная модель ИИ" src="'+chrome.runtime.getURL('popup/ai.html')+'" scrolling="no" style="display:block;width:100%;height:850px;border:0;background:transparent"></iframe>';
     else if(id === "phone")body="";
     else
-      body =
-        '<p class="fpt-desc">' +
-        {
-          lots: "Импорт, экспорт и массовое редактирование лотов.",
-          commands: "Команды и подстановки сообщений.",
-          blacklist: "Правила для выбранных покупателей.",
-          piggy: "Финансовые цели и правила накопления.",
-        }[id] +
-        "</p>" +
-        editButton(id);
+      body = editButton(id);
     if (id === "home" || id === "replies") body += deliveryDiagnostics(d);
     const root = document.getElementById("fpt-content");
     root.innerHTML =
@@ -508,12 +532,19 @@
       .forEach((b) => (b.onclick = () => setPreset(b.dataset.preset)));
     root.querySelectorAll("[data-retry-id]").forEach((button) => {
       button.onclick = async () => {
-        if (
-          !window.confirm(
-            "Вы проверили чат и убедились, что сообщение не отправлено? Повторная отправка возможна.",
-          )
-        )
+        // Two-step inline confirm: the first click arms the button, the second sends.
+        if (!button.dataset.armed) {
+          button.dataset.armed = "1";
+          button.dataset.label = button.textContent;
+          button.textContent = "Чат проверен, сообщения нет — повторить";
+          clearTimeout(button._disarm);
+          button._disarm = setTimeout(() => {
+            delete button.dataset.armed;
+            button.textContent = button.dataset.label;
+          }, 8000);
           return;
+        }
+        clearTimeout(button._disarm);
         button.disabled = true;
         try {
           const result = await chrome.runtime.sendMessage({
@@ -534,7 +565,8 @@
     if (focusId) document.getElementById(focusId)?.focus?.();
     else if (focusToggle)
       root.querySelector?.('[data-toggle="' + focusToggle + '"]')?.focus?.();
-    if(id === "ai"){const frame=document.getElementById('fpt-popup-ai-frame');frame.addEventListener('load',()=>{const main=frame.contentDocument?.querySelector('main');if(main){const resize=()=>frame.style.height=Math.max(500,Math.ceil(main.getBoundingClientRect().height)+8)+'px';new ResizeObserver(resize).observe(main);resize();}});}
+    else if (focusSel) root.querySelector(focusSel)?.focus?.();
+    if(id === "ai"){const frame=document.getElementById('fpt-popup-ai-frame');frame.addEventListener('load',()=>{const main=frame.contentDocument?.querySelector('main');if(main){const resize=()=>frame.style.height=Math.max(500,Math.ceil(main.getBoundingClientRect().height)+8)+'px';aiObserver?.disconnect();aiObserver=new ResizeObserver(resize);aiObserver.observe(main);resize();}});}
     if(id === "phone"){const area=document.createElement("div");area.id="phone-transfer";root.querySelector('.fpt-page').appendChild(area);FPTPhoneTransfer.mount(area,state.data);}
     if (id === "calc") {
       ["price", "fee"].forEach(
@@ -588,32 +620,50 @@
           (p / (1 - f / 100)).toFixed(2) +
           " ₽";
   }
+  function setStatus(online, label) {
+    const dot = document.getElementById("status-dot");
+    if (dot) {
+      dot.classList.toggle("online", online === true);
+      dot.classList.toggle("offline", online === false);
+    }
+    const text = document.getElementById("status-label");
+    if (text) text.textContent = label;
+  }
   function showError(message) {
     state.error = message;
     const e = document.getElementById("ui-error");
     if (e) e.textContent = message;
   }
+  let pendingPatch = null;
   async function save(patch) {
-    if (!EXT || busy) return;
+    if (!EXT) return;
+    // A save issued while another is in flight is merged and flushed afterwards, never dropped.
+    pendingPatch = { ...(pendingPatch || {}), ...patch };
+    if (busy) return;
     busy = true;
     try {
-      await chrome.storage.local.set(patch);
-      Object.assign(state.data, patch);
+      while (pendingPatch) {
+        const next = pendingPatch;
+        pendingPatch = null;
+        await chrome.storage.local.set(next);
+        Object.assign(state.data, next);
+      }
       state.error = "";
       applyAppearance();
       render();
     } catch (e) {
+      pendingPatch = null;
       showError("Настройки не сохранены. Повторите действие.");
     } finally {
       busy = false;
     }
   }
   async function saveTheme(patch) {
-    if (!EXT || busy) return;
+    if (!EXT) return;
     try {
       const d = await chrome.storage.local.get("fpToolsTheme");
       await save({
-        fpToolsTheme: { ...(d.fpToolsTheme || {}), ...patch },
+        fpToolsTheme: { ...(d.fpToolsTheme || {}), ...(pendingPatch?.fpToolsTheme || {}), ...patch },
         enableCustomTheme: true,
       });
     } catch (e) {
@@ -632,7 +682,7 @@
   }
   let togglePending = false;
   async function setToggle(key) {
-    if (!EXT || busy || togglePending) return;
+    if (!EXT || togglePending) return;
     togglePending = true;
     try {
       const d = await chrome.storage.local.get([
@@ -731,6 +781,16 @@
           });
           if(Object.keys(ch).every(k=>k==="fptAppUpdate"))return;
           applyAppearance();
+          // An own save re-renders once when it finishes.
+          if (busy) return;
+          // Inputs on these pages hold live edits (calculator, colour picker); only sync theme selection.
+          if (["calc", "settings", "appearance"].includes(state.page)) {
+            if (state.page === "appearance" && ch.fpToolsTheme)
+              document.querySelectorAll("[data-preset]").forEach((b) =>
+                b.setAttribute("aria-pressed", String(b.dataset.preset === state.data.fpToolsTheme?.sitePreset)),
+              );
+            return;
+          }
           // Keep an in-progress QR transfer intact when runtime counters change.
           // Settings QR reads storage on demand, so a full redraw is unnecessary.
           if(state.page === "phone" || state.page === "ai")return;
@@ -739,12 +799,10 @@
       });
       chrome.tabs
         .query({ url: "https://funpay.com/*" })
-        .then(
-          (t) =>
-            (document.getElementById("status-label").textContent = t.length
-              ? "FunPay открыт"
-              : "FunPay не открыт"),
-        );
+        .then((t) =>
+          setStatus(t.length > 0, t.length ? "FunPay открыт" : "FunPay не открыт"),
+        )
+        .catch(() => setStatus(null, "Статус неизвестен"));
     }
   });
 })();

@@ -2,6 +2,8 @@
 
 (function() {
     'use strict';
+    if (window.__fptInjected) return; // повторная инжекция — не инициализироваться дважды
+    window.__fptInjected = true;
 
     // ПРИСУТСТВИЕ на странице FunPay. Пока вкладка ВИДИМА, держим в storage метку
     // fptPresentUntil (≈ сейчас + 30 c, обновляем раз в 12 c и на любое действие). Фоновые
@@ -742,12 +744,24 @@
         });
     }
 
+    // Failsafe: что бы ни случилось в инициализации, #content и удержание
+    // контента не должны остаться скрытыми.
+    const revealContent = () => {
+        document.getElementById('fp-tools-content-hold')?.remove();
+        const c = document.getElementById('content');
+        if (c && c.style.visibility === 'hidden') c.style.visibility = '';
+    };
+    const runInit = async () => {
+        try { await initializeFpTools(); }
+        catch (e) { console.error('FP Tools init error:', e); }
+        finally { setTimeout(revealContent, 2500); }
+    };
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initializeFpTools);
+        document.addEventListener('DOMContentLoaded', runInit);
     } else {
-        initializeFpTools();
+        runInit();
     }
-    
+
 })();
 chrome.runtime.onMessage.addListener((request,sender,reply)=>{
     if(request?.action!=='fptReadAuthenticatedPage'||sender.id!==chrome.runtime.id)return;

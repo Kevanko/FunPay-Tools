@@ -12,17 +12,25 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 final class FunPayClient {
+    /** The server answered with an explicit failure, so the request is known not to have been applied. */
+    static final class Definitive extends IOException {Definitive(String message){super(message);}}
+    private static final Map<String,Object[]> csrfCache=new HashMap<>();
+    static final ThreadLocal<String> expectedAccount=new ThreadLocal<>();
     static final String BASE="https://funpay.com";
     static final String UA="Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36";
     final SessionStore store;
     final String uid,name,userAgent,sessionId;
     String cookies;
     String csrf;
+    String authenticatedHtml="";
     private static long lastRequest;
+    private static final Map<String,Map<String,String>> orderCache=new LinkedHashMap<>();
+    private static final Map<String,Long> orderCacheTimes=new HashMap<>();
     static long backoffUntil;
     FunPayClient(Context c) throws IOException {
         store=new SessionStore(c); JSONObject s;try{s=store.session();}catch(Exception e){throw new IOException("Не удалось открыть сохранённую сессию",e);} if(s==null)throw new IOException("Войдите в FunPay");
         uid=s.optString("uid");name=s.optString("name");cookies=s.optString("cookies");userAgent=s.optString("userAgent",UA);sessionId=s.optString("sessionId");
+        if(expectedAccount.get()!=null&&!uid.equals(expectedAccount.get()))throw new IOException("Аккаунт изменился. Действие отменено.");
         if(!uid.matches("\\d+")||!hasSessionCookie(cookies))throw new IOException("Сессия отсутствует. Войдите снова.");
     }
     static JSONObject authData(String html) throws Exception {
@@ -90,12 +98,14 @@ final class FunPayClient {
     private String request(String path,String method,Map<String,String> form,int redirects) throws Exception {
         if(!path.startsWith("/")||path.startsWith("//"))throw new IOException("Недопустимый адрес");
         assertSession();
+        long wait;
         synchronized(FunPayClient.class) {
-            long wait=Math.max(backoffUntil-System.currentTimeMillis(),900-(System.currentTimeMillis()-lastRequest));
-            if(wait>60000)throw new IOException("FunPay ограничил запросы. Повторите позже.");
-            if(wait>0)Thread.sleep(wait);
-            lastRequest=System.currentTimeMillis();
+            long now=System.currentTimeMillis();
+            wait=Math.max(backoffUntil-now,900-(now-lastRequest));
+            if(wait>60000)throw new Definitive("FunPay ограничил запросы. Повторите позже.");
+            lastRequest=now+Math.max(wait,0);
         }
+        if(wait>0)Thread.sleep(wait);
         assertSession();
         final String sentCookies=cookies;
         HttpURLConnection con=(HttpURLConnection)new URL(BASE+path).openConnection();
@@ -124,9 +134,9 @@ final class FunPayClient {
                 con.disconnect();
                 return request(destination.getRawPath()+(destination.getRawQuery()==null?"":"?"+destination.getRawQuery()),method,null,redirects+1);
             }
-            if(code==429||code>=500) { synchronized(FunPayClient.class){backoffUntil=System.currentTimeMillis()+60000;}throw new IOException("FunPay временно недоступен ("+code+")"); }
+            if(code==429||code>=500) { synchronized(FunPayClient.class){backoffUntil=System.currentTimeMillis()+60000;}throw new Definitive("FunPay временно недоступен ("+code+")"); }
             if(code>=300&&code<400)throw new IOException("FunPay перенаправил запрос. Проверьте вход.");
-            if(code!=200)throw new IOException("Ошибка FunPay: "+code);
+            if(code!=200)throw new Definitive("Ошибка FunPay: "+code);
             ByteArrayOutputStream out=new ByteArrayOutputStream();
             try(InputStream in=con.getInputStream()) { byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1) { if(out.size()+n>4*1024*1024)throw new IOException("Ответ слишком большой");out.write(b,0,n); } }
             assertSession();return out.toString(StandardCharsets.UTF_8.name());
@@ -135,30 +145,90 @@ final class FunPayClient {
     static String encode(Map<String,String> m) throws Exception {
         List<String> p=new ArrayList<>();for(var e:m.entrySet())p.add(URLEncoder.encode(e.getKey(),"UTF-8")+"="+URLEncoder.encode(e.getValue(),"UTF-8"));return String.join("&",p);
     }
-    void authenticate() throws Exception { JSONObject a=authData(request("/chat/","GET",null));if(!uid.equals(a.optString("userId")))throw new IOException("FunPay вернул другой аккаунт. Фоновая работа остановлена.");csrf=a.getString("csrf-token"); }
+    void authenticate() throws Exception {
+        authenticatedHtml=request("/chat/","GET",null);JSONObject a=authData(authenticatedHtml);
+        if(!uid.equals(a.optString("userId")))throw new IOException("FunPay вернул другой аккаунт. Фоновая работа остановлена.");
+        csrf=a.getString("csrf-token");synchronized(csrfCache){csrfCache.put(uid,new Object[]{csrf,System.currentTimeMillis()});}JSONObject profile=parseProfile(authenticatedHtml);
+        store.updateProfile(uid,profile.optString("name").isEmpty()?name:profile.optString("name"),profile.optString("balance"),profile.optString("avatar"));
+    }
+    /** Reuses a recent csrf token instead of a full /chat/ page load; returns true when the cache was used. */
+    boolean ensureAuth() throws Exception {
+        Object[] cached;synchronized(csrfCache){cached=csrfCache.get(uid);}
+        if(cached!=null&&System.currentTimeMillis()-(Long)cached[1]<600000){csrf=(String)cached[0];authenticatedHtml="";return true;}
+        authenticate();return false;
+    }
+    void forgetAuth(){synchronized(csrfCache){csrfCache.remove(uid);}}
+    static JSONObject parseProfile(String html) throws Exception {
+        Document doc=Jsoup.parse(html);JSONObject value=new JSONObject();
+        String username=text(doc,".user-link-name"),balance=text(doc,".badge-balance, .user-link-balance, .menu-item-balance");
+        if(username.isEmpty())try{username=authData(html).optString("userName");}catch(Exception ignored){}
+        java.util.regex.Matcher amount=java.util.regex.Pattern.compile("[\\d][\\d\\s.,]*\\s*[₽$€]").matcher(balance);
+        String sum=amount.find()?amount.group().trim():"";
+        if(sum.isEmpty()&&!username.isEmpty()&&doc.selectFirst("a[href*=/account/balance]")!=null)sum="0 ₽";
+        value.put("name",username).put("balance",sum).put("avatar",avatar(doc.selectFirst(".user-link-photo, .user-link-dropdown .avatar-photo")));
+        return value;
+    }
     static JSONObject object(String type,String id) throws Exception {return new JSONObject().put("type",type).put("id",id).put("tag",UUID.randomUUID().toString().replace("-","").substring(0,8)).put("data",false);}
     JSONObject runner(JSONArray objects,Object req) throws Exception {
         Map<String,String> f=new LinkedHashMap<>();f.put("objects",objects.toString());f.put("request",req==null?"false":req.toString());f.put("csrf_token",csrf);
-        JSONObject r=new JSONObject(request("/runner/","POST",f));if(hasError(r))throw new IOException("FunPay отклонил действие");return r;
+        JSONObject r=new JSONObject(request("/runner/","POST",f));if(hasError(r))throw new Definitive("FunPay отклонил действие");return r;
     }
     static boolean hasError(JSONObject result) {Object e=result.opt("error");return Boolean.TRUE.equals(e)||(e instanceof Number n&&n.intValue()!=0)||(e instanceof String s&&!s.equals("0")&&!s.equals("false")&&!s.isEmpty())||(result.optJSONArray("errors")!=null&&result.optJSONArray("errors").length()>0);}
     List<Chat> chats() throws Exception {
+        List<Chat> pageChats=parseChats(authenticatedHtml);
+        if(!pageChats.isEmpty())return pageChats;
         JSONObject r=runner(new JSONArray().put(object("chat_bookmarks",uid)),null);JSONArray a=r.optJSONArray("objects");
         if(a!=null)for(int i=0;i<a.length();i++) {JSONObject o=a.getJSONObject(i);if(o.optString("type").equals("chat_bookmarks")){JSONObject data=o.optJSONObject("data");if(data!=null&&data.has("html"))return parseChats(data.optString("html"));}}
         throw new IOException("Список чатов не получен. Обновите или откройте сайт.");
     }
-    static final class Chat {String id,name,text,msgId;boolean unread,bot;}
+    static final class Chat {String id,name,text,msgId,avatar="",time="",status="unknown",userId="";boolean unread,bot;}
     static List<Chat> parseChats(String html) {
         List<Chat> list=new ArrayList<>();
-        for(Element e:Jsoup.parse(html).select("a.contact-item")){Chat c=new Chat();c.id=e.attr("data-id");c.msgId=e.attr("data-node-msg");c.name=text(e,".media-user-name");c.text=text(e,".contact-item-message");c.unread=e.hasClass("unread");c.bot=c.text.startsWith("\u2061")||c.text.startsWith("\u2064");if(c.id.matches("\\d+"))list.add(c);}return list;
+        for(Element e:Jsoup.parse(html).select("a.contact-item")){Chat c=new Chat();c.id=e.attr("data-id");c.msgId=e.attr("data-node-msg");c.name=text(e,".media-user-name");c.text=text(e,".contact-item-message");c.unread=e.hasClass("unread");c.bot=c.text.startsWith("\u2061")||c.text.startsWith("\u2064");c.avatar=avatar(e.selectFirst(".avatar-photo, .contact-item-photo, img"));c.time=text(e,".contact-item-time, .contact-item-date, time");c.userId=e.attr("data-user-id");if(c.id.matches("\\d+"))list.add(c);}return list;
+    }
+    static String avatar(Element element){
+        if(element==null)return "";String address=element.tagName().equals("img")?element.attr("src"):"";
+        if(address.isEmpty()){Element img=element.selectFirst("img[src]");if(img!=null)address=img.attr("src");}
+        if(address.isEmpty()){java.util.regex.Matcher m=java.util.regex.Pattern.compile("url\\(['\"]?([^)'\"]+)['\"]?\\)").matcher(element.attr("style"));if(m.find())address=m.group(1);}
+        if(address.startsWith("//"))address="https:"+address;else if(address.startsWith("/"))address=BASE+address;
+        try{URI uri=new URI(address);String host=uri.getHost();return "https".equals(uri.getScheme())&&host!=null&&(host.equals("funpay.com")||host.endsWith(".funpay.com")||host.equals("funpay.ru")||host.endsWith(".funpay.ru"))?address:"";}catch(Exception e){return "";}
+    }
+    static String orderStatus(String raw){
+        return switch(raw.trim().toLowerCase(java.util.Locale.ROOT)){case "оплачен","paid"->"paid";case "закрыт","завершён","завершен","completed","closed"->"completed";case "возврат","возвращён","возвращен","refunded"->"refunded";default->"unknown";};
+    }
+    static Map<String,String> parseOrderStatuses(String html){
+        Map<String,String> values=new LinkedHashMap<>();
+        for(Element row:Jsoup.parse(html).select("a.tc-item[href*=/orders/]")){
+            String buyer=text(row,".tc-user .media-user-name, .tc-user, .media-user-name"),status=orderStatus(text(row,".tc-status"));
+            if(!buyer.isEmpty()&&!values.containsKey(buyer.toLowerCase(Locale.ROOT)))values.put(buyer.toLowerCase(Locale.ROOT),status);
+        }return values;
+    }
+    void enrichOrders(List<Chat> chats) throws Exception {
+        Map<String,String> orders;
+        synchronized(orderCache){orders=System.currentTimeMillis()-orderCacheTimes.getOrDefault(uid,0L)<60000?orderCache.get(uid):null;}
+        if(orders==null){orders=parseOrderStatuses(request("/orders/trade","GET",null));synchronized(orderCache){if(orderCache.size()>=8){orderCache.clear();orderCacheTimes.clear();}orderCache.put(uid,orders);orderCacheTimes.put(uid,System.currentTimeMillis());}}
+        for(Chat chat:chats)chat.status=orders.getOrDefault(chat.name.toLowerCase(Locale.ROOT),"unknown");
+    }
+    static String multilineText(Element e,String selector) {
+        Element v=e.selectFirst(selector);if(v==null)return "";
+        Element copy=v.clone();for(Element br:copy.select("br"))br.replaceWith(new org.jsoup.nodes.TextNode("\uE000"));
+        return copy.text().replaceAll(" *\uE000 *","\n").trim();
     }
     static String text(Element e,String selector) {Element v=e.selectFirst(selector);return v==null?"":v.text();}
-    static final class Message {String author,text;boolean own;}
+    static final class Message {String author,text,avatar="",time="",status="unknown";boolean own,system;}
     List<Message> messages(String chatId) throws Exception {
         if(!chatId.matches("\\d+"))throw new IOException("Некорректный чат");
+        return parseMessages(request("/chat/?node="+chatId,"GET",null),uid);
+    }
+    static List<Message> parseMessages(String html,String uid){
         List<Message> out=new ArrayList<>();
-        for(Element e:Jsoup.parse(request("/chat/?node="+chatId,"GET",null)).select(".chat-msg-item")) {
-            Message m=new Message();m.author=text(e,".chat-msg-author");m.text=text(e,".chat-msg-text");Element author=e.selectFirst(".chat-msg-author-link");m.own=author!=null&&author.attr("href").matches(".*/users/"+uid+"/?$");
+        String previousAuthor="",previousTime="";boolean previousOwn=false,previousSystem=false;
+        for(Element e:Jsoup.parse(html).select(".chat-msg-item")) {
+            Message m=new Message();m.text=multilineText(e,".chat-msg-text");Element author=e.selectFirst(".chat-msg-author-link");
+            boolean header=e.hasClass("chat-msg-with-head")||author!=null;
+            if(header){previousAuthor=author==null?"FunPay":author.text();previousOwn=author!=null&&author.attr("href").matches(".*/users/"+uid+"/?$");previousSystem=author==null&&e.selectFirst(".chat-msg-author-label, .chat-msg-body > .alert")!=null;previousTime=text(e,".chat-msg-date, .chat-msg-time, time");}
+            m.author=previousAuthor;m.own=previousOwn;m.time=previousTime;m.system=previousSystem||e.hasClass("chat-msg-item-sys")||e.hasClass("chat-msg-item-system");m.avatar=avatar(e.selectFirst(".avatar-photo, .chat-msg-avatar"));
+            if(m.system){if(m.text.contains("оплатил заказ"))m.status="paid";else if(m.text.contains("подтвердил выполнение заказа"))m.status="completed";else if(m.text.contains("вернул деньги")||m.text.contains("возврат средств"))m.status="refunded";}
             if(!e.select("img").isEmpty()&&m.text.isEmpty())m.text="Изображение · открыть на сайте";
             out.add(m);
         }return out;
@@ -169,7 +239,7 @@ final class FunPayClient {
         JSONObject obj=object("chat_node",chatId).put("data",data);
         JSONObject result=runner(new JSONArray().put(obj),new JSONObject().put("action","chat_message").put("data",data));
         JSONObject response=result.optJSONObject("response");
-        if(response!=null&&hasError(response))throw new IOException("FunPay отклонил сообщение");
+        if(response!=null&&hasError(response))throw new Definitive("FunPay отклонил сообщение");
     }
     boolean sellerWrote(String chatId) throws Exception {
         Document d=Jsoup.parse(request("/chat/?node="+chatId,"GET",null));

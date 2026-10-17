@@ -37,7 +37,8 @@
     function sanitize(settings, options = {}) {
         if (!plain(settings)) throw new Error('Файл не содержит объекта настроек');
         const out = {};
-        for (const k of keys) if (own(settings,k)) {
+        // options.lenient: a bad value skips that key (names + reasons collected in options.skipped) instead of failing the whole operation.
+        for (const k of keys) if (own(settings,k)) try {
             const v = settings[k];
             if (bools.has(k) && typeof v !== 'boolean') throw new Error('Неверный тип: ' + k);
             if (objects.has(k) && !plain(v)) throw new Error('Неверный объект: ' + k);
@@ -46,14 +47,15 @@
             if (['notificationVolume','autoBumpCooldown'].includes(k) && (!Number.isFinite(Number(v)) || Number(v) < 0 || (k === 'notificationVolume' && Number(v) > 100))) throw new Error('Неверное число: ' + k);
             if(k==='notificationVolume'){out[k]=Number(v)>1?Number(v)/100:Number(v);continue;}
             out[k] = k === 'fpToolsAutoReplies' ? sanitizeAutoReplies(v, options) : clean(v);
-        }
+        } catch (e) { if (!options.lenient) throw e; (options.skipped || (options.skipped = [])).push(k); }
+        if (out.notificationSound === 'custom' && !out.fpToolsCustomSoundData) out.notificationSound = 'default';
         if (options.cloud && out.fpToolsTheme) for (const k of ['bgVideo','bgData','bgVideoData']) delete out.fpToolsTheme[k];
         if (options.cloud) for (const k of ['fpToolsCustomSoundData','reviewTemplateImages']) delete out[k];
         if (JSON.stringify(out).length > MAX_BYTES) throw new Error('Слишком большой файл настроек');
         return out;
     }
     function encode(settings, extVer) { return JSON.stringify({_magic:MAGIC,_version:VERSION,_date:new Date().toISOString(),_extVer:extVer,settings:sanitize(settings)},null,2); }
-    function decode(text) { if (typeof text !== 'string' || text.length > MAX_BYTES) throw new Error('Слишком большой файл настроек'); const obj = JSON.parse(text); if (!plain(obj) || obj._magic !== MAGIC || ![1,VERSION].includes(obj._version)) throw new Error('Неподдерживаемый формат или версия .fpconfig'); return {settings:sanitize(obj.settings),version:obj._version,extVer:typeof obj._extVer === 'string' ? obj._extVer : ''}; }
+    function decode(text) { const opts = {lenient:true}; if (typeof text !== 'string' || text.length > MAX_BYTES) throw new Error('Слишком большой файл настроек'); const obj = JSON.parse(text); if (!plain(obj) || obj._magic !== MAGIC || ![1,VERSION].includes(obj._version)) throw new Error('Неподдерживаемый формат или версия .fpconfig'); return {settings:sanitize(obj.settings,opts),skipped:opts.skipped||[],version:obj._version,extVer:typeof obj._extVer === 'string' ? obj._extVer : ''}; }
     const api = {VERSION,MAGIC,MAX_BYTES,keys,sanitize,sanitizeAutoReplies,encode,decode};
     root.FPTSettingsSchema = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;

@@ -44,6 +44,15 @@ final class Settings {
             if(!p.edit().putString("config_"+account,o.toString()).putString("cloudTimes_"+account,times.toString()).commit())throw new IllegalStateException("Не удалось сохранить настройки");
         }}CloudSyncWorker.enqueue(context);
     }
+    /** QR/file import: overlay imported keys on the current config, keep local-only keys, and do NOT bump cloud timestamps so newer cloud data still wins on the next sync. */
+    void importMerge(JSONObject imported){
+        synchronized(Settings.class){synchronized(SessionStore.class){
+            String account=uid();
+            try{JSONObject next=new JSONObject(config().toString());for(Iterator<String> it=imported.keys();it.hasNext();){String key=it.next();next.put(key,imported.get(key));}
+                if(!p.edit().putString("config_"+account,next.toString()).commit())throw new IllegalStateException("Не удалось сохранить настройки");}
+            catch(JSONException e){throw new IllegalStateException(e);}
+        }}CloudSyncWorker.enqueue(context);
+    }
     JSONObject syncTimes(String account){try{return new JSONObject(p.getString("cloudTimes_"+account,"{}"));}catch(Exception e){return new JSONObject();}}
     void resetSyncTimes(String account){if(!p.edit().putString("cloudTimes_"+account,"{}").commit())throw new IllegalStateException("Не удалось подготовить синхронизацию");}
     JSONObject reconcile(String account,JSONObject remote) throws Exception { synchronized(Settings.class){synchronized(SessionStore.class){
@@ -52,6 +61,7 @@ final class Settings {
         JSONObject merged=CloudProtocol.merge(packet,remote),values=new JSONObject(merged.getJSONObject("s").toString());
         JSONObject next=new JSONObject(local.toString());
         for(String key:CloudProtocol.KEYS){if(values.has(key))next.put(key,values.get(key));else next.remove(key);}
+        if("custom".equals(next.optString("notificationSound"))&&next.optString("fpToolsCustomSoundData").isEmpty())next.put("notificationSound","default");
         JSONObject oldTheme=local.optJSONObject("fpToolsTheme"),newTheme=next.optJSONObject("fpToolsTheme");
         if(oldTheme!=null&&newTheme!=null)for(String key:CloudProtocol.LOCAL_THEME)if(oldTheme.has(key))newTheme.put(key,oldTheme.get(key));
         JSONObject oldReplies=local.optJSONObject("fpToolsAutoReplies"),newReplies=next.optJSONObject("fpToolsAutoReplies");
@@ -86,15 +96,17 @@ final class Settings {
     JSONObject state(String uid){try{return new JSONObject(p.getString("runtime_"+uid,"{}"));}catch(Exception e){return new JSONObject();}}
     void state(String uid,JSONObject state){if(!p.edit().putString("runtime_"+uid,state.toString()).commit())throw new IllegalStateException("Не удалось сохранить состояние. Отправка остановлена.");}
     static final Set<String> IMPORT_KEYS=new HashSet<>(Arrays.asList("enableCustomTheme","enableRedesignedHomepage","viewSellersPromo","fpToolsBumpOnlyAutoDelivery","fpToolsBumpNotifyEnabled","fpToolsSmartBumpEnabled","fpToolsIdentifierEnabled","fpToolsShowPaymentType","fpToolsShowUnconfirmed","fpToolsBuyerHistory","fpToolsAutoRestoreEnabled","fpToolsAutoDisableEnabled","fpToolsCustomSoundMeta","reviewTemplateImages","fpToolsCustomCursor","fpToolsMyEpicNick","fpToolsPopupPosition","fpToolsPopupSize","fpToolsCursorFx","fpToolsHeaderButtonStyles","fpToolsLiveStyles","reviewTemplates","fpToolsPiggyBanks","fpToolsCustomSoundData","fpToolsReviewRequestTemplate","fpToolsAutoReplies","fpToolsTemplateSettings","fpToolsSlashCommands","fpToolsTheme","autoBumpEnabled","autoBumpCooldown","notificationSound","notificationVolume","hideBalance","showSalesStats","fpToolsDisabledFeatures","fpToolsUserNotes","fpToolsPinnedLots","fpToolsSelectedBumpCategories","fpToolsSelectiveBumpEnabled"));
+    static final int MAX_BYTES=4*1024*1024;
     static JSONObject decode(String raw) throws Exception {
-        if(raw.length()>2*1024*1024)throw new Exception("Файл больше 2 МБ");
+        if(raw.length()>MAX_BYTES)throw new Exception("Файл больше 4 МБ");
         JSONObject root=new JSONObject(raw);
         Object version=root.opt("_version");
         if(!root.optString("_magic").equals("FPTCONFIG")||!(version instanceof Number)||!(((Number)version).doubleValue()==1||((Number)version).doubleValue()==2))throw new Exception("Нужен .fpconfig версии 1 или 2");
         JSONObject source=root.getJSONObject("settings"),safe=new JSONObject();
         for(String key:IMPORT_KEYS)if(source.has(key))safe.put(key,source.get(key));
         validatePortableTypes(safe);
-        if(safe.has("autoBumpCooldown")&&(!(safe.get("autoBumpCooldown") instanceof Number)||safe.getInt("autoBumpCooldown")<5||safe.getInt("autoBumpCooldown")>240))throw new Exception("Интервал должен быть от 5 до 240 минут");
+        if(safe.has("autoBumpCooldown")){Object c=safe.get("autoBumpCooldown");if(!(c instanceof Number)||!Double.isFinite(((Number)c).doubleValue()))throw new Exception("Неверный интервал поднятия");safe.put("autoBumpCooldown",(int)Math.max(5,Math.min(240,((Number)c).doubleValue())));}
+        if("custom".equals(safe.optString("notificationSound"))&&safe.optString("fpToolsCustomSoundData").isEmpty())safe.put("notificationSound","default");
         if(safe.has("fpToolsAutoReplies"))safe.put("fpToolsAutoReplies",cleanReplies(safe.getJSONObject("fpToolsAutoReplies")));
         return safe;
     }
@@ -121,14 +133,29 @@ final class Settings {
     }
     static JSONObject cleanReplies(JSONObject ar) throws Exception {
         JSONObject clean=new JSONObject();
-        for(String key:Arrays.asList("greetingEnabled","keywordsEnabled","greetingText","keywords","newOrderReplyEnabled","newOrderReplyText","orderConfirmReplyEnabled","orderConfirmReplyText","autoReviewEnabled","reviewTemplates","bonusForReviewEnabled","autoDeliveryEnabled","ignoreSystemMessages","onlyNewChats","bonusMode","greetingSendOrder","newOrderReplySendOrder","orderConfirmReplySendOrder","greetingCooldownDays","greetingImages","newOrderReplyImages","orderConfirmReplyImages","reviewTemplateImages"))if(ar.has(key))clean.put(key,ar.get(key));
-        for(String key:Arrays.asList("greetingEnabled","keywordsEnabled","newOrderReplyEnabled","orderConfirmReplyEnabled","autoReviewEnabled","bonusForReviewEnabled","autoDeliveryEnabled","ignoreSystemMessages","onlyNewChats"))if(clean.has(key)&&!(clean.get(key) instanceof Boolean))throw new Exception("Неверный переключатель "+key);
-        for(String key:Arrays.asList("greetingText","newOrderReplyText","orderConfirmReplyText","bonusMode","greetingSendOrder","newOrderReplySendOrder","orderConfirmReplySendOrder"))if(clean.has(key)&&!(clean.get(key) instanceof String))throw new Exception("Неверный текст "+key);
-        if(clean.has("greetingCooldownDays")){double days;try{days=Double.parseDouble(clean.get("greetingCooldownDays").toString());}catch(Exception e){throw new Exception("Неверный период приветствия");}if(!Double.isFinite(days)||days<0||days>3650)throw new Exception("Неверный период приветствия");}
-        if(clean.has("reviewTemplates")&&!(clean.get("reviewTemplates") instanceof JSONObject))throw new Exception("Неверные шаблоны отзывов");
-        if(clean.has("greetingText")&&(!(clean.get("greetingText") instanceof String)||clean.getString("greetingText").length()>4000))throw new Exception("Приветствие до 4000 символов");
-        JSONArray rules=clean.optJSONArray("keywords");if(clean.has("keywords")&&rules==null)throw new Exception("Неверный список правил");
-        if(rules!=null){if(rules.length()>100)throw new Exception("Максимум 100 правил");for(int i=0;i<rules.length();i++){JSONObject rule=rules.getJSONObject(i);if(rule.optString("keyword").isEmpty()||rule.optString("keyword").length()>200||rule.optString("response").isEmpty()||rule.optString("response").length()>4000)throw new Exception("Неверное правило "+(i+1));}}
+        List<String> flags=Arrays.asList("greetingEnabled","keywordsEnabled","newOrderReplyEnabled","orderConfirmReplyEnabled","autoReviewEnabled","bonusForReviewEnabled","autoDeliveryEnabled","ignoreSystemMessages","onlyNewChats");
+        List<String> texts=Arrays.asList("greetingText","newOrderReplyText","orderConfirmReplyText","bonusMode","greetingSendOrder","newOrderReplySendOrder","orderConfirmReplySendOrder");
+        // Invalid values are skipped (not fatal) so one bad field cannot block the whole import; limits match content/settings_schema.js.
+        for(String key:flags)if(ar.opt(key)instanceof Boolean)clean.put(key,ar.opt(key));
+        for(String key:texts){Object v=ar.opt(key);if(v instanceof String t)clean.put(key,t.length()>30000?t.substring(0,30000):t);}
+        Object days=ar.opt("greetingCooldownDays");
+        if(days!=null){try{double d=Double.parseDouble(days.toString());if(Double.isFinite(d)&&d>=0&&d<=3650)clean.put("greetingCooldownDays",days);}catch(NumberFormatException ignored){}}
+        JSONObject templates=ar.optJSONObject("reviewTemplates");
+        if(templates!=null){JSONObject out=new JSONObject();for(String k:Arrays.asList("1","2","3","4","5")){Object v=templates.opt(k);if(v instanceof String t)out.put(k,t.length()>30000?t.substring(0,30000):t);}clean.put("reviewTemplates",out);}
+        JSONArray rules=ar.optJSONArray("keywords");
+        if(rules!=null){
+            JSONArray out=new JSONArray();
+            for(int i=0;i<rules.length()&&out.length()<1000;i++){
+                JSONObject rule=rules.optJSONObject(i);if(rule==null)continue;
+                String keyword=rule.optString("keyword"),response=rule.optString("response"),mode=rule.optString("matchMode","contains");
+                if(keyword.isEmpty()||response.isEmpty()||(!mode.equals("contains")&&!mode.equals("exact")))continue;
+                JSONObject copy=new JSONObject(rule.toString());
+                copy.put("keyword",keyword.length()>1000?keyword.substring(0,1000):keyword).put("response",response.length()>30000?response.substring(0,30000):response).put("matchMode",mode);
+                out.put(copy);
+            }
+            clean.put("keywords",out);
+        }
+        for(String key:Arrays.asList("greetingImages","newOrderReplyImages","orderConfirmReplyImages","reviewTemplateImages"))if(ar.has(key))clean.put(key,ar.get(key));
         validateStructure(clean,0);
         return clean;
     }

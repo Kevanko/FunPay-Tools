@@ -20,10 +20,14 @@ public final class PresenceService extends Service {
     }
     @Override public void onCreate(){super.onCreate();settings=new Settings(this);executor=Executors.newSingleThreadScheduledExecutor();}
     @Override public int onStartCommand(Intent intent,int flags,int startId){
-        if(intent!=null&&"stop".equals(intent.getAction())){PeriodicPresence.schedule(this,false);stopSelf();return START_NOT_STICKY;}
+        boolean stop=intent!=null&&"stop".equals(intent.getAction());
+        // Started via startForegroundService: must enter the foreground on every path before stopping.
+        try{
+            if(Build.VERSION.SDK_INT>=29)startForeground(1,notice(this,"Проверяю соединение с FunPay",true),ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
+            else startForeground(1,notice(this,"Проверяю соединение с FunPay",true));
+        }catch(RuntimeException e){if(stop)PeriodicPresence.schedule(this,false);stopSelf();return START_NOT_STICKY;}
+        if(stop){PeriodicPresence.schedule(this,false);stopSelf();return START_NOT_STICKY;}
         if(new SessionStore(this).read()==null){stopSelf();return START_NOT_STICKY;}
-        if(Build.VERSION.SDK_INT>=29)startForeground(1,notice(this,"Проверяю соединение с FunPay",true),ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
-        else startForeground(1,notice(this,"Проверяю соединение с FunPay",true));
         if(!started){
             started=true;
             settings.serviceBeat(true);

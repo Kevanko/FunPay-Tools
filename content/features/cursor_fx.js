@@ -57,6 +57,9 @@ class CursorFX {
             // PERF: only touch the custom-cursor element when it's actually enabled.
             // Previously this wrote a transform on EVERY mousemove even with the feature
             // off (display:none), causing constant layout/style work and visible lag.
+            if (this._customCursorActive && !this.customCursor.isConnected && this.cursorHideStyleTag.textContent) {
+                this.cursorHideStyleTag.textContent = '';
+            }
             if (this._customCursorActive) {
                 this.customCursor.style.transform = `translate(calc(${e.clientX}px - 50%), calc(${e.clientY}px - 50%))`;
             }
@@ -92,7 +95,8 @@ class CursorFX {
             this._customCursorActive = true;
             this.customCursor.style.display = 'block';
             
-            if (this.customCursorConfig.hideSystem) {
+            // нативный курсор прячем только пока наш курсор реально в DOM
+            if (this.customCursorConfig.hideSystem && this.customCursor.isConnected) {
                 this.cursorHideStyleTag.textContent = `* { cursor: none !important; }`;
             } else {
                 this.cursorHideStyleTag.textContent = '';

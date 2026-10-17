@@ -171,7 +171,17 @@
         // ТОЛЬКО на полной странице чата (/chat/). На странице профиля пользователя
         // (/users/<id>/) есть встроенный мини-чат с ДРУГОЙ раскладкой — там подгонка по
         // высоте окна растягивала ленту и текст вылезал за пределы виджета.
-        if (!location.pathname.includes('/chat/')) return;
+        if (!location.pathname.startsWith('/chat/')) {
+            // ушли со страницы чата — снимаем наши inline-стили, чтобы не ломать другие раскладки
+            const c0 = document.querySelector('.chat-message-container');
+            const l0 = document.querySelector('.chat-message-list');
+            if (c0 && c0.dataset.fptFitted) {
+                delete c0.dataset.fptFitted;
+                c0.style.flex = ''; c0.style.minHeight = ''; c0.style.height = '';
+                if (l0) l0.style.height = '';
+            }
+            return;
+        }
         // FunPay держит ленту сообщений в .chat-message-container (flex:1), а сам список —
         // абсолютным внутри него; высоту он считает по JS и НЕ учитывает нашу полосу шаблонов,
         // поэтому композер+полоса уезжают за низ окна и последнее сообщение прячется. Двигать
@@ -189,6 +199,7 @@
         if (avail < 140) return;                              // слишком мало / не та раскладка — не трогаем
         if (Math.abs(container.getBoundingClientRect().height - avail) < 3) return;   // уже верно
         const atBottom = list.scrollHeight - list.clientHeight - list.scrollTop < 50;
+        container.dataset.fptFitted = '1';
         container.style.flex = '0 0 auto';
         container.style.minHeight = '0';
         container.style.height = avail + 'px';

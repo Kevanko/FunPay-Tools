@@ -57,8 +57,15 @@ function tgApi(token, method, params) {
     return fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params || {})
-    }).then(r => r.json());
+        body: JSON.stringify(params || {}),
+        signal: AbortSignal.timeout(30000)
+    }).then(async r => {
+        // 429/5xx и не-JSON ответы превращаем в {ok:false} — вызывающий решает, повторять ли
+        let j = null;
+        try { j = await r.json(); } catch (_) {}
+        if (j && typeof j === 'object') return j;
+        return { ok: false, error_code: r.status, description: 'HTTP ' + r.status };
+    });
 }
 
 function tgEscape(s) {
@@ -90,11 +97,12 @@ async function telegramValidateAndResolve(token) {
         const upd = await tgApi(token, 'getUpdates', { timeout: 0, limit: 10 });
         if (upd.ok && Array.isArray(upd.result)) {
             for (let i = upd.result.length - 1; i >= 0; i--) {
-                const m = upd.result[i].message || upd.result[i].edited_message;
-                if (m && m.chat && m.chat.id) { chatId = String(m.chat.id); break; }
+                const m = upd.result[i].message;
+                // не привязываем произвольный чат: только личный чат, где боту явно написали /start
+                if (m && m.chat && m.chat.id && m.chat.type === 'private' && /^\/start(@\w+)?(\s|$)/i.test(m.text || '')) { chatId = String(m.chat.id); break; }
             }
         }
-        return { ok: true, botName, chatId };
+        return { ok: true, botName, chatId, needsStart: !chatId };
     } catch (e) {
         return { ok: false, error: e.message };
     }
@@ -187,13 +195,18 @@ async function handleTelegramCommand(text, cfg) {
 }
 
 // ── Уведомления (новые сообщения / заказы) ────────────────────────────────────
-async function telegramNotifyNewMessages(chats) {
+// scope — userId аккаунта: у каждого аккаунта свои «уже отправлено»/seeded, иначе при смене
+// аккаунта чужие id блокируют уведомления или первый проход шлёт всё подряд.
+const tgScoped = (key, scope) => scope ? key + '__' + scope : key;
+
+async function telegramNotifyNewMessages(chats, scope = '') {
     const cfg = await tgGet();
     if (!cfg.enabled || !cfg.notifyMessages || !cfg.token || !cfg.chatId) return;
 
-    const { [TG_PROCESSED]: processedArr } = await chrome.storage.local.get(TG_PROCESSED);
+    const procKey = tgScoped(TG_PROCESSED, scope);
+    const { [procKey]: processedArr } = await chrome.storage.local.get(procKey);
     const processed = new Set(processedArr || []);
-    const seededKey = 'fpToolsTelegramSeeded';
+    const seededKey = tgScoped('fpToolsTelegramSeeded', scope);
     const { [seededKey]: seeded } = await chrome.storage.local.get(seededKey);
     const firstRun = !seeded;
 
@@ -205,7 +218,7 @@ async function telegramNotifyNewMessages(chats) {
         const id = 'm' + chat.msgId;
         if (processed.has(id)) continue;
         if (!firstRun) {
-            await tgSendMessage(
+            const sent = await tgSendMessage(
                 `💬 <b>Новое сообщение</b>\n` +
                 `От: ${tgEscape(chat.chatName || 'Покупатель')}\n` +
                 `${tgEscape((chat.messageText || '').slice(0, 300))}`,
@@ -217,6 +230,8 @@ async function telegramNotifyNewMessages(chats) {
                     }
                 }
             );
+            // не отправилось (429/сеть/ok:false) — не помечаем обработанным, повторим в следующем цикле
+            if (!sent || !sent.ok) break;
         }
         processed.add(id);
         changed = true;
@@ -225,11 +240,11 @@ async function telegramNotifyNewMessages(chats) {
     if (changed || firstRun) {
         let arr = Array.from(processed);
         if (arr.length > 300) arr = arr.slice(-300);
-        await chrome.storage.local.set({ [TG_PROCESSED]: arr, [seededKey]: true });
+        await chrome.storage.local.set({ [procKey]: arr, [seededKey]: true });
     }
 }
 
-async function telegramNotifyNewOrders(orders) {
+async function telegramNotifyNewOrders(orders, scope = '') {
     const cfg = await tgGet();
     if (!cfg.enabled || !cfg.notifyOrders || !cfg.token || !cfg.chatId) return;
 
@@ -238,8 +253,8 @@ async function telegramNotifyNewOrders(orders) {
     // состояние, иначе при следующем успешном опросе все заказы посыплются как новые.
     if (!list.length) return;
 
-    const key = 'fpToolsTelegramProcessedOrders';
-    const seededKey = 'fpToolsTelegramOrdersSeeded';
+    const key = tgScoped('fpToolsTelegramProcessedOrders', scope);
+    const seededKey = tgScoped('fpToolsTelegramOrdersSeeded', scope);
     const { [key]: processedArr } = await chrome.storage.local.get(key);
     const { [seededKey]: seeded } = await chrome.storage.local.get(seededKey);
     const processed = new Set(processedArr || []);
@@ -249,13 +264,14 @@ async function telegramNotifyNewOrders(orders) {
     for (const o of list) {
         if (processed.has(o.id)) continue;
         if (!firstRun) {
-            await tgSendMessage(
+            const sent = await tgSendMessage(
                 `🛒 <b>Новый заказ</b>\n` +
                 `${tgEscape(o.title || '')}\n` +
                 `Покупатель: ${tgEscape(o.buyer || '—')}\n` +
                 `Сумма: ${tgEscape(o.price || '—')}`,
                 o.link ? { reply_markup: { inline_keyboard: [[{ text: 'Открыть заказ', url: o.link }]] } } : undefined
             );
+            if (!sent || !sent.ok) break;   // повторим в следующем цикле (429/сеть)
         }
         processed.add(o.id);
         changed = true;
@@ -275,7 +291,9 @@ async function telegramPollOnce() {
     _polling = true;
     try {
         const cfg = await tgGet();
-        if (!cfg.enabled || !cfg.token || !cfg.allowControl) return;
+        if (!cfg.enabled || !cfg.token) return;
+        // без привязанного чата опрашиваем только ради /start-привязки; команды — при allowControl
+        if (cfg.chatId && !cfg.allowControl) return;
 
         const upd = await tgApi(cfg.token, 'getUpdates', {
             offset: (cfg.lastUpdateId || 0) + 1,
@@ -291,10 +309,12 @@ async function telegramPollOnce() {
             const msg = u.message;
             if (!msg || !msg.text) continue;
             // принимаем команды только из настроенного chatId (безопасность)
-            if (cfg.chatId && String(msg.chat.id) !== String(cfg.chatId)) {
-                // если chatId ещё не настроен — примем первый и зафиксируем
-                if (!cfg.chatId) await tgSet({ chatId: String(msg.chat.id) });
-                else continue;
+            if (cfg.chatId) {
+                if (String(msg.chat.id) !== String(cfg.chatId)) continue;
+            } else {
+                // чат не привязан: привязываем ТОЛЬКО по явной команде /start из личного чата
+                if (msg.chat.type !== 'private' || !/^\/start(@\w+)?(\s|$)/i.test(msg.text)) continue;
+                await tgSet({ chatId: String(msg.chat.id) });
             }
             await handleTelegramCommand(msg.text, await tgGet());
         }
@@ -346,8 +366,12 @@ function telegramInit(deps) {
     _deps = deps || {};
 }
 
+// Страховка для будильника: после перезапуска SW таймера быстрого опроса нет — поднимаем.
+function telegramEnsureFastPoll() { if (!_fastPollTimer) return scheduleFastPoll(); }
+
 export {
     TELEGRAM_ALARM,
+    telegramEnsureFastPoll,
     telegramInit,
     telegramSyncAlarm,
     telegramPollOnce,

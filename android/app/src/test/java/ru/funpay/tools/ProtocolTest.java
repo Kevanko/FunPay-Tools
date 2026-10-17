@@ -4,6 +4,19 @@ import org.json.*;
 import static org.junit.Assert.*;
 
 public class ProtocolTest {
+    @Test public void groupedMessagesInheritSenderAndOnlyServerNoticesGetPaymentStatus(){
+        var messages=FunPayClient.parseMessages("<div class='chat-msg-item chat-msg-with-head'><a class='chat-msg-author-link' href='/users/42/'>Me</a><span class='chat-msg-date'>12:30</span><div class='chat-msg-text'>Hello</div></div><div class='chat-msg-item'><div class='chat-msg-text'>Second</div></div><div class='chat-msg-item chat-msg-with-head'><div class='chat-msg-author-label'>оповещение</div><div class='chat-msg-body'><div class='alert'><div class='chat-msg-text'>Покупатель оплатил заказ #ABCDEFG1</div></div></div></div><div class='chat-msg-item chat-msg-with-head'><a class='chat-msg-author-link' href='/users/43/'>Buyer</a><div class='chat-msg-text'>я оплатил заказ</div></div>","42");
+        assertTrue(messages.get(0).own);assertTrue(messages.get(1).own);assertEquals("Me",messages.get(1).author);assertTrue(messages.get(2).system);assertEquals("paid",messages.get(2).status);assertFalse(messages.get(3).system);assertEquals("unknown",messages.get(3).status);
+    }
+    @Test public void chatAvatarsAndTimesUseOnlyTrustedImageOrigins(){
+        var chats=FunPayClient.parseChats("<a class='contact-item' data-id='7'><span class='media-user-name'>Buyer</span><span class='avatar-photo' style='background-image:url(https://funpay.com/uploads/avatar.png)'></span><span class='contact-item-time'>12:30</span><span class='contact-item-message'>оплатил</span></a>");
+        assertEquals("https://funpay.com/uploads/avatar.png",chats.get(0).avatar);assertEquals("12:30",chats.get(0).time);assertEquals("unknown",chats.get(0).status);
+        assertEquals("",FunPayClient.avatar(org.jsoup.Jsoup.parse("<img src='https://evil.example/avatar.png'>").selectFirst("img")));
+    }
+    @Test public void paymentStatusesComeFromOrdersAndLatestOrderWins(){
+        var statuses=FunPayClient.parseOrderStatuses("<a class='tc-item' href='/orders/ABCDEFG1/'><span class='media-user-name'>Buyer</span><span class='tc-status'>Оплачен</span></a><a class='tc-item' href='/orders/ABCDEFG2/'><span class='media-user-name'>Buyer</span><span class='tc-status'>Закрыт</span></a><a class='tc-item' href='/orders/ABCDEFG3/'><span class='media-user-name'>Other</span><span class='tc-status'>Возврат</span></a>");
+        assertEquals("paid",statuses.get("buyer"));assertEquals("refunded",statuses.get("other"));assertEquals("unknown",FunPayClient.orderStatus("покупатель написал, что оплатил"));
+    }
     @Test public void numericErrorsAndNestedErrorsAreNotSuccess() throws Exception {
         assertTrue(FunPayClient.hasError(new JSONObject("{\"error\":1}")));
         assertTrue(FunPayClient.hasError(new JSONObject("{\"error\":true}")));

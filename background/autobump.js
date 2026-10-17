@@ -79,10 +79,18 @@ async function getAuthDetails() {
 }
 
 
+// Кука должна оставаться той, под которой получен auth (heartbeat/переключение могли её сменить).
+async function assertSameAccount(auth) {
+    const m = /golden_key=([^;]+)/.exec(auth.cookies || '');
+    const cur = await chrome.cookies.get({ url: 'https://funpay.com', name: 'golden_key' });
+    if (!m || !cur?.value || cur.value !== m[1]) throw new Error('Аккаунт изменился во время поднятия');
+}
+
 async function raiseCategory(categoryData, auth) {
   // обе POST-операции /lots/raise — атомарно под общим cookie-замком, чтобы heartbeat
   // не подменил golden_key между ними и не поднял чужой аккаунт.
   return withCookieLock(async () => {
+    await assertSameAccount(auth);
     const { cookies, csrfToken } = auth;
     const { gameId, nodeId, categoryName } = categoryData;
     
@@ -138,8 +146,15 @@ async function raiseCategory(categoryData, auth) {
 }
 
 // --- ИЗМЕНЕННАЯ ФУНКЦИЯ ---
+let _bumpRunning = false;
 export async function runBumpCycle() {
     const summary = { raised: 0, errors: 0, skipped: 0 };
+    // защита от наложения: alarm, ручной запуск и Telegram /bump не должны идти параллельно
+    if (_bumpRunning) { summary.skipped++; return summary; }
+    _bumpRunning = true;
+    try { return await runBumpCycleInner(summary); } finally { _bumpRunning = false; }
+}
+async function runBumpCycleInner(summary) {
     const raisedNames = [];
     try {
         if (fpIsRateLimited()) { await logToConsole('FunPay под бэк-оффом (rate-limit) — поднятие пропущено.'); return summary; }
@@ -181,7 +196,7 @@ export async function runBumpCycle() {
         const categoryUrlHrefs = categoryUrls.map(url => url.href);
 
         for (const categoryUrl of categoryUrlHrefs) {
-            const categoryPageResponse = await withCookieLock(() => fpFetch(categoryUrl, { credentials: 'include', cache: 'no-store' }));
+            const categoryPageResponse = await withCookieLock(async () => { await assertSameAccount(auth); return fpFetch(categoryUrl, { credentials: 'include', cache: 'no-store' }); });
             
             const urlParts = categoryUrl.split('/');
             const guessedName = urlParts.length > 2 ? urlParts[urlParts.length - 2] : 'Неизвестная категория';
@@ -223,9 +238,17 @@ export async function runBumpCycle() {
     }
 }
 
+export function validBumpPeriod(v) {
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 export async function startAutoBump(cooldownMinutes) {
-    await chrome.alarms.create(BUMP_ALARM_NAME, { delayInMinutes: 1, periodInMinutes: parseInt(cooldownMinutes, 10) });
-    await runBumpCycle();
+    const period = validBumpPeriod(cooldownMinutes);
+    if (!period) throw new Error('Некорректный интервал автоподнятия');
+    await chrome.alarms.create(BUMP_ALARM_NAME, { delayInMinutes: 1, periodInMinutes: period });
+    // цикл поднятия идёт долго (паузы между категориями) — не держим ответ на него
+    runBumpCycle().catch(e => console.warn('FP Tools AutoBump:', e?.message));
 }
 
 export async function stopAutoBump() {

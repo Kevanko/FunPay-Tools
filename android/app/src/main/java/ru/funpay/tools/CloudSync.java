@@ -20,7 +20,7 @@ final class CloudSync {
     static void connect(Context c,String text) throws Exception {
         synchronized(Settings.class){synchronized(SessionStore.class){
             Settings settings=new Settings(c);String uid=settings.uid();JSONObject cap=CloudProtocol.capability(text,uid);
-            SessionStore vault=new SessionStore(c,"cloud");JSONObject all=vault.read();if(all==null)all=new JSONObject();
+            SessionStore vault=new SessionStore(c,"cloud");if(vault.unreadable())vault.discardUnreadable();JSONObject all=vault.read();if(all==null)all=new JSONObject();
             if(!CloudProtocol.equal(all.opt(uid),cap))settings.resetSyncTimes(uid);
             all.put(uid,cap);vault.write(all);status(c,uid,"Подключено. Ожидается синхронизация",false);
         }}CloudSyncWorker.schedule(c);CloudSyncWorker.enqueue(c);

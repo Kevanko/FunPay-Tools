@@ -14,7 +14,7 @@ public final class LoginPairingChecks extends Instrumentation {
         try{
             if(new SessionStore(getTargetContext()).read()!=null)throw new IllegalStateException("Run only without a real account");isolated=true;
             try(var input=getContext().getAssets().open("login-transfer.json")){JSONObject f=new JSONObject(new String(input.readAllBytes(),java.nio.charset.StandardCharsets.UTF_8));JSONObject plain=LoginTransfer.decrypt(f.getString("qr"),f.getString("code"),1700000000100L);if(!"424242".equals(plain.optString("uid")))throw new AssertionError("Browser QR decryption failed on Android");}
-            check("424242",true);check("111111",false);
+            check("424242",true);check("111111",false);checkMultiStore();
             JSONObject expired=new JSONObject().put("expires",System.currentTimeMillis()-1);LoginTransfer.stage(expired);if(LoginTransfer.consume()!=null)throw new AssertionError("Expired handoff accepted");
             WelcomeActivity welcome=(WelcomeActivity)startActivitySync(new Intent(getTargetContext(),WelcomeActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             final Throwable[] layoutFailure={null};runOnMainSync(()->{try{if(welcome.getWindow().getDecorView().findViewWithTag("auth-transfer-section").getBackground()!=null)throw new AssertionError("Nested welcome surface");new TypographyChecks().verify(welcome.getWindow().getDecorView());}catch(Throwable e){layoutFailure[0]=e;}});if(layoutFailure[0]!=null)throw new AssertionError(layoutFailure[0]);
@@ -23,12 +23,23 @@ public final class LoginPairingChecks extends Instrumentation {
         finally{if(isolated){LoginTransfer.clear();new SessionStore(getTargetContext()).clear();runOnMainSync(()->{CookieManager.getInstance().removeAllCookies(null);CookieManager.getInstance().flush();});}}
         finish(code,result);
     }
+    void checkMultiStore() throws Exception {
+        SessionStore sessions=new SessionStore(getTargetContext());sessions.clear();
+        sessions.save("golden_key=fixture_first","42","First");String original=sessions.read().getString("sessionId");
+        sessions.save("golden_key=fixture_second","43","Second");
+        if(sessions.list().length()!=2)throw new AssertionError("Second login overwrote saved account");
+        sessions.activate("42");if(!"42".equals(sessions.read().optString("uid"))||original.equals(sessions.read().optString("sessionId")))throw new AssertionError("Switch did not rotate active session");
+        String active=sessions.read().getString("sessionId");sessions.updateProfile("42","First updated","100 ₽","https://example.invalid/avatar");
+        if(!active.equals(sessions.read().getString("sessionId")))throw new AssertionError("Profile update invalidated active client");
+        sessions.remove("42");if(sessions.list().length()!=1||!"43".equals(sessions.read().optString("uid")))throw new AssertionError("Remove deleted unrelated account");
+        SessionStore fixture=new SessionStore(getTargetContext(),"multi-fixture");fixture.write(new JSONObject().put("marker","raw"));if(!"raw".equals(fixture.read().optString("marker")))throw new AssertionError("Non-session namespace changed format");fixture.clear();sessions.clear();
+    }
     void check(String actualUid,boolean accepted) throws Exception {
         new SessionStore(getTargetContext()).clear();
         LoginTransfer.stage(new JSONObject().put("uid","424242").put("name","Fixture").put("golden_key","fixture_session_only_0123456789").put("expires",System.currentTimeMillis()+300000));
         SiteActivity screen=(SiteActivity)startActivitySync(new Intent(getTargetContext(),SiteActivity.class).putExtra("login",true).putExtra("pairing",true).putExtra("path","/").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         if(LoginTransfer.consume()!=null)throw new AssertionError("Handoff reused");Thread.sleep(300);
-        runOnMainSync(()->{screen.web.stopLoading();screen.web.setWebViewClient(new android.webkit.WebViewClient());screen.web.loadDataWithBaseURL("https://funpay.com/","<html><body data-app-data='{&quot;userId&quot;:"+actualUid+",&quot;userName&quot;:&quot;Fixture&quot;,&quot;csrf-token&quot;:&quot;fixture-csrf&quot;}'>Fixture</body></html>","text/html","UTF-8","https://funpay.com/");});
+        runOnMainSync(()->{screen.web.stopLoading();screen.capturing=false;screen.web.setWebViewClient(new android.webkit.WebViewClient());screen.web.loadDataWithBaseURL("https://funpay.com/","<html><body data-app-data='{&quot;userId&quot;:"+actualUid+",&quot;userName&quot;:&quot;Fixture&quot;,&quot;csrf-token&quot;:&quot;fixture-csrf&quot;}'>Fixture</body></html>","text/html","UTF-8","https://funpay.com/");});
         for(int i=0;i<50;i++){if(new SessionStore(getTargetContext()).read()!=null)break;final boolean[] rejected={false};runOnMainSync(()->rejected[0]=screen.status.getText().toString().contains("не совпал"));if(rejected[0])break;Thread.sleep(100);}
         JSONObject saved=new SessionStore(getTargetContext()).read();
         if(accepted&&(saved==null||!"424242".equals(saved.optString("uid"))))throw new AssertionError("Matching QR account not captured");

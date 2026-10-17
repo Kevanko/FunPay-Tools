@@ -146,6 +146,16 @@ function escapeHtmlClone(str) {
     ));
 }
 
+// Допускаем только http(s)/относительные URL (значения приходят из скрапинга).
+function safeCloneUrl(u) {
+    const s = String(u ?? '').trim();
+    if (!s) return '';
+    try {
+        const p = new URL(s, location.origin);
+        return (p.protocol === 'https:' || p.protocol === 'http:') ? s : '';
+    } catch (_) { return ''; }
+}
+
 function renderCloneReview() {
     const st = __fpCloneState;
     if (!st) return;
@@ -333,7 +343,7 @@ async function executeCloneCreate() {
 
         if (resp.newId) st.createdIds.push(resp.newId);
         const link = resp.newId
-            ? `<a href="https://funpay.com/lots/offerEdit?offer=${resp.newId}" target="_blank">Открыть лот →</a>`
+            ? `<a href="https://funpay.com/lots/offerEdit?offer=${encodeURIComponent(resp.newId)}" target="_blank">Открыть лот →</a>`
             : '';
         statusEl.innerHTML = `<span class="fp-cw-ok">✓ Лот создан!</span> ${link}`;
         showNotification('Лот успешно создан на сервере!', false);
@@ -565,7 +575,7 @@ function setupImportWizardLogic(overlay) {
             myLotsCache = lots || [];
             renderMyLots();
         } catch (e) {
-            listEl.innerHTML = `<div class="fp-cw-err" style="padding:15px; text-align:center;">Ошибка загрузки: ${e.message}</div>`;
+            listEl.innerHTML = `<div class="fp-cw-err" style="padding:15px; text-align:center;">Ошибка загрузки: ${escapeHtmlClone(e.message)}</div>`;
         }
     });
 
@@ -601,7 +611,7 @@ function setupImportWizardLogic(overlay) {
         try {
             const lots = await chrome.runtime.sendMessage({ action: 'getLotList', url: globalCategoryUrl });
             renderGlobalItems(lots, 'lot');
-        } catch (err) { listEl.innerHTML = `<div class="fp-cw-err">Ошибка: ${err.message}</div>`; }
+        } catch (err) { listEl.innerHTML = `<div class="fp-cw-err">Ошибка: ${escapeHtmlClone(err.message)}</div>`; }
     });
 
     searchInput.addEventListener('input', () => {
@@ -628,7 +638,7 @@ function setupImportWizardLogic(overlay) {
                         const games = await chrome.runtime.sendMessage({ action: 'searchGames', query: query });
                         renderGlobalItems(games, 'game');
                     } catch (e) {
-                        listEl.innerHTML = `<div class="fp-cw-err" style="padding:15px; text-align:center;">Ошибка: ${e.message}</div>`;
+                        listEl.innerHTML = `<div class="fp-cw-err" style="padding:15px; text-align:center;">Ошибка: ${escapeHtmlClone(e.message)}</div>`;
                     }
                 }, 400);
             }
@@ -660,7 +670,7 @@ function setupImportWizardLogic(overlay) {
                 searchInput.dispatchEvent(new Event('input')); 
             }
         } catch (e) {
-            listEl.innerHTML = `<div class="fp-cw-err" style="padding:15px; text-align:center;">Ошибка: ${e.message}</div>`;
+            listEl.innerHTML = `<div class="fp-cw-err" style="padding:15px; text-align:center;">Ошибка: ${escapeHtmlClone(e.message)}</div>`;
         }
     });
 
@@ -684,7 +694,7 @@ function setupImportWizardLogic(overlay) {
                 try {
                     const categories = await chrome.runtime.sendMessage({ action: 'getCategoryList', url: globalGameUrl });
                     renderGlobalItems(categories, 'category');
-                } catch (err) { listEl.innerHTML = `<div class="fp-cw-err">Ошибка: ${err.message}</div>`; }
+                } catch (err) { listEl.innerHTML = `<div class="fp-cw-err">Ошибка: ${escapeHtmlClone(err.message)}</div>`; }
             } else if (globalStep === 'category') {
                 globalCategoryUrl = item.dataset.url;
                 globalStep = 'lot';
@@ -692,7 +702,7 @@ function setupImportWizardLogic(overlay) {
                 try {
                     const lots = await chrome.runtime.sendMessage({ action: 'getLotList', url: globalCategoryUrl });
                     renderGlobalItems(lots, 'lot');
-                } catch (err) { listEl.innerHTML = `<div class="fp-cw-err">Ошибка: ${err.message}</div>`; }
+                } catch (err) { listEl.innerHTML = `<div class="fp-cw-err">Ошибка: ${escapeHtmlClone(err.message)}</div>`; }
             } else if (globalStep === 'lot') {
                 loadLotPreviewForImport(item.dataset.offerId, previewEl);
             }
@@ -728,23 +738,23 @@ function setupImportWizardLogic(overlay) {
         let html = '';
         if (type === 'game') {
             items.forEach(g => {
-                html += `<div class="fp-iw-list-item" data-url="${g.url}" style="flex-direction:row; align-items:center;">
-                    <img src="${g.img}" style="width:24px;height:24px;border-radius:4px;" onerror="this.style.display='none'">
+                html += `<div class="fp-iw-list-item" data-url="${escapeHtmlClone(safeCloneUrl(g.url))}" style="flex-direction:row; align-items:center;">
+                    <img src="${escapeHtmlClone(safeCloneUrl(g.img))}" style="width:24px;height:24px;border-radius:4px;" onerror="this.style.display='none'">
                     <span class="fp-iw-list-item-title" style="flex:1;">${escapeHtmlClone(g.name)}</span>
                 </div>`;
             });
         } else if (type === 'category') {
             items.forEach(c => {
-                html += `<div class="fp-iw-list-item" data-url="${c.url}">
+                html += `<div class="fp-iw-list-item" data-url="${escapeHtmlClone(safeCloneUrl(c.url))}">
                     <div class="fp-iw-list-item-meta">
                         <span style="font-weight:600; color:var(--cw-color);">${escapeHtmlClone(c.name)}</span>
-                        <span style="background:var(--cw-subtle); padding:2px 6px; border-radius:10px;">${c.count}</span>
+                        <span style="background:var(--cw-subtle); padding:2px 6px; border-radius:10px;">${escapeHtmlClone(c.count)}</span>
                     </div>
                 </div>`;
             });
         } else if (type === 'lot') {
             items.forEach(l => {
-                html += `<div class="fp-iw-list-item" data-offer-id="${l.offerId}">
+                html += `<div class="fp-iw-list-item" data-offer-id="${escapeHtmlClone(l.offerId)}">
                     <span class="fp-iw-list-item-title">${escapeHtmlClone(l.description)}</span>
                     <div class="fp-iw-list-item-meta">
                         <span>Продавец: ${escapeHtmlClone(l.seller)}</span>

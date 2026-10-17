@@ -22,7 +22,7 @@ function extensionContext(overrides = {}) {
         tabs: { query: async () => [] }
     };
     const ctx = vm.createContext({ chrome, parseOffscreen: async()=>undefined, console: silent, URL, URLSearchParams, AbortSignal, TextEncoder, crypto: webcrypto, setTimeout, clearTimeout, Date, Math, ...overrides });
-    vm.runInContext(arSource.replace(/^import .*;\n/gm, '').replace(/export /g, ''), ctx);
+    vm.runInContext(arSource.replace(/^import .*;\r?\n/gm, '').replace(/export /g, ''), ctx);
     return { ctx, state, chrome, rules, events };
 }
 
@@ -143,7 +143,7 @@ test('VPS retains uncertain send across restart and does not replay it blindly',
     const source = fs.readFileSync(new URL('../vps/autoreply.js', import.meta.url), 'utf8');
     let sends = 0;
     const ctx = vm.createContext({ console: silent, setTimeout, URLSearchParams, AbortSignal, Date, Math });
-    vm.runInContext(source.replace(/^import .*;\n/gm, '').replace(/export /g, ''), ctx);
+    vm.runInContext(source.replace(/^import .*;\r?\n/gm, '').replace(/export /g, ''), ctx);
     ctx.send = async()=>{sends++;throw new Error('lost ack');};
     ctx.chats = [{chatId:'123',nodeMsg:2,messageText:'hello',chatName:'Buyer'}];
     vm.runInContext(`accountAuth=async()=>({userId:'10',username:'Seller'});fetchChats=async()=>chats;matchKeywordReply=()=>({text:'reply'});sendMessage=send;fpFetch=async()=>({ok:true,text:async()=>'<fixture>'});`,ctx);

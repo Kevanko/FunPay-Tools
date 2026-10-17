@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-const { createLoginTransfer, trustedLoginSender } = await import('data:text/javascript;base64,' + Buffer.from(readFileSync('background/login_transfer.js')).toString('base64'));
+const { createLoginTransfer, createQuickLoginTransfer, trustedLoginSender } = await import('data:text/javascript;base64,' + Buffer.from(readFileSync('background/login_transfer.js')).toString('base64'));
 const auth = { userId: 424242, username: 'Тест QR', golden_key: 'fixture_session_only_0123456789' };
 async function decode(value, code = value.code) {
  const e = JSON.parse(value.qr.slice('FPTLOGIN1:'.length));
@@ -19,6 +19,38 @@ test('login QR encrypts session and expires in five minutes, separate code is no
 });
 test('unauthenticated or malformed session never produces QR', async () => {
  for(const bad of [{},{...auth,userId:0},{...auth,golden_key:'bad; Path=/'},{...auth,userId:'other'}])await assert.rejects(createLoginTransfer(bad));
+});
+
+async function decodeQuick(transfer){
+ const envelope=JSON.parse(transfer.qr.slice('FPTLOGIN2:'.length));
+ const key=await crypto.subtle.importKey('raw',Buffer.from(envelope.key,'base64'),'AES-GCM',false,['decrypt']);
+ const bytes=await crypto.subtle.decrypt({name:'AES-GCM',iv:Buffer.from(envelope.iv,'base64'),additionalData:new TextEncoder().encode('FPTLOGIN2:')},key,Buffer.from(envelope.ct,'base64'));
+ const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+ return JSON.parse(await new Response(stream).text());
+}
+test('scan-only QR carries both accounts and settings without a separately typed code',async()=>{
+ const second={uid:'424243',name:'Second',golden_key:'fixture_second_session_0123456789',settings:{autoBumpEnabled:true}};
+ const transfer=await createQuickLoginTransfer({...auth,settings:{fpToolsTheme:{sitePreset:'clay'}}},[second],1700000000000);
+ const value=await decodeQuick(transfer);assert.equal(transfer.code,undefined);assert.equal(transfer.accounts,2);
+ assert.equal(value.accounts[0].uid,'424242');assert.equal(value.accounts[1].uid,'424243');assert.equal(value.accounts[1].settings.autoBumpEnabled,true);assert.equal(value.expires,1700000300000);
+ assert.ok(!transfer.qr.includes(auth.golden_key));assert.ok(!transfer.qr.includes(second.golden_key));
+});
+test('scan-only QR payload keeps only uid,name,issued,expires,accounts at top level',async()=>{
+ const value=await decodeQuick(await createQuickLoginTransfer({...auth,settings:{autoBumpEnabled:true},cookies:{golden_seal:'a.b'}},[],1700000000000,{schema:1}));
+ assert.deepEqual(Object.keys(value).sort(),['accounts','expires','issued','name','uid']);
+ assert.equal(value.accounts[0].settings.autoBumpEnabled,true);
+});
+test('scan-only QR drops heavy media then refuses honestly when still too large',async()=>{
+ const noise=()=>Buffer.from(crypto.getRandomValues(new Uint8Array(65536))).toString('base64');
+ const heavy={fpToolsTheme:{sitePreset:'clay',bgImage:'data:image/png;base64,'+noise()}};
+ const value=await decodeQuick(await createQuickLoginTransfer({...auth,settings:heavy},[],1700000000000));
+ assert.ok(value.accounts[0].settings.fpToolsTheme.bgImage==='');assert.equal(value.accounts[0].settings.fpToolsTheme.sitePreset,'clay');
+ await assert.rejects(createQuickLoginTransfer({...auth,settings:{fpToolsUserNotes:noise()}}),/файлом \.fpconfig/);
+});
+test('scan-only QR validates accounts and deduplicates primary',async()=>{
+ assert.equal((await createQuickLoginTransfer(auth,[{uid:'424242',golden_key:auth.golden_key}])).accounts,1);
+ await assert.rejects(createQuickLoginTransfer(auth,[{uid:'no',golden_key:auth.golden_key}]));
+ await assert.rejects(createQuickLoginTransfer(auth,Array.from({length:8},(_,i)=>({uid:String(100+i),golden_key:auth.golden_key}))));
 });
 
 test('login QR encrypts only supported session cookies and strips header injection', async () => {

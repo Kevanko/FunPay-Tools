@@ -8,10 +8,19 @@
     // Прячем страницу ДО любых отрисовок; фон вспышки задаётся ниже под тему.
     const hideStyle = document.createElement('style');
     hideStyle.id = HIDE_STYLE_ID;
-    hideStyle.textContent = `body { visibility: hidden !important; }`;
-    document.documentElement.appendChild(hideStyle);
+    // В под-фреймах страницу не прячем (нет вспышки, а снять скрытие некому).
+    if (window === window.top) {
+        hideStyle.textContent = `body { visibility: hidden !important; }`;
+        document.documentElement.appendChild(hideStyle);
+    }
+    // Failsafe: что бы ни случилось (нет глобалов темы, зависший storage), страница
+    // не должна остаться скрытой дольше 800 мс.
+    setTimeout(() => document.getElementById(HIDE_STYLE_ID)?.remove(), 800);
 
     try {
+        if (typeof fptNormalizeToPreset !== 'function' || typeof FPT_SITE_PRESETS === 'undefined' || typeof DEFAULT_THEME === 'undefined') {
+            throw new Error('theme globals missing');
+        }
         const data = await chrome.storage.local.get([
             'enableCustomTheme', 'fpToolsTheme', 'enableRedesignedHomepage',
             'hideBalance', 'fpToolsDisabledFeatures'

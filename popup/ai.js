@@ -1,7 +1,9 @@
 import { AI_PROVIDERS, AI_MODELS, normalizeAIEndpoint } from '../background/ai_provider.js';
 const embedded=window.parent!==window;
 document.body.classList.toggle('embedded',embedded);
-if(embedded)new ResizeObserver(()=>{window.parent.postMessage({type:'fpt-ai-resize',height:Math.ceil(document.querySelector('main').getBoundingClientRect().height)},'https://funpay.com');}).observe(document.querySelector('main'));
+// Parent is either the funpay.com content page or an extension page (popup); never broadcast with '*'.
+const parentOrigin=(location.ancestorOrigins&&location.ancestorOrigins[0]===location.origin)?location.origin:'https://funpay.com';
+if(embedded)new ResizeObserver(()=>{window.parent.postMessage({type:'fpt-ai-resize',height:Math.ceil(document.querySelector('main').getBoundingClientRect().height)},parentOrigin);}).observe(document.querySelector('main'));
 const $ = id => document.getElementById(id);
 let busy = false;
 let connections = [];

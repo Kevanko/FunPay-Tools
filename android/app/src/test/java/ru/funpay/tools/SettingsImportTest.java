@@ -26,6 +26,13 @@ public class SettingsImportTest {
     @Test public void autoreplyTransferPreservesPortableOptionsWithoutRuntimeOrStock() throws Exception {
         JSONObject replies=new JSONObject().put("ignoreSystemMessages",true).put("onlyNewChats",true).put("greetingCooldownDays",7).put("greetingSendOrder","text-first").put("greetingImages",new JSONArray().put("data:image/png;base64,fixture")).put("reviewTemplates",new JSONObject().put("5","Спасибо")).put("lastHandledText",new JSONObject().put("1","private")).put("products",new JSONArray().put("secret-stock"));
         JSONObject safe=Settings.decode(file(new JSONObject().put("fpToolsAutoReplies",replies))).getJSONObject("fpToolsAutoReplies");assertTrue(safe.getBoolean("ignoreSystemMessages"));assertTrue(safe.getBoolean("onlyNewChats"));assertEquals(7,safe.getInt("greetingCooldownDays"));assertEquals("text-first",safe.getString("greetingSendOrder"));assertEquals(1,safe.getJSONArray("greetingImages").length());assertFalse(safe.has("lastHandledText"));assertFalse(safe.has("products"));
-        reject(new JSONObject().put("fpToolsAutoReplies",new JSONObject().put("onlyNewChats","yes")));reject(new JSONObject().put("fpToolsAutoReplies",new JSONObject().put("greetingCooldownDays",-1)));
+        // invalid reply fields are skipped, not fatal
+        JSONObject lenient=Settings.decode(file(new JSONObject().put("fpToolsAutoReplies",new JSONObject().put("onlyNewChats","yes").put("greetingCooldownDays",-1).put("greetingText","ok")))).getJSONObject("fpToolsAutoReplies");
+        assertFalse(lenient.has("onlyNewChats"));assertFalse(lenient.has("greetingCooldownDays"));assertEquals("ok",lenient.getString("greetingText"));
+    }
+    @Test public void clampsCooldownAndLongRepliesAndDefaultsCustomSoundWithoutData() throws Exception {
+        JSONObject safe=Settings.decode(file(new JSONObject().put("autoBumpCooldown",9999).put("notificationSound","custom").put("fpToolsAutoReplies",new JSONObject().put("keywords",new JSONArray().put(new JSONObject().put("keyword","").put("response","x")).put(new JSONObject().put("keyword","k").put("response","y".repeat(5000)))))));
+        assertEquals(240,safe.getInt("autoBumpCooldown"));assertEquals("default",safe.getString("notificationSound"));
+        JSONArray rules=safe.getJSONObject("fpToolsAutoReplies").getJSONArray("keywords");assertEquals(1,rules.length());assertEquals(5000,rules.getJSONObject(0).getString("response").length());
     }
 }

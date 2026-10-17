@@ -31,6 +31,7 @@ async function loadBuyerHistory(buyerUsername) {
 
 function renderHistoryPanel(orders, name, anchor) {
     document.getElementById('fp-buyer-hist-panel')?.remove();
+    const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
     const sums = {};
     for (const o of orders) {
@@ -48,19 +49,19 @@ function renderHistoryPanel(orders, name, anchor) {
         <div class="fp-bh-header">
             <div class="fp-bh-title">
                 <span class="fp-bh-icon"><span class="material-symbols-rounded" style="font-size:16px;vertical-align:-3px;">inventory_2</span></span>
-                <span>История покупок <strong>${name}</strong></span>
+                <span>История покупок <strong>${esc(name)}</strong></span>
             </div>
             <button class="fp-bh-close" title="Закрыть">✕</button>
         </div>
         <div class="fp-bh-meta">${orders.length} заказ${orders.length === 1 ? '' : (orders.length < 5 ? 'а' : 'ов')} · ${total}</div>
         <div class="fp-bh-list">
             ${orders.slice(0, 20).map(o => `
-                <a href="https://funpay.com/orders/${o.orderId}/" target="_blank" class="fp-bh-item">
-                    <div class="fp-bh-item-desc">${o.desc || o.orderId}</div>
+                <a href="https://funpay.com/orders/${encodeURIComponent(String(o.orderId).replace(/[^A-Za-z0-9_-]/g, ''))}/" target="_blank" rel="noopener" class="fp-bh-item">
+                    <div class="fp-bh-item-desc">${esc(o.desc || o.orderId)}</div>
                     <div class="fp-bh-item-meta">
-                        <span class="fp-bh-price">${o.price}</span>
+                        <span class="fp-bh-price">${esc(o.price)}</span>
                         <span class="fp-bh-dot">·</span>
-                        <span class="fp-bh-date">${o.date}</span>
+                        <span class="fp-bh-date">${esc(o.date)}</span>
                     </div>
                 </a>`).join('')}
         </div>`;
@@ -105,9 +106,12 @@ async function appendTranslation(msgTextEl) {
 
     const wrap = document.createElement('div');
     wrap.className = 'fp-trans-wrap';
-    wrap.innerHTML =
-        '<div class="fp-trans-divider"></div>' +
-        '<div class="fp-trans-text">' + translated + '</div>';
+    const divider = document.createElement('div');
+    divider.className = 'fp-trans-divider';
+    const textEl = document.createElement('div');
+    textEl.className = 'fp-trans-text';
+    textEl.textContent = translated;
+    wrap.append(divider, textEl);
 
     msgTextEl.appendChild(wrap);
 }

@@ -13,7 +13,7 @@
 const FPT_CLOUD_KEYS = [
     'fpToolsAutoReplies', 'reviewTemplates', 'fpToolsSlashCommands',
     'fpToolsTemplateSettings', 'fpToolsTheme', 'enableCustomTheme', 'notificationSound',
-    'notificationVolume', 'fpToolsCursorFx', 'keywords', 'greetingText',
+    'notificationVolume', 'fpToolsCursorFx',
     'autoBumpEnabled', 'autoBumpCooldown', 'fpToolsSmartBumpEnabled', 'fpToolsBumpNotifyEnabled',
     'fpToolsLiveStyles', 'enableRedesignedHomepage', 'showSalesStats', 'hideBalance',
     'viewSellersPromo', 'fpToolsDisabledFeatures', 'fpToolsHeaderButtonStyles',
@@ -150,6 +150,11 @@ async function _fptCloudApply(mergedS, delKeys) {
                 return (r && typeof r === 'object' && li && li.images !== undefined) ? { ...r, images: li.images } : r;
             });
         }
+    }
+    // the custom sound file itself never syncs: without local data 'custom' would be silent/broken
+    if (incoming.notificationSound === 'custom') {
+        const { fpToolsCustomSoundData: localSound } = await chrome.storage.local.get('fpToolsCustomSoundData');
+        if (!localSound) incoming.notificationSound = 'default';
     }
     const toRemove = (delKeys || []).filter(k => FPT_CLOUD_KEYSET.has(k));
     _fptCloudApplied = {}; _fptCloudAppliedUntil = Date.now() + 6000;

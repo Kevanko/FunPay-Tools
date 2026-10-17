@@ -314,17 +314,20 @@
 }
 /* Кнопки боковой панели - на 2% плотнее меню, чтобы выделялись, но тоже прозрачные */
 .fp-tools-popup.fpt-menu-transparent .fp-tools-nav li a {
-    background: var(--fpt-menu-navbtn, rgba(42,16,51,0.05)) !important;
+    background: var(--fpt-menu-navbtn, rgba(20,22,30,0.05)) !important;
     border: none !important;
-    outline: none !important;
     box-shadow: 0 4px 14px rgba(0,0,0,0.28) !important;
 }
+.fp-tools-popup.fpt-menu-transparent .fp-tools-nav li a:focus-visible {
+    outline: 2px solid var(--fpt-uacc, #5b86d8) !important;
+    outline-offset: -2px;
+}
 .fp-tools-popup.fpt-menu-transparent .fp-tools-nav li a:hover {
-    background: var(--fpt-menu-navactive, rgba(42,16,51,0.11)) !important;
+    background: var(--fpt-menu-navactive, rgba(20,22,30,0.11)) !important;
     box-shadow: 0 5px 16px rgba(0,0,0,0.32) !important;
 }
 .fp-tools-popup.fpt-menu-transparent .fp-tools-nav li.active a {
-    background: var(--fpt-menu-navactive, rgba(42,16,51,0.11)) !important;
+    background: var(--fpt-menu-navactive, rgba(20,22,30,0.11)) !important;
     box-shadow: 0 5px 16px rgba(0,0,0,0.34) !important;
 }
 /* Элементы внутри вкладок - такая же стеклянная подложка, как у кнопок боковой панели */
@@ -340,7 +343,7 @@
 .fp-tools-popup.fpt-menu-transparent .fp-tools-content input[type="search"],
 .fp-tools-popup.fpt-menu-transparent .fp-tools-content textarea,
 .fp-tools-popup.fpt-menu-transparent .fp-tools-content .checkbox-label-inline {
-    background: var(--fpt-menu-navbtn, rgba(42,16,51,0.05)) !important;
+    background: var(--fpt-menu-navbtn, rgba(20,22,30,0.05)) !important;
     border-radius: 10px;
     border: none !important;
     box-shadow: 0 2px 8px rgba(0,0,0,0.16) !important;
@@ -1512,6 +1515,10 @@
     outline: none;
     background: rgba(255, 255, 255, 0.1);
 }
+.ad-item-input:focus-visible {
+    outline: 2px solid var(--fpt-uacc, #5b86d8);
+    outline-offset: 1px;
+}
 
 .ad-item-controls {
     display: flex;
@@ -1667,12 +1674,8 @@
     --fp-radius: 12px;
 }
 
-html {
+html.fpt-custom-theme-on {
     scroll-behavior: smooth;
-}
-
-body:not(.funpay-redesigned) #content {
-    visibility: hidden;
 }
 
 body.funpay-redesigned {
@@ -2523,6 +2526,10 @@ body.funpay-redesigned .promo-games {
     background: var(--fpt-surface-3, rgba(255, 255, 255, 0.15));
 }
 
+.fp-tools-radio-option input[type="radio"]:focus-visible {
+    outline: 2px solid var(--fpt-uacc, #5b86d8);
+    outline-offset: 2px;
+}
 .fp-tools-radio-option input[type="radio"] {
     appearance: none;
     -webkit-appearance: none;
@@ -8177,6 +8184,7 @@ body.fpt-dnd-active .chat{ position:relative; }
 .fpt-ics-input{
     flex:1;min-width:0;background:transparent;border:none;outline:none;color:inherit;font-size:14px;padding:8px 2px;
 }
+.fpt-ics-input:focus-visible{ outline:2px solid var(--fpt-uacc, #5b86d8);outline-offset:2px;border-radius:4px; }
 .fpt-ics-input::placeholder{ color:inherit;opacity:.5; }
 .fpt-ics-count{ opacity:.6;font-size:12.5px;min-width:42px;text-align:center; }
 .fpt-ics-nav,.fpt-ics-close{

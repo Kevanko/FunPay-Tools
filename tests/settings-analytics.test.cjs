@@ -17,6 +17,10 @@ test('invalid schema rejects versions, pollution and invalid types before writes
     assert.throws(()=>schema.sanitize(JSON.parse('{"fpToolsTheme":{"__proto__":{"polluted":true}}}')));
     assert.throws(()=>schema.sanitize({fpToolsAutoReplies:{keywords:[{keyword:3,response:'bad'}]}}));
 });
+test('import decode skips one bad key instead of failing everything and reports it',()=>{
+    const r=schema.decode(JSON.stringify({_magic:'FPTCONFIG',_version:2,settings:{showSalesStats:'x',hideBalance:true,notificationSound:'custom'}}));
+    assert.deepEqual(r.skipped,['showSalesStats']);assert.equal(r.settings.hideBalance,true);assert.equal(r.settings.notificationSound,'default');
+});
 test('cloud stripping and AR allowlist prevent stock and unknown nested state leaks',()=>{
     const out=schema.sanitize({fpToolsTheme:{bgVideo:'binary',bgVideoData:'binary',primaryColor:'#fff'},fpToolsAutoReplies:{greetingText:'Привет',autoDeliveryLots:{password:'secret'},bonusSentOrderIds:['1']}},{cloud:true});
     assert.equal(out.fpToolsTheme.bgVideo,undefined);assert.deepEqual(out.fpToolsAutoReplies,{greetingText:'Привет'});
